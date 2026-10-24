@@ -1,0 +1,107 @@
+---
+id: notifications
+title: Notifications
+description: Send an ntfy push or a JSON webhook whenever an Outpost update cycle updates a container, finds a newer image, rolls back, or fails.
+sidebar_position: 3
+keywords:
+  - outpost
+  - notifications
+  - ntfy
+  - webhook
+  - alerts
+tags:
+  - features
+  - notifications
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Hear about updates, new images, and failures as they happen, and stay undisturbed when there is nothing to report.
+
+## Why Use This Feature?
+
+1. Tells you right away when an update was rolled back or failed so you can look before anyone notices.
+2. Lists new images for <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers so you know when to schedule a manual update.
+3. Stays silent when every container is current so the notifications you get are worth reading.
+
+## Setup
+
+Set one or both targets on the Outpost container:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    environment:
+      # ntfy topic, on ntfy.sh or your own server.
+      OUTPOST_NTFY_URL: "https://ntfy.example.com/outpost"
+      OUTPOST_NTFY_TOKEN: "tk_yourtoken"
+
+      # Any endpoint that accepts a JSON POST.
+      OUTPOST_WEBHOOK_URL: "https://hooks.example.com/outpost"
+```
+
+`OUTPOST_NTFY_TOKEN` is optional and only needed when the topic requires an access token.
+
+## When a Notification Is Sent
+
+Outpost sends one summary per <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and only when at least one container is `updated`, `available`, `rolled-back`, or `failed`. A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> where everything is `up-to-date` or `skipped` sends nothing.
+
+The summary lists only the containers that need attention, one per line:
+
+```text
+web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest
+api (ghcr.io/example/api:2): rolled-back - New container is unhealthy; rolled back to the previous container
+```
+
+## ntfy
+
+Outpost sends the summary as plain text in a `POST` to the topic URL, with these headers:
+
+| Header          | Value                                                             |
+|-----------------|-------------------------------------------------------------------|
+| `Title`         | `Outpost: 2 containers need attention`                            |
+| `Tags`          | `warning` when something rolled back or failed, otherwise `whale` |
+| `Priority`      | `high` when something rolled back or failed, otherwise `default`  |
+| `Authorization` | `Bearer <OUTPOST_NTFY_TOKEN>`, when a token is set                |
+
+ntfy shows the `warning` and `whale` tags as emoji, so a failed <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> stands out on your phone.
+
+## Webhook
+
+The webhook receives a JSON `POST` with the same title, message, tags, and priority, plus the full <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `payload`:
+
+```json title="Webhook body"
+{
+  "title": "Outpost: 1 container needs attention",
+  "message": "web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest",
+  "tags": ["whale"],
+  "priority": "default",
+  "payload": {
+    "startedAt": "2026-10-24T04:00:00.012Z",
+    "finishedAt": "2026-10-24T04:01:12.480Z",
+    "results": [
+      {
+        "container": "web",
+        "image": "ghcr.io/example/web:latest",
+        "status": "updated",
+        "detail": "Recreated with ghcr.io/example/web:latest"
+      },
+      {
+        "container": "postgres",
+        "image": "postgres:17",
+        "status": "up-to-date",
+        "detail": "sha256:9c1d..."
+      }
+    ]
+  }
+}
+```
+
+Unlike the message, `payload.results` includes every container in the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, so you can store or chart the full picture.
+
+## Delivery Failures
+
+A notification that fails, such as an unreachable URL or a non-2xx response, never affects the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. Outpost doesn't retry it, but it writes the error to the container log so you can fix the target.
+
+It is recommended to test a new URL by hand once, for example with `curl --data "test" https://ntfy.example.com/outpost`.

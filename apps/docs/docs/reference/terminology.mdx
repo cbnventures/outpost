@@ -1,0 +1,50 @@
+---
+id: terminology
+title: Terminology
+description: Define cycle, report, label mode, monitor-only, remote digest, recreation, rollback, and settle period as used throughout the Outpost documentation.
+sidebar_position: 3
+keywords:
+  - outpost
+  - glossary
+  - cycle
+  - rollback
+  - monitor-only
+  - label mode
+tags:
+  - reference
+  - glossary
+---
+
+Define the update, selection, and recovery terms that appear throughout the Outpost documentation.
+
+## Cycle
+
+One pass over all selected containers, started by the schedule or the API, producing one report. Only one cycle runs at a time.
+
+## Label Mode
+
+How Outpost picks containers. `opt-out` updates every container unless it is labeled off, and `opt-in` updates only containers labeled on.
+
+## Monitor-Only
+
+Reporting available updates without recreating containers. It can be turned on for every container or for single containers with a label.
+
+## Recreation
+
+Stopping a container, starting an identical one on the new image, and removing the old one once the new one is up. Settings, volumes, and networks carry over.
+
+## Remote Digest
+
+The manifest digest the registry reports for an image tag. Outpost compares it with the digest of the running image to decide whether an update exists without pulling.
+
+## Report
+
+The per-container results of a cycle. Each container is `updated`, `available`, `up-to-date`, `skipped`, `rolled-back`, or `failed`.
+
+## Rollback
+
+Removing a failed replacement and restarting the previous container under its original name. It happens when the new container stops, turns unhealthy, or doesn't become healthy in time.
+
+## Settle Period
+
+How long a container without a healthcheck must keep running before an update counts as successful. It is set with `OUTPOST_SETTLE_SECONDS`.

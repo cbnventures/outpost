@@ -1,0 +1,110 @@
+---
+id: labels-and-modes
+title: Labels and Modes
+description: Choose which containers Outpost updates with opt-out or opt-in label mode, and keep sensitive services monitor-only so you are told instead.
+sidebar_position: 1
+keywords:
+  - outpost
+  - labels
+  - opt-in
+  - opt-out
+  - monitor-only
+  - container selection
+tags:
+  - features
+  - labels
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Decide which containers Outpost updates, which it only watches, and which it leaves alone, using two container labels and two settings.
+
+## Why Use This Feature?
+
+1. Lets you update everything by default and carve out the few services that need care so a big host stays low-maintenance.
+2. Lets you start with nothing and opt services in one at a time so you build trust before Outpost touches anything important.
+3. Keeps databases and other sensitive services <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> so you hear about new images but choose when to apply them.
+
+## Labels
+
+| Label                                 | Value             | Effect                                                                                                                                                                               |
+|---------------------------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `io.cbnventures.outpost.enable`       | `true` or `false` | Opts a container in or out, depending on the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>. |
+| `io.cbnventures.outpost.monitor-only` | `true`            | Reports a newer image for this container without recreating it.                                                                                                                      |
+
+Values are matched exactly, so `True`, `yes`, or `1` have no effect.
+
+## Label Mode
+
+Set `OUTPOST_LABEL_MODE` to choose the starting point.
+
+### Opt-Out (Default)
+
+Every running container is checked unless it has `io.cbnventures.outpost.enable=false`:
+
+```yaml title="compose.yml"
+services:
+  postgres:
+    image: postgres:17
+    labels:
+      # Never touch the database.
+      io.cbnventures.outpost.enable: "false"
+```
+
+### Opt-In
+
+Only containers with `io.cbnventures.outpost.enable=true` are checked:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    environment:
+      OUTPOST_LABEL_MODE: "opt-in"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  web:
+    image: ghcr.io/example/web:latest
+    labels:
+      io.cbnventures.outpost.enable: "true"
+```
+
+Containers that are left out by the label rules don't appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> at all.
+
+## Monitor-Only
+
+A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container is checked like any other, but when a newer image exists it is reported as `available` instead of being recreated. You can turn it on in two ways:
+
+- **For one container** — Add `io.cbnventures.outpost.monitor-only: "true"` to it.
+- **For everything** — Set `OUTPOST_MONITOR_ONLY: "true"` on Outpost.
+
+```yaml title="compose.yml"
+services:
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    labels:
+      io.cbnventures.outpost.monitor-only: "true"
+```
+
+:::info
+When the registry can't report a digest, Outpost falls back to pulling the image to compare it. In that case a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container's new image is downloaded, but the container is still left as it is.
+:::
+
+## Containers Outpost Always Skips
+
+Some containers are never recreated, whatever their labels say. They appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `skipped` with a reason:
+
+| Container                                            | Reason shown                                   |
+|------------------------------------------------------|------------------------------------------------|
+| Outpost itself                                       | `Outpost does not update itself while running` |
+| Image pinned to a digest, such as `nginx@sha256:...` | `Image is pinned to a digest or ID`            |
+| `network_mode: container:...` or `service:...`       | `Shares another container's network namespace` |
+
+Stopped containers are not checked either, because Outpost only looks at running containers. To update Outpost itself, pull its image and recreate it like any other service, for example with `docker compose pull && docker compose up --detach`.
+
+## Dependency Order
+
+Within a Compose project, services listed under `depends_on` are checked and updated before the services that depend on them. A database is updated before the app that uses it, for example.
+
+Containers from different projects, or started without Compose, keep the order Docker lists them in.

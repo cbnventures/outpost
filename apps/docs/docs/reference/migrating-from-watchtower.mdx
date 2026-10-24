@@ -1,0 +1,95 @@
+---
+id: migrating-from-watchtower
+title: Migrating from Watchtower
+description: Map Watchtower environment variables, labels, and API endpoints to their Outpost equivalents, and see which Watchtower options have no counterpart.
+sidebar_position: 2
+keywords:
+  - outpost
+  - watchtower
+  - migration
+  - watchtower alternative
+  - labels
+  - environment variables
+tags:
+  - reference
+  - migration
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Move from Watchtower to Outpost by translating your settings and labels, and know up front which Watchtower options don't carry over.
+
+## Why Migrate?
+
+1. Gets automatic <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology> so an update that breaks a container no longer leaves it down.
+2. Keeps anonymous volume data and the new image's defaults through every <Terminology title="swapping a container onto the new image" to="/docs/reference/terminology#recreation">recreation</Terminology>.
+3. Runs the updater as a non-root user that only joins the Docker socket's group.
+4. Moves to a project that is actively maintained.
+
+## Migration Steps
+
+1. Stop and remove the Watchtower container so the two never update the same container at once.
+2. Translate its environment variables and your container labels with the tables below.
+3. Start Outpost with `OUTPOST_MONITOR_ONLY: "true"` and check the first <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>.
+4. Remove `OUTPOST_MONITOR_ONLY` once the results look right.
+
+## Environment Variables
+
+| Watchtower                             | Outpost                                     | Notes                                                                                                                                                          |
+|----------------------------------------|---------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `WATCHTOWER_SCHEDULE`                  | `OUTPOST_SCHEDULE`                          | Both use six-field cron with seconds, so the value carries over unchanged.                                                                                     |
+| `WATCHTOWER_POLL_INTERVAL`             | `OUTPOST_SCHEDULE`                          | No interval setting. Express it as cron, such as `0 0 */6 * * *`.                                                                                              |
+| `WATCHTOWER_RUN_ONCE`                  | None                                        | `OUTPOST_RUN_ON_START` runs at start, but Outpost keeps running afterwards.                                                                                    |
+| `WATCHTOWER_LABEL_ENABLE`              | `OUTPOST_LABEL_MODE=opt-in`                 |                                                                                                                                                                |
+| `WATCHTOWER_MONITOR_ONLY`              | `OUTPOST_MONITOR_ONLY`                      |                                                                                                                                                                |
+| `WATCHTOWER_CLEANUP`                   | `OUTPOST_CLEANUP`                           | Outpost cleans up by default. Set `false` to keep old images.                                                                                                  |
+| `WATCHTOWER_TIMEOUT`                   | `OUTPOST_STOP_TIMEOUT`                      | Whole seconds, such as `30`, not a duration like `30s`.                                                                                                        |
+| `WATCHTOWER_HTTP_API_TOKEN`            | `OUTPOST_API_TOKEN`                         |                                                                                                                                                                |
+| `WATCHTOWER_HTTP_API_UPDATE`           | `OUTPOST_API_TOKEN`                         | Setting the token enables the update endpoint.                                                                                                                 |
+| `WATCHTOWER_HTTP_API_METRICS`          | `OUTPOST_API_TOKEN`                         | Setting the token enables `/metrics`. Metric names differ.                                                                                                     |
+| `WATCHTOWER_HTTP_API_PERIODIC_POLLS`   | None                                        | Not needed. The schedule always runs alongside the API.                                                                                                        |
+| `WATCHTOWER_ROLLING_RESTART`           | None                                        | Not needed. Outpost always updates one container at a time.                                                                                                    |
+| `WATCHTOWER_NOTIFICATION_URL`          | `OUTPOST_NTFY_URL` or `OUTPOST_WEBHOOK_URL` | Only ntfy and JSON webhooks are supported, not every Shoutrrr service.                                                                                         |
+| `WATCHTOWER_NOTIFICATIONS`             | None                                        | Email, Slack, Teams, and Gotify have no built-in target.                                                                                                       |
+| `WATCHTOWER_INCLUDE_STOPPED`           | None                                        | Outpost checks running containers only.                                                                                                                        |
+| `WATCHTOWER_REVIVE_STOPPED`            | None                                        |                                                                                                                                                                |
+| `WATCHTOWER_INCLUDE_RESTARTING`        | None                                        |                                                                                                                                                                |
+| `WATCHTOWER_NO_PULL`                   | None                                        |                                                                                                                                                                |
+| `WATCHTOWER_NO_RESTART`                | None                                        |                                                                                                                                                                |
+| `WATCHTOWER_SCOPE`                     | None                                        | Run one Outpost per host and use labels instead.                                                                                                               |
+| `WATCHTOWER_DISABLE_CONTAINERS`        | None                                        | Label those containers `io.cbnventures.outpost.enable=false`.                                                                                                  |
+| `WATCHTOWER_LIFECYCLE_HOOKS`           | None                                        | Pre-update and post-update commands are not supported.                                                                                                         |
+| `WATCHTOWER_DEBUG`, `WATCHTOWER_TRACE` | None                                        | Outpost logs one line per container per <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. |
+| `REPO_USER`, `REPO_PASS`               | None                                        | Put the login in a mounted `config.json` instead.                                                                                                              |
+| `DOCKER_HOST`                          | `DOCKER_HOST`                               | Unix sockets and plain `tcp://` only.                                                                                                                          |
+| `DOCKER_TLS_VERIFY`                    | None                                        | TLS connections to the Docker daemon are not supported.                                                                                                        |
+| `DOCKER_CONFIG`                        | `DOCKER_CONFIG`                             | Outpost reads `config.json` from this directory, `/config` by default.                                                                                         |
+
+Container names passed as arguments, such as `watchtower nginx redis`, have no equivalent. It is recommended to use <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">opt-in mode</Terminology> with labels instead.
+
+## Labels
+
+| Watchtower                                    | Outpost                               | Notes                                                                                                                                                                  |
+|-----------------------------------------------|---------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `com.centurylinklabs.watchtower.enable`       | `io.cbnventures.outpost.enable`       | Same values: `true` or `false`.                                                                                                                                        |
+| `com.centurylinklabs.watchtower.monitor-only` | `io.cbnventures.outpost.monitor-only` | `true` makes the container <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>. |
+| `com.centurylinklabs.watchtower.depends-on`   | None                                  | Compose `depends_on` is read automatically.                                                                                                                            |
+| `com.centurylinklabs.watchtower.scope`        | None                                  |                                                                                                                                                                        |
+| `com.centurylinklabs.watchtower.no-pull`      | None                                  |                                                                                                                                                                        |
+| `com.centurylinklabs.watchtower.stop-signal`  | None                                  | Docker uses the container's own stop signal.                                                                                                                           |
+| `com.centurylinklabs.watchtower.lifecycle.*`  | None                                  | Lifecycle hooks are not supported.                                                                                                                                     |
+
+Outpost ignores Watchtower labels entirely. You can keep them while you migrate, but they have no effect.
+
+## API and Metrics
+
+- **Update** — Watchtower's `/v1/update` becomes `POST /v1/update`, which returns `202` or `409` instead of waiting for the run to finish.
+- **Status** — `GET /v1/status` is new and returns the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as JSON.
+- **Metrics** — `/metrics` uses `outpost_*` names, so dashboards and alerts built on `watchtower_*` metrics need updating. See [HTTP API and Metrics](/docs/features/http-api-and-metrics/#metrics) for the list.
+
+## Behavior Differences
+
+- **Rollback** — A new container that stops or turns unhealthy is replaced by the previous one.
+- **Cleanup default** — Old images are removed after an update unless you set `OUTPOST_CLEANUP=false`.
+- **Shared network namespaces** — Containers with `network_mode: container:...` or `service:...` are skipped and need updating by hand.
+- **Credential helpers** — `credsStore` and `credHelpers` are not supported; see [Private Registries](/docs/getting-started/private-registries/#credential-helpers-are-not-supported).

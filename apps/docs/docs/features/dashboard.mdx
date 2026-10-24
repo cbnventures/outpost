@@ -1,0 +1,150 @@
+---
+id: dashboard
+title: Web Dashboard
+description: See Outpost's status, every running container, and the last 50 checks in a password-protected web dashboard, and start a check with one click.
+sidebar_position: 5
+keywords:
+  - outpost
+  - web dashboard
+  - admin
+  - sign in
+  - docker secret
+  - update history
+tags:
+  - features
+  - dashboard
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Check on Outpost from your browser, see which containers it manages and why, and start a check without touching the command line.
+
+## Why Use the Dashboard?
+
+1. Shows the status, the next scheduled check, and the latest results on one page so you don't have to read container logs.
+2. Explains why each running container is or isn't managed so a missing update is easy to trace back to a label.
+3. Keeps the last 50 checks on disk so you can see what changed overnight, even after Outpost restarts.
+4. Starts a check for everything or for a single container with one click, without setting up an API token.
+
+## What It Shows
+
+The dashboard has four sections:
+
+- **Overview** — The current status (idle or checking), how many containers are managed, when the last check finished, and when the next one is due. A **Check now** button starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and the results of the last check appear below.
+- **Containers** — Every running container with its image and last result. Each row says whether it's managed, and if not, why: `Opted out by label`, `Not opted in`, or `Outpost itself`.
+- **History** — The last 50 checks, newest first. Each entry shows counts per status and expands to the per-container results.
+- **Settings** — A read-only list of the active configuration. Secrets such as `OUTPOST_API_TOKEN` and `OUTPOST_NTFY_TOKEN` appear only as `Set` or `Not set`.
+
+### Checking a Single Container
+
+Managed containers have their own button in the **Containers** section:
+
+- **Check & update** — Checks that container and updates it when a newer image exists.
+- **Check** — Shown for <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers, which are only checked and never recreated.
+
+A single-container check is a short <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> of its own. Its <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> lists only that container, and it is saved to the history like any other.
+
+:::info
+Only one <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs at a time. If the schedule or the API already started one, the dashboard shows `A check is already running.` instead of starting another.
+:::
+
+### Theme
+
+A toggle in the header switches between the system, light, and dark themes. The choice is kept in your browser, so each browser remembers its own.
+
+## Enable the Dashboard
+
+The dashboard is always served at `/admin/`, and `/` redirects there. It stays locked until you give Outpost an administrator password.
+
+It is recommended to keep the password in a file and pass it as a Docker secret, so it doesn't show up in `docker inspect`:
+
+```bash
+openssl rand -base64 24 > ./outpost-admin-password.txt
+```
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    environment:
+      OUTPOST_ADMIN_USERNAME: "admin"
+      OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
+    secrets:
+      - outpost_admin_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # Keeps the dashboard history across restarts.
+      - outpost-data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+secrets:
+  outpost_admin_password:
+    file: ./outpost-admin-password.txt
+
+volumes:
+  outpost-data:
+```
+
+- **Password file** — Leading and trailing whitespace, including the final newline, is ignored.
+- **Plain variable** — `OUTPOST_ADMIN_PASSWORD` works too, but it is only used when `OUTPOST_ADMIN_PASSWORD_FILE` is unset.
+- **Startup check** — If the file can't be read or is empty, Outpost stops at startup and names the file in the log.
+
+When no password is set, the startup log shows `Dashboard: http://localhost:3000/admin/ (locked: set OUTPOST_ADMIN_PASSWORD_FILE)`, and the sign-in page explains how to unlock it.
+
+### Keep the History
+
+The last 50 <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">reports</Terminology> are saved to `history.json` in the data directory, which is `/data` by default. Mount a volume at `/data` so the history survives when the container is recreated.
+
+Without a volume, the history lives in the container's own filesystem and is lost whenever the container is replaced. See [Configuration](/docs/getting-started/configuration/#dashboard) for `OUTPOST_DATA_DIRECTORY`.
+
+## Sign In
+
+Open `http://localhost:3000/admin/` and sign in with `OUTPOST_ADMIN_USERNAME` (`admin` by default) and the password.
+
+- **One administrator** — There is a single account. The username and password come only from the environment.
+- **Idle timeout** — A session ends after 30 minutes without requests. An open dashboard tab refreshes itself every 30 seconds, which keeps its session alive.
+- **Restarts** — Sessions are kept in memory, so restarting Outpost signs everyone out.
+- **Failed sign-ins** — After 10 failed sign-ins from one address within 15 minutes, further attempts from that address are refused with `429` until the window passes.
+
+:::info
+The dashboard login is separate from `OUTPOST_API_TOKEN`. The token still guards `/v1/update`, `/v1/status`, and `/metrics`, and a dashboard session doesn't unlock them. See [HTTP API and Metrics](/docs/features/http-api-and-metrics/).
+:::
+
+## Security Notes
+
+The dashboard can start updates on your Docker host, so it is worth protecting like SSH access:
+
+- **Network exposure** — It is recommended to keep the port bound to `127.0.0.1` and reach it through a VPN or SSH tunnel. If you expose it beyond localhost, put it behind HTTPS.
+- **Cookie** — The session cookie `outpost_session` is `HttpOnly`, `SameSite=Strict`, and limited to `/admin`. Changes such as starting a check also need a per-session CSRF token in the `X-CSRF-Token` header.
+- **Page hardening** — Dashboard pages send a strict Content Security Policy and refuse to be framed.
+
+## Behind a Reverse Proxy
+
+Outpost itself serves plain HTTP. When a reverse proxy in front of it terminates HTTPS, set `OUTPOST_TRUST_PROXY` to `true` so Outpost reads the `X-Forwarded-For` and `X-Forwarded-Proto` headers from that one proxy.
+
+- The session cookie is then marked `Secure`, because Outpost knows the browser used HTTPS.
+- The sign-in limit then counts each client's real address instead of the proxy's.
+
+:::warning
+Only set `OUTPOST_TRUST_PROXY` when a proxy you control sits directly in front of Outpost. Without a proxy, any client could forge those headers to dodge the sign-in limit.
+:::
+
+## Dashboard API
+
+The dashboard page talks to a JSON API under `/admin/api`. It is built for the dashboard itself, and the [HTTP API](/docs/features/http-api-and-metrics/) is the stable choice for scripts.
+
+| Method   | Path                    | Description                                                                                                                                            |
+|----------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`    | `/admin/api/session`    | Whether the dashboard is enabled and whether you're signed in.                                                                                         |
+| `POST`   | `/admin/api/session`    | Signs in with `{"username":"...","password":"..."}` and sets the session cookie.                                                                       |
+| `DELETE` | `/admin/api/session`    | Signs out. Needs the CSRF token.                                                                                                                       |
+| `GET`    | `/admin/api/overview`   | Status, next run, latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>, and mode. |
+| `GET`    | `/admin/api/containers` | Running containers, whether each is managed, and its last result.                                                                                      |
+| `GET`    | `/admin/api/history`    | Saved <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">reports</Terminology>, newest first.               |
+| `GET`    | `/admin/api/settings`   | The active configuration, with secrets shown as `Set` or `Not set`.                                                                                    |
+| `POST`   | `/admin/api/run`        | Starts a check. Send `{"containerId":"..."}` to check one container. Needs the CSRF token.                                                             |
+
+Every endpoint except `/admin/api/session` returns `401` without a valid session. `POST /admin/api/run` returns `202` when a check started and `409` when one is already running.

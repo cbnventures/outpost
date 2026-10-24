@@ -1,0 +1,46 @@
+{
+  "name": "outpost-docs",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nova utility run-scripts --parallel --node-env development \"dev:*\"",
+    "dev:start": "docusaurus start --port 3000",
+    "prod": "nova utility run-scripts --sequential --node-env production \"prod:*\"",
+    "prod:serve": "docusaurus serve --port 3000",
+    "check": "nova utility run-scripts --sequential \"check:*\"",
+    "check:lint": "eslint ./ --max-warnings=0",
+    "check:types": "nova utility type-check --project tsconfig.json",
+    "check:test": "vitest run",
+    "build": "nova utility run-scripts --sequential --node-env production \"build:*\"",
+    "build:site": "docusaurus build",
+    "clean": "nova utility run-scripts --parallel \"clean:*\"",
+    "clean:build": "shx rm -rf ./build",
+    "clean:clear": "docusaurus clear",
+    "i18n": "nova utility run-scripts --sequential \"i18n:*\"",
+    "i18n:sync": "theme-nova i18n sync",
+    "i18n:check": "theme-nova i18n check",
+    "i18n:coverage": "theme-nova i18n coverage"
+  },
+  "engines": {
+    "node": "^22 || ^24"
+  },
+  "dependencies": {
+    "@cbnventures/docusaurus-preset-nova": "0.33.0",
+    "@cbnventures/nova": "0.33.0",
+    "@docusaurus/core": "3.10.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/types": "3.10.2",
+    "@types/node": "24.9.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "9.39.5",
+    "glob": "13.0.6",
+    "shx": "0.4.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

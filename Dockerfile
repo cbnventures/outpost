@@ -1,0 +1,98 @@
+# syntax=docker/dockerfile:1
+
+##################################
+#### Step 1: Build Workspaces ####
+##################################
+FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS build
+WORKDIR /workspace
+COPY packages/docker/build-package.json ./package.json
+COPY packages/docker/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# This package manager does not need generated build configuration.
+COPY ["packages/docker/workspace-manifests/packages/docker-engine/package.json","packages/docker-engine/package.json"]
+COPY ["packages/docker/workspace-manifests/packages/registry/package.json","packages/registry/package.json"]
+COPY ["packages/docker/workspace-manifests/packages/notifiers/package.json","packages/notifiers/package.json"]
+COPY ["packages/docker/workspace-manifests/packages/updater/package.json","packages/updater/package.json"]
+COPY ["packages/docker/workspace-manifests/apps/server/package.json","apps/server/package.json"]
+RUN corepack enable npm && npm install
+COPY ["packages/docker-engine","packages/docker-engine"]
+COPY ["packages/docker/workspace-manifests/packages/docker-engine/package.json","packages/docker-engine/package.json"]
+COPY ["packages/registry","packages/registry"]
+COPY ["packages/docker/workspace-manifests/packages/registry/package.json","packages/registry/package.json"]
+COPY ["packages/notifiers","packages/notifiers"]
+COPY ["packages/docker/workspace-manifests/packages/notifiers/package.json","packages/notifiers/package.json"]
+COPY ["packages/updater","packages/updater"]
+COPY ["packages/docker/workspace-manifests/packages/updater/package.json","packages/updater/package.json"]
+COPY ["apps/server","apps/server"]
+COPY ["packages/docker/workspace-manifests/apps/server/package.json","apps/server/package.json"]
+RUN npm run build --workspace='outpost-package-docker-engine'
+RUN npm run build --workspace='outpost-package-registry'
+RUN npm run build --workspace='outpost-package-notifiers'
+RUN npm run build --workspace='outpost-package-updater'
+RUN npm run build --workspace='outpost-app-server'
+RUN npm prune --omit=dev && npm cache clean --force
+RUN mkdir -p /runtime \
+  && cp -a . /runtime/
+
+####################################
+#### Step 2: Install s6-overlay ####
+####################################
+FROM debian:trixie-20261005-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f AS s6-overlay
+ARG DEBIAN_FRONTEND="noninteractive"
+ARG TARGETARCH
+ARG S6_OVERLAY_VERSION="3.2.3.2"
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    xz-utils \
+  && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+  case "${TARGETARCH}" in \
+    "amd64") s6_architecture="x86_64" ;; \
+    "arm64") s6_architecture="aarch64" ;; \
+    *) echo "Unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac; \
+  mkdir -p /s6-rootfs; \
+  for archive_name in "s6-overlay-noarch.tar.xz" "s6-overlay-${s6_architecture}.tar.xz"; do \
+    release_url="https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}"; \
+    curl --fail --location --silent --show-error \
+      --output "/tmp/${archive_name}" \
+      "${release_url}/${archive_name}"; \
+    curl --fail --location --silent --show-error \
+      --output "/tmp/${archive_name}.sha256" \
+      "${release_url}/${archive_name}.sha256"; \
+    cd /tmp; \
+    sha256sum -c "${archive_name}.sha256"; \
+    tar -C /s6-rootfs -Jxpf "/tmp/${archive_name}"; \
+    rm -f "/tmp/${archive_name}" "/tmp/${archive_name}.sha256"; \
+  done
+
+###############################
+#### Step 3: Runtime Image ####
+###############################
+FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS runtime
+ARG DEBIAN_FRONTEND="noninteractive"
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production \
+  DOCKER_CONFIG=/config \
+  PGID=1000 \
+  PUID=1000 \
+  TZ=UTC
+WORKDIR /app
+COPY --from=s6-overlay /s6-rootfs/ /
+COPY packages/docker/rootfs/ /
+RUN find /usr/local/libexec/nova-docker -type f -exec sed -i 's/\r$//' {} \; \
+  && find /usr/local/libexec/nova-docker -type f -exec chmod 0755 {} \; \
+  && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec sed -i 's/\r$//' {} \; \
+  && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod 0755 {} \;
+COPY --from=build /runtime/ /app/
+RUN mkdir -p '/data'
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["/usr/local/libexec/nova-docker/healthcheck"]
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/init"]

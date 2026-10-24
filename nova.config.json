@@ -1,0 +1,711 @@
+{
+  "project": {
+    "name": {
+      "title": "Outpost",
+      "slug": "outpost"
+    },
+    "description": {
+      "short": "Self-hosted container auto-updater for Docker, a modern Watchtower replacement",
+      "long": "Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, ntfy and webhook notifications, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image."
+    },
+    "keywords": [
+      "docker",
+      "watchtower",
+      "container",
+      "auto-update",
+      "self-hosted",
+      "homelab",
+      "devops"
+    ],
+    "legalName": "CBN Ventures LLC",
+    "pronouns": "business",
+    "platforms": [
+      "nodejs",
+      "docker",
+      "web"
+    ],
+    "startingYear": 2026,
+    "license": "MIT"
+  },
+  "entities": [
+    {
+      "name": "CBN Ventures",
+      "email": "contact@cbnventures.io",
+      "url": "https://www.cbnventures.io/",
+      "roles": [
+        "author"
+      ]
+    },
+    {
+      "name": "Jacky Liang",
+      "email": "hello@mrjackyliang.com",
+      "url": "https://www.mrjackyliang.com/",
+      "roles": [
+        "contributor",
+        "supporter"
+      ]
+    }
+  ],
+  "emails": {
+    "bugs": "bugs@cbnventures.io"
+  },
+  "github": {
+    "owner": "cbnventures",
+    "repo": "outpost",
+    "topics": [
+      "docker",
+      "watchtower",
+      "watchtower-alternative",
+      "container",
+      "auto-update",
+      "self-hosted",
+      "homelab",
+      "typescript"
+    ],
+    "features": {
+      "issues": true,
+      "wiki": false,
+      "projects": false,
+      "discussions": false,
+      "sponsorships": true
+    },
+    "policies": {
+      "visibility": "public",
+      "defaultBranch": "main",
+      "mergeMethods": {
+        "merge": true,
+        "squash": true,
+        "rebase": true
+      },
+      "mergeCommit": {
+        "title": "merge-message",
+        "message": "pull-request-title"
+      },
+      "squashMerge": {
+        "title": "commit-or-pull-request-title",
+        "message": "commit-messages"
+      },
+      "autoDeleteHeadBranch": true,
+      "autoMerge": false,
+      "allowUpdateBranch": false,
+      "webCommitSignoffRequired": false
+    },
+    "security": {
+      "vulnerabilityAlerts": true,
+      "dependabotSecurityUpdates": false,
+      "secretScanning": true,
+      "pushProtection": true
+    },
+    "rulesets": {
+      "defaultBranch": {
+        "enforcement": "active",
+        "blockDeletions": true,
+        "blockForcePushes": true,
+        "requireLinearHistory": false,
+        "requireSignedCommits": true,
+        "requirePullRequest": false,
+        "requiredStatusChecks": [],
+        "requireBranchesToBeUpToDate": false
+      }
+    },
+    "actions": {
+      "enabled": true,
+      "allowedActions": "all",
+      "shaPinningRequired": false,
+      "defaultWorkflowPermissions": "read",
+      "canApprovePullRequestReviews": false,
+      "artifactRetentionDays": 7
+    },
+    "labels": [
+      {
+        "name": "bug",
+        "color": "d73a4a",
+        "description": "Something isn't working"
+      },
+      {
+        "name": "documentation",
+        "color": "0075ca",
+        "description": "Improvements or additions to documentation"
+      },
+      {
+        "name": "duplicate",
+        "color": "cfd3d7",
+        "description": "This issue or pull request already exists"
+      },
+      {
+        "name": "enhancement",
+        "color": "a2eeef",
+        "description": "New feature or request"
+      },
+      {
+        "name": "good first issue",
+        "color": "7057ff",
+        "description": "Good for newcomers"
+      },
+      {
+        "name": "help wanted",
+        "color": "008672",
+        "description": "Extra attention is needed"
+      },
+      {
+        "name": "invalid",
+        "color": "e4e669",
+        "description": "This doesn't seem right"
+      },
+      {
+        "name": "question",
+        "color": "d876e3",
+        "description": "Further information is requested"
+      },
+      {
+        "name": "wontfix",
+        "color": "ffffff",
+        "description": "This will not be worked on"
+      }
+    ],
+    "issueTemplate": {
+      "bugReportFields": [
+        "nodejs"
+      ]
+    }
+  },
+  "workflows": [
+    {
+      "template": "check-sponsor-gated-issues",
+      "name": "sponsor-check",
+      "triggers": [
+        "issue-comment",
+        "issues"
+      ],
+      "runsOn": "ubuntu-latest",
+      "timeoutMinutes": 5
+    },
+    {
+      "template": "lock-inactive-issues",
+      "name": "lock-inactive",
+      "triggers": [
+        "schedule-weekly"
+      ],
+      "runsOn": "ubuntu-latest",
+      "timeoutMinutes": 5
+    },
+    {
+      "template": "publish",
+      "name": "project",
+      "triggers": [
+        "release"
+      ],
+      "runsOn": "ubuntu-latest",
+      "timeoutMinutes": 45,
+      "build": [
+        "./apps/docs"
+      ],
+      "deploy": [
+        {
+          "to": "docker-hub",
+          "path": "./",
+          "with": {
+            "IMAGE_NAMESPACE": "cbnventures",
+            "IMAGE_REPOSITORY": "outpost"
+          }
+        },
+        {
+          "to": "ghcr",
+          "path": "./",
+          "with": {
+            "IMAGE_REPOSITORY": "outpost"
+          }
+        },
+        {
+          "to": "cloudflare-pages-docusaurus",
+          "path": "./apps/docs"
+        }
+      ]
+    }
+  ],
+  "urls": {
+    "homepage": "https://outpost.cbnventures.io/",
+    "repository": "git+https://github.com/cbnventures/outpost.git",
+    "bugs": "https://github.com/cbnventures/outpost/issues",
+    "license": "https://github.com/cbnventures/outpost/blob/HEAD/LICENSE",
+    "logo": "https://outpost.cbnventures.io/images/logo.svg",
+    "documentation": "https://outpost.cbnventures.io/",
+    "docker": "https://hub.docker.com/r/cbnventures/outpost",
+    "fundSources": [
+      "https://github.com/sponsors/cbnventures",
+      "https://www.paypal.com/biz/profile/cbnventures"
+    ],
+    "privacyPolicy": "https://www.cbnventures.io/privacy/",
+    "termsOfUse": "https://www.cbnventures.io/terms/"
+  },
+  "readme": {
+    "badges": [
+      "docker-pulls",
+      "docker-image-size",
+      "github-release",
+      "github-top-language",
+      "github-license",
+      "funding"
+    ]
+  },
+  "workspaces": {
+    "./": {
+      "role": "project",
+      "policy": "freezable",
+      "name": "outpost-project"
+    },
+    "./apps/docs": {
+      "role": "docs",
+      "policy": "freezable",
+      "name": "outpost-docs"
+    },
+    "./apps/server": {
+      "role": "app",
+      "policy": "trackable",
+      "name": "outpost-app-server"
+    },
+    "./packages/docker-engine": {
+      "role": "package",
+      "policy": "trackable",
+      "name": "outpost-package-docker-engine"
+    },
+    "./packages/notifiers": {
+      "role": "package",
+      "policy": "trackable",
+      "name": "outpost-package-notifiers"
+    },
+    "./packages/registry": {
+      "role": "package",
+      "policy": "trackable",
+      "name": "outpost-package-registry"
+    },
+    "./packages/updater": {
+      "role": "package",
+      "policy": "trackable",
+      "name": "outpost-package-updater"
+    },
+    "./packages/docker": {
+      "role": "tool",
+      "policy": "freezable",
+      "name": "outpost-tool-docker"
+    }
+  },
+  "ignoreFiles": {
+    "./.gitignore": {
+      "bundles": [
+        "nova"
+      ],
+      "patterns": [
+        "/assets/",
+        "graphify-out/",
+        "outpost-admin-password.txt"
+      ]
+    },
+    "./.dockerignore": {
+      "bundles": [
+        "nova"
+      ],
+      "patterns": [
+        "outpost-admin-password.txt"
+      ]
+    }
+  },
+  "agents": [
+    "claude-code",
+    "codex"
+  ],
+  "recipes": {
+    "github": {
+      "sync-actions": {
+        "enabled": true
+      },
+      "sync-features": {
+        "enabled": true
+      },
+      "sync-identity": {
+        "enabled": true
+      },
+      "sync-labels": {
+        "enabled": true
+      },
+      "sync-policies": {
+        "enabled": true
+      },
+      "sync-rulesets": {
+        "enabled": true
+      },
+      "sync-security": {
+        "enabled": true
+      }
+    },
+    "license": {
+      "update-copyright": {
+        "enabled": true
+      }
+    },
+    "miscellaneous": {
+      "fix-markdown-tables": {
+        "enabled": true
+      },
+      "remove-operating-system-files": {
+        "enabled": true,
+        "settings": {
+          "linux": {},
+          "macos": {
+            "appleDouble": true,
+            "desktopServicesStore": true
+          },
+          "windows": {
+            "enhancedThumbnailDatabase": true,
+            "enhancedVistaThumbnailDatabase": true,
+            "thumbnailDatabase": true
+          }
+        }
+      }
+    },
+    "nova-config": {
+      "normalize-order": {
+        "enabled": true
+      }
+    },
+    "read-me": {
+      "update-badges": {
+        "enabled": true
+      },
+      "update-credits": {
+        "enabled": true
+      },
+      "update-documentation": {
+        "enabled": true
+      },
+      "update-header": {
+        "enabled": true
+      },
+      "update-introduction": {
+        "enabled": true
+      }
+    },
+    "package-json": {
+      "./": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./apps/docs": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./apps/server": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./packages/docker-engine": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./packages/notifiers": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./packages/registry": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./packages/updater": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "environment": {
+    "project": {
+      "prefix": "PROJECT_"
+    },
+    "workspaces": {
+      "./": {
+        "prefix": "ROOT_"
+      },
+      "./apps/docs": {
+        "prefix": "DOCS_"
+      },
+      "./apps/server": {
+        "prefix": "SERVER_"
+      }
+    },
+    "workflows": {
+      "sponsor-check": {
+        "prefix": "SGS_"
+      }
+    }
+  },
+  "settings": {
+    "lockStepVersioning": true,
+    "runWorkspaces": {
+      "cache": {
+        "enabled": true,
+        "directory": "./node_modules/.cache/nova/run-workspaces",
+        "scripts": [
+          "build",
+          "check"
+        ]
+      },
+      "concurrency": {
+        "build": 2,
+        "check": 2,
+        "deploy": 2
+      }
+    },
+    "versionStrategy": "semver"
+  }
+}

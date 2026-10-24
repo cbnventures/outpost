@@ -1,0 +1,169 @@
+---
+id: quick-start
+title: Quick Start
+description: Run the Outpost container with docker run or Docker Compose, confirm it can reach the Docker socket, and trigger a first update check right away.
+sidebar_position: 1
+keywords:
+  - outpost
+  - quick start
+  - installation
+  - docker run
+  - docker compose
+tags:
+  - quickstart
+  - installation
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Start Outpost next to your other containers and let it check them for new images every night.
+
+## Prerequisites
+
+- **Docker Engine** — On Linux, for `amd64` or `arm64`.
+- **Docker socket** — Outpost talks to Docker through `/var/run/docker.sock`, which you mount into the container.
+- **A user ID and group ID** — Outpost runs as `PUID` and `PGID` (both `1000` by default) and joins the socket's group on its own.
+
+## Pick an Image
+
+The same multi-platform image is published to two registries:
+
+- `cbnventures/outpost` on [Docker Hub](https://hub.docker.com/r/cbnventures/outpost)
+- `ghcr.io/cbnventures/outpost` on the GitHub Container Registry
+
+## Start Outpost
+
+<Tabs groupId="deployment-method">
+  <TabItem value="compose" label="Docker Compose" default>
+
+    ```bash
+    # Create the dashboard password once, next to compose.yml.
+    openssl rand -base64 24 > ./outpost-admin-password.txt
+    ```
+
+    ```yaml title="compose.yml"
+    services:
+      outpost:
+        image: cbnventures/outpost:latest
+        container_name: outpost
+        environment:
+          PUID: "1000"
+          PGID: "1000"
+          TZ: "America/New_York"
+
+          # Six-field cron (with seconds). Default: every day at 04:00.
+          OUTPOST_SCHEDULE: "0 0 4 * * *"
+          OUTPOST_LABEL_MODE: "opt-out"
+
+          # Unlocks the dashboard at http://localhost:3000/admin/.
+          OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
+        secrets:
+          - outpost_admin_password
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+
+          # Keeps the dashboard history across restarts.
+          - outpost-data:/data
+        ports:
+          - "127.0.0.1:3000:3000"
+        restart: unless-stopped
+
+    secrets:
+      outpost_admin_password:
+        file: ./outpost-admin-password.txt
+
+    volumes:
+      outpost-data:
+    ```
+
+    ```bash
+    docker compose up --detach
+    ```
+
+  </TabItem>
+  <TabItem value="docker-run" label="docker run">
+
+    ```bash
+    docker run --detach \
+      --name outpost \
+      --restart unless-stopped \
+      --env PUID=1000 \
+      --env PGID=1000 \
+      --env TZ=America/New_York \
+      --volume /var/run/docker.sock:/var/run/docker.sock \
+      --volume outpost-data:/data \
+      --publish 127.0.0.1:3000:3000 \
+      cbnventures/outpost:latest
+    ```
+
+    Plain `docker run` has no secrets, so the dashboard starts locked. See [Web Dashboard](/docs/features/dashboard/#enable-the-dashboard) for how to unlock it.
+
+  </TabItem>
+</Tabs>
+
+With these settings, Outpost checks every running container at 04:00 in your time zone. New images are pulled and the containers are recreated on them.
+
+:::warning
+Outpost recognizes its own container through the hostname Docker assigns it, so it never updates itself mid-run. It is recommended not to set a custom `hostname` on the Outpost container.
+:::
+
+## Check That It Started
+
+Read the container logs:
+
+```bash
+docker logs outpost
+```
+
+A healthy start prints the dashboard address, the schedule with its next run time, and the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>:
+
+```text
+Outpost
+  Dashboard: http://localhost:3000/admin/
+  Schedule: 0 0 4 * * * (next run 2026-10-25T04:00:00.000Z)
+  Mode: opt-out
+```
+
+When no dashboard password is set, the dashboard line ends with `(locked: set OUTPOST_ADMIN_PASSWORD_FILE)`.
+
+If Outpost can't reach the Docker socket, the server stops before printing this and the error repeats in the logs. See [Troubleshooting](/docs/reference/troubleshooting/#permission-denied-on-the-docker-socket) for the fix.
+
+## Open the Dashboard
+
+Open [http://localhost:3000/admin/](http://localhost:3000/admin/) on the Docker host and sign in as `admin` with the password from `outpost-admin-password.txt`. The dashboard shows every running container, the next scheduled check, and the results of past checks.
+
+## Run a First Check Now
+
+You don't have to wait for the schedule. Pick one of these:
+
+- **Use the dashboard** — Select **Check now** on the overview.
+- **Check on every start** — Set `OUTPOST_RUN_ON_START: "true"` and restart the container.
+- **Trigger it over HTTP** — Set `OUTPOST_API_TOKEN`, publish port `3000`, and call the update endpoint as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#trigger-an-update).
+
+```bash
+curl --request POST \
+  --header "Authorization: Bearer your-long-random-token" \
+  http://127.0.0.1:3000/v1/update
+```
+
+Each container gets one line in the logs when the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes:
+
+```text
+postgres (postgres:17): up-to-date - sha256:9c1d...
+web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest
+outpost (cbnventures/outpost:latest): skipped - Outpost does not update itself while running
+```
+
+:::tip
+To try Outpost without changing anything, set `OUTPOST_MONITOR_ONLY: "true"` first. Outpost then only reports which containers have a newer image.
+:::
+
+## What Is Next
+
+- **[Configuration](/docs/getting-started/configuration/)** — Every environment variable and its default.
+- **[Web Dashboard](/docs/features/dashboard/)** — Sign-in, sessions, and security notes for the dashboard.
+- **[Labels and Modes](/docs/features/labels-and-modes/)** — Opt containers in or out, or keep them <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.
+- **[Notifications](/docs/features/notifications/)** — Get told when something was updated or failed.
+- **[Private Registries](/docs/getting-started/private-registries/)** — Check images that need a login.

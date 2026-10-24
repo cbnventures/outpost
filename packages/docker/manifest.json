@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "services": [
+    {
+      "command": "node build/index.js",
+      "critical": false,
+      "dependencies": [],
+      "environment": {
+        "PORT": "3000"
+      },
+      "kind": "longrun",
+      "name": "server",
+      "requiredForHealth": true,
+      "runAsRoot": false,
+      "workspace": "apps/server",
+      "writablePaths": [
+        "/data"
+      ],
+      "healthCommand": "node -e \"fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))\"",
+      "port": 3000
+    }
+  ],
+  "workspaces": [
+    {
+      "buildDirectory": "build",
+      "packageName": "outpost-app-server",
+      "path": "apps/server",
+      "profile": "http-service",
+      "runtimePaths": [
+        "public"
+      ]
+    }
+  ]
+}

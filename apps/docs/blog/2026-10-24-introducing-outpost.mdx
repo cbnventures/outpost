@@ -1,0 +1,61 @@
+---
+title: "Introducing Outpost: Container Updates That Roll Back"
+description: Outpost keeps your Docker containers on their latest images and puts the previous container back automatically when an update fails to start.
+slug: introducing-outpost
+authors:
+  - mrjackyliang
+keywords:
+  - outpost
+  - docker
+  - watchtower alternative
+  - container updates
+  - rollback
+  - self-hosted
+tags:
+  - release
+  - docker
+  - self-hosted
+---
+
+Keeping a home server's containers current is easy to automate and easy to regret. One bad image at 4 a.m. and a service you rely on is down until you notice.
+
+Outpost is our answer: a self-hosted container updater that keeps your images current and undoes an update when it breaks.
+
+{/* truncate */}
+
+## Why We Built It
+
+Watchtower has been the default answer for years, but it is no longer actively maintained and runs as root. Its recreate step can also bring anonymous volumes back empty and freeze an old image's environment defaults into the new container.
+
+Worst of all, a failed update simply stays failed. We wanted an updater we could leave running on every host without checking on it the next morning.
+
+## What It Does
+
+On a schedule you choose, Outpost checks each running container's registry for a newer image. When it finds one, it:
+
+- **Recreates the container** — With the same environment, ports, volumes, and networks, including anonymous volumes.
+- **Waits for it to prove itself** — The new container must turn healthy, or keep running for a few seconds if it has no healthcheck.
+- **Rolls back if it doesn't** — The previous container is restarted under its original name.
+
+Up-to-date containers cost a single digest lookup, so nothing is downloaded unless there is something new.
+
+## Control Without Babysitting
+
+- **Labels** — Update everything except what you label off, or only what you label on.
+- **Monitor-only** — Hear about new images for your database without Outpost touching it.
+- **Notifications** — ntfy or a JSON webhook, sent only when something changed or failed.
+- **HTTP API and metrics** — Trigger a run from CI and scrape Prometheus counters.
+
+## Try It
+
+All it needs is the Docker socket:
+
+```bash
+docker run --detach \
+  --name outpost \
+  --restart unless-stopped \
+  --volume /var/run/docker.sock:/var/run/docker.sock \
+  cbnventures/outpost:latest
+```
+
+Head to the [Quick Start](/docs/getting-started/quick-start/) for the Compose version. Coming from Watchtower, [Migrating from Watchtower](/docs/reference/migrating-from-watchtower/) maps your settings and labels.

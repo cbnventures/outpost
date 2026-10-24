@@ -1,0 +1,91 @@
+---
+id: private-registries
+title: Private Registries
+description: Give Outpost registry logins through a mounted Docker config.json so it can check and pull private images and get higher registry rate limits.
+sidebar_position: 3
+keywords:
+  - outpost
+  - private registry
+  - docker login
+  - config.json
+  - credentials
+  - ghcr
+tags:
+  - configuration
+  - registries
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Let Outpost check and pull images that need a login by mounting the same `config.json` file that `docker login` writes.
+
+## Why Use Registry Credentials?
+
+1. Lets Outpost update containers built from private images on Docker Hub, GHCR, or your own registry.
+2. Raises the rate limits some registries apply to anonymous lookups so busy hosts don't get throttled.
+3. Reuses the file Docker already writes so you don't keep a second copy of each password in your Compose file.
+
+## Mount the File
+
+Outpost reads `config.json` from the directory in `DOCKER_CONFIG`, which is `/config` in the image. Mount your file there read-only:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/you/.docker/config.json:/config/config.json:ro
+```
+
+The file is read at every check, so a new login takes effect on the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> without a restart. When the file is missing, Outpost checks every registry anonymously.
+
+:::warning
+Outpost runs as `PUID`, so the mounted file must be readable by that user. If `docker login` created it as another user with mode `600`, it is recommended to copy it somewhere readable by `PUID` instead of loosening the original.
+:::
+
+## Supported File Format
+
+Outpost reads logins from the `auths` section. Each entry can hold either a base64 `auth` value or a plain `username` and `password`:
+
+```json title="config.json"
+{
+  "auths": {
+    "https://index.docker.io/v1/": {
+      "auth": "eW91LXVzZXI6ZGNrcl9wYXRfZXhhbXBsZQ=="
+    },
+    "ghcr.io": {
+      "username": "your-github-user",
+      "password": "ghp_exampletoken"
+    }
+  }
+}
+```
+
+The `auth` value is `username:password` encoded with base64. You can create one like this:
+
+```bash
+printf '%s' 'your-user:your-access-token' | base64
+```
+
+## Registry Keys
+
+| Registry           | Keys Outpost looks for                                            |
+|--------------------|-------------------------------------------------------------------|
+| Docker Hub         | `https://index.docker.io/v1/`, `index.docker.io`, `docker.io`     |
+| Any other registry | The host as written in the image name, with or without `https://` |
+
+For an image like `registry.example.com:5000/team/app:1.4`, the key is `registry.example.com:5000`. Access tokens work in place of passwords wherever the registry accepts them.
+
+## Credential Helpers Are Not Supported
+
+Docker Desktop and some Linux setups store passwords in a credential helper instead of the file. In that case `config.json` contains a `credsStore` or `credHelpers` entry and no passwords, so Outpost has nothing to read.
+
+To work around it, write a separate `config.json` for Outpost with `auth` entries as shown above and mount that file instead. See [Troubleshooting](/docs/reference/troubleshooting/#private-images-fail-with-credential-helpers) for the symptoms.
+
+## How the Login Is Used
+
+- **Digest lookups** — Outpost uses the login to answer the registry's sign-in challenge when it asks for the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology>.
+- **Pulls** — The same login is passed to Docker when a new image is pulled.
+
+Identity tokens in `config.json` (the `identitytoken` field) are not used. A registry that only offers identity tokens needs a username and password or access token instead.

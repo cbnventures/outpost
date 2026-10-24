@@ -1,0 +1,196 @@
+---
+id: troubleshooting
+title: Troubleshooting
+description: Resolve common Outpost problems, from Docker socket permission errors and registry rate limits to skipped containers and dashboard sign-in issues.
+sidebar_position: 4
+keywords:
+  - outpost
+  - troubleshooting
+  - permission denied
+  - rate limit
+  - credential helpers
+  - network mode
+tags:
+  - reference
+  - troubleshooting
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Diagnose the most common startup, registry, and update problems and get Outpost checking your containers again.
+
+## Permission Denied on the Docker Socket
+
+**Symptom**: The logs repeat `EACCES` or `permission denied` for `/var/run/docker.sock`, and the container reports unhealthy.
+
+**Cause**: Outpost runs as `PUID` and joins the socket's group, but only when it finds the socket at the path in `DOCKER_HOST`.
+
+**Solution**:
+
+- Mount the socket at the path `DOCKER_HOST` points to, which is `/var/run/docker.sock` by default.
+- For rootless Docker, mount the user socket to the default path, such as `/run/user/1000/docker.sock:/var/run/docker.sock`.
+- Check that the socket is a socket on the host (`ls -l /var/run/docker.sock` shows a leading `s`), not a directory Docker created because the path was wrong.
+
+## Startup Stops With an Invalid Value
+
+**Symptom**: The logs show a message such as `OUTPOST_CLEANUP must be "true" or "false", received "yes".`, repeated each time the server restarts.
+
+**Cause**: Outpost validates every variable at startup and refuses to guess.
+
+**Solution**:
+
+- Fix the named variable using [Configuration](/docs/getting-started/configuration/#validation).
+- Flags must be exactly `true` or `false`, and timeouts positive whole numbers.
+
+## Docker Hub Rate Limits
+
+**Symptom**: Results show `failed` with `toomanyrequests` or `HTTP 429`.
+
+**Cause**: Docker Hub and some other registries limit anonymous requests. When the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology> lookup is refused, Outpost falls back to pulling, which counts against the pull limit too.
+
+**Solution**:
+
+- Add a Docker Hub login, even a free account, as shown in [Private Registries](/docs/getting-started/private-registries/).
+- Run the schedule less often, such as once a day instead of every hour.
+- Pull images from a mirror such as `ghcr.io` where the project publishes one.
+
+## Private Images Fail With Credential Helpers
+
+**Symptom**: Private images show `failed` with `requires credentials`, `unauthorized`, or `pull access denied`, even though `docker pull` works on the host.
+
+**Cause**: Your `config.json` uses `credsStore` or `credHelpers`, so it contains no passwords. Outpost doesn't run credential helpers.
+
+**Solution**:
+
+- Write a separate `config.json` for Outpost with an `auth` entry per registry.
+- Mount it at `/config/config.json` and check that `PUID` can read it.
+- See [Private Registries](/docs/getting-started/private-registries/#supported-file-format) for the format.
+
+## Container Is Skipped for Its Network Mode
+
+**Symptom**: A container shows `skipped` with `Shares another container's network namespace`.
+
+**Cause**: The container uses `network_mode: container:...`, or `network_mode: service:...` in Compose, which Docker turns into the same thing. Outpost doesn't recreate these yet.
+
+**Solution**:
+
+- Update the pair by hand, for example `docker compose pull && docker compose up --detach`.
+- Or label the container `io.cbnventures.outpost.monitor-only: "true"` so you still hear about new images.
+
+## Container Is Skipped as Pinned
+
+**Symptom**: A container shows `skipped` with `Image is pinned to a digest or ID`.
+
+**Cause**: The container was started from `image@sha256:...` or an image ID, so there is no tag to follow.
+
+**Solution**:
+
+- Start it from a tag, such as `nginx:1.27`, if you want Outpost to update it.
+- Otherwise this is expected and nothing needs to change.
+
+## Updates Keep Rolling Back
+
+**Symptom**: A container shows `rolled-back` every <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>.
+
+**Cause**: The new image fails to start, reports unhealthy, or takes longer than the timeout to become healthy.
+
+**Solution**:
+
+- Read the detail, such as `New container stopped (exited)` or `did not become healthy within 120s`.
+- Start the new image by hand with `docker run` to see its logs.
+- For slow starters, raise `OUTPOST_HEALTH_TIMEOUT`.
+- Mark the container <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> until a fixed image is released.
+
+## Outpost Updated Itself or Stopped Mid-Run
+
+**Symptom**: The Outpost container stops during a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, or the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> doesn't show Outpost as `skipped`.
+
+**Cause**: Outpost recognizes itself through its hostname. A custom `hostname` on the Outpost container hides it.
+
+**Solution**:
+
+- Remove the `hostname` setting from the Outpost container.
+- As a safeguard, label Outpost `io.cbnventures.outpost.enable: "false"`.
+
+## API Returns 404 or 401
+
+**Symptom**: `/v1/update`, `/v1/status`, or `/metrics` returns `404` or `401`.
+
+**Cause**: `404` means `OUTPOST_API_TOKEN` isn't set. `401` means the `Authorization` header is missing or the token doesn't match.
+
+**Solution**:
+
+- Set `OUTPOST_API_TOKEN` and recreate the container.
+- Send the header as `Authorization: Bearer <token>`, with exactly one space.
+
+## Dashboard Says It Is Locked
+
+**Symptom**: The sign-in page says the dashboard is locked, and the startup log shows `(locked: set OUTPOST_ADMIN_PASSWORD_FILE)`.
+
+**Cause**: Neither `OUTPOST_ADMIN_PASSWORD_FILE` nor `OUTPOST_ADMIN_PASSWORD` is set, so there is no password to sign in with.
+
+**Solution**:
+
+- Create a password file, for example with `openssl rand -base64 24 > ./outpost-admin-password.txt`.
+- Pass it as a Docker secret and set `OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password`, as shown in [Web Dashboard](/docs/features/dashboard/#enable-the-dashboard).
+- Recreate the container with `docker compose up --detach`.
+
+## Startup Stops on the Password File
+
+**Symptom**: The logs show `OUTPOST_ADMIN_PASSWORD_FILE points at "/run/secrets/outpost_admin_password", which cannot be read.` or `which is empty.`, repeated each time the server restarts.
+
+**Cause**: The file is missing from the container, isn't readable by `PUID`, or contains only whitespace.
+
+**Solution**:
+
+- Check that the secret is listed under the service's `secrets` and that its `file` path exists next to `compose.yml`.
+- Make sure the file on the host is readable by the user ID in `PUID`, such as with `chmod 644 ./outpost-admin-password.txt`.
+- Write a non-empty password into the file.
+
+## History Is Empty After a Restart
+
+**Symptom**: The dashboard's **History** section, or `lastReport` in `/v1/status`, is empty after the container was recreated.
+
+**Cause**: The history is saved to `/data/history.json`. Without a volume at `/data`, it is lost whenever the container is replaced.
+
+**Solution**:
+
+- Mount a volume at `/data`, such as `outpost-data:/data`.
+- If you changed `OUTPOST_DATA_DIRECTORY`, mount the volume at that path instead.
+- Look for `Could not save update history` in `docker logs outpost`, which means the directory isn't writable by `PUID`.
+
+## Too Many Failed Sign-Ins
+
+**Symptom**: Signing in fails with `Too many failed sign-ins. Wait 15 minutes and try again.`
+
+**Cause**: Ten sign-ins failed from the same address within 15 minutes. Behind a reverse proxy without `OUTPOST_TRUST_PROXY=true`, every client shares the proxy's address, so other people's attempts count too.
+
+**Solution**:
+
+- Wait 15 minutes, then sign in with the correct password.
+- Read the password from the file with `cat ./outpost-admin-password.txt` to rule out a typo.
+- Behind a reverse proxy, set `OUTPOST_TRUST_PROXY=true` so each client is counted separately.
+- Restarting Outpost also clears the counter, and signs out every session.
+
+## Dashboard Keeps Signing You Out
+
+**Symptom**: The dashboard returns to the sign-in page.
+
+**Cause**: Sessions expire after 30 minutes without requests and are kept in memory, so a restart or update of Outpost ends them.
+
+**Solution**:
+
+- Sign in again. This is expected after a restart.
+- Keep a dashboard tab open if you want the session to stay alive, since it refreshes itself every 30 seconds.
+
+## No Notifications Arrive
+
+**Symptom**: Updates happen, but nothing reaches ntfy or the webhook.
+
+**Cause**: Notifications are only sent when a container is `updated`, `available`, `rolled-back`, or `failed`, or the target rejected the request.
+
+**Solution**:
+
+- Check `docker logs outpost` to confirm the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> had something to report, and look for lines such as `ntfy notification failed with HTTP 403.`
+- Send a test message to the same URL with `curl` from the Docker host.
+- If the topic needs a token, set `OUTPOST_NTFY_TOKEN`.

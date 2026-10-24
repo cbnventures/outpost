@@ -1,0 +1,141 @@
+---
+id: http-api-and-metrics
+title: HTTP API and Metrics
+description: Trigger an Outpost update cycle, read the latest report, and scrape Prometheus metrics through a small HTTP API protected by a bearer token.
+sidebar_position: 4
+keywords:
+  - outpost
+  - http api
+  - prometheus
+  - metrics
+  - bearer token
+  - status
+tags:
+  - features
+  - api
+---
+
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+Start an update on demand, check what the last run did, and feed Outpost into Prometheus, all over plain HTTP.
+
+## Why Use This Feature?
+
+1. Lets a CI pipeline trigger an update right after it pushes an image so you don't wait for the schedule.
+2. Shows the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as JSON so dashboards and scripts can read it without parsing logs.
+3. Exposes Prometheus counters so you can alert on failed or rolled-back updates.
+
+## Enable the API
+
+The health endpoint is always on. The others stay disabled until you set a token and publish the port:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    environment:
+      OUTPOST_API_TOKEN: "${OUTPOST_API_TOKEN}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:3000:3000"
+```
+
+It is recommended to use a long random token, such as the output of `openssl rand -hex 32`. Binding the port to `127.0.0.1` keeps the API off your network unless you put a reverse proxy in front of it.
+
+:::info
+The API token is separate from the [web dashboard](/docs/features/dashboard/) login. Signing in to the dashboard doesn't unlock these endpoints, and the token doesn't open the dashboard.
+:::
+
+## Endpoints
+
+| Method | Path         | Token    | Description                                                                                                                                                       |
+|--------|--------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/`          | No       | Redirects to the [web dashboard](/docs/features/dashboard/) at `/admin/`.                                                                                         |
+| `GET`  | `/health`    | No       | Returns `{"status":"ok"}`. Used by the image's own healthcheck.                                                                                                   |
+| `POST` | `/v1/update` | Required | Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> in the background.                 |
+| `GET`  | `/v1/status` | Required | Returns the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>, error, and running totals. |
+| `GET`  | `/metrics`   | Required | Returns Prometheus metrics in text format.                                                                                                                        |
+
+Send the token in the `Authorization` header:
+
+```bash
+curl --header "Authorization: Bearer $OUTPOST_API_TOKEN" http://127.0.0.1:3000/v1/status
+```
+
+### Error Responses
+
+| Status | When                                        | Body                                                         |
+|--------|---------------------------------------------|--------------------------------------------------------------|
+| `404`  | `OUTPOST_API_TOKEN` is not set              | `{"error":"Set OUTPOST_API_TOKEN to enable this endpoint."}` |
+| `401`  | The header is missing or the token is wrong | `{"error":"Invalid or missing bearer token."}`               |
+
+## Trigger an Update
+
+```bash
+curl --request POST \
+  --header "Authorization: Bearer $OUTPOST_API_TOKEN" \
+  http://127.0.0.1:3000/v1/update
+```
+
+| Status | Body                | Meaning                                                                                                                                                          |
+|--------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `202`  | `{"started":true}`  | A new <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> started.                             |
+| `409`  | `{"started":false}` | A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is already running, so none was started. |
+
+The request returns right away. Poll `/v1/status` until `running` is `false` to read the results.
+
+## Read the Status
+
+```json title="GET /v1/status"
+{
+  "running": false,
+  "nextRun": "2026-10-25T04:00:00.000Z",
+  "lastReport": {
+    "startedAt": "2026-10-24T04:00:00.012Z",
+    "finishedAt": "2026-10-24T04:01:12.480Z",
+    "results": [
+      {
+        "container": "web",
+        "image": "ghcr.io/example/web:latest",
+        "status": "updated",
+        "detail": "Recreated with ghcr.io/example/web:latest"
+      }
+    ]
+  },
+  "totals": {
+    "cycles": 3,
+    "updated": 1,
+    "failed": 0
+  }
+}
+```
+
+- **`nextRun`** — When the schedule starts the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. While one is running, `startedAt` shows when it began.
+- **`lastReport`** — The newest entry in the saved history, so it survives a restart when `/data` is on a volume. Missing until the first <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes.
+- **`lastError`** — Present only when the last <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> failed as a whole, for example because the Docker socket was unreachable.
+- **`totals`** — Counted since Outpost started, and reset when it restarts.
+
+## Metrics
+
+Point Prometheus at `/metrics` with the token as a bearer credential:
+
+```yaml title="prometheus.yml"
+scrape_configs:
+  - job_name: outpost
+    authorization:
+      credentials: your-long-random-token
+    static_configs:
+      - targets:
+          - outpost:3000
+```
+
+| Metric                                 | Type    | Description                                                                                                                                                               |
+|----------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `outpost_cycles_total`                 | counter | Update cycles finished since start.                                                                                                                                       |
+| `outpost_containers_updated_total`     | counter | Containers updated since start.                                                                                                                                           |
+| `outpost_containers_failed_total`      | counter | Container updates that failed or rolled back since start.                                                                                                                 |
+| `outpost_cycle_running`                | gauge   | `1` while a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is running, otherwise `0`.              |
+| `outpost_last_cycle_timestamp_seconds` | gauge   | Unix time the last <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finished. Missing until one has. |
+
+A useful alert is `increase(outpost_containers_failed_total[1d]) > 0`, which fires when any update failed or rolled back in the last day.

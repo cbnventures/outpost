@@ -1,0 +1,41 @@
+{
+  "name": "outpost-package-registry",
+  "version": "0.0.1",
+  "description": "Container image reference parsing, registry credentials, and remote digest lookup.",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
+    }
+  },
+  "scripts": {
+    "check": "nova utility run-scripts --sequential \"check:*\"",
+    "check:lint": "eslint ./ --max-warnings=0",
+    "check:types-source": "nova utility type-check --project tsconfig.source.json",
+    "check:types-config": "nova utility type-check --project tsconfig.config.json",
+    "check:types-tests": "nova utility type-check --project tsconfig.tests.json",
+    "check:test": "vitest run",
+    "build": "nova utility run-scripts --sequential --node-env production \"build:*\"",
+    "build:reset": "shx rm -rf ./build",
+    "build:transpile": "nova utility transpile --project tsconfig.source.json",
+    "build:copy-types": "shx rm -rf ./build/types && shx cp -r ./src/types ./build/types",
+    "clean": "nova utility run-scripts --parallel \"clean:*\"",
+    "clean:build": "shx rm -rf ./build"
+  },
+  "engines": {
+    "node": "^22 || ^24"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cbnventures/nova": "0.33.0",
+    "@types/node": "24.9.1",
+    "eslint": "9.39.5",
+    "shx": "0.4.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

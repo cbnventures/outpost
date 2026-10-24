@@ -1,0 +1,16 @@
+{
+  "name": "outpost-tool-docker-build",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "packages/docker-engine",
+    "packages/registry",
+    "packages/notifiers",
+    "packages/updater",
+    "apps/server"
+  ],
+  "engines": {
+    "node": "^22 || ^24"
+  },
+  "packageManager": "npm@11.18.0"
+}
