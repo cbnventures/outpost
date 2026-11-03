@@ -1,5 +1,9 @@
 # outpost-package-updater
 
+## 1.0.2 - 2026-11-03
+
+No changes.
+
 ## 1.0.1 - 2026-11-03
 
 No changes.

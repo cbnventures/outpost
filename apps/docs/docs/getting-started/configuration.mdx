@@ -42,8 +42,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - outpost-data:/data
     ports:
-      - "0.0.0.0:22601:22601"
+      - "22601:22601"
     restart: unless-stopped
+
+networks:
+  default:
+    enable_ipv6: true
 
 volumes:
   outpost-data:
@@ -117,7 +121,7 @@ Outpost also joins the group that owns the Docker socket, so `PGID` doesn't need
 
 ## Port
 
-Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API listen on `22601` by default. The examples publish it on `0.0.0.0` so another computer on the network can reach the Docker host. To use a different port only on the host, change the host side of the mapping, such as `"0.0.0.0:8080:22601"`.
+Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API listen on `22601` by default. The examples publish it on every IPv4 and IPv6 address so another computer on the network can reach the Docker host. To use a different port only on the host, change the host side of the mapping, such as `"8080:22601"`.
 
 Set `PORT` to change the port inside the container too. The image healthcheck follows the same value, so the environment and both sides of the mapping must agree:
 
@@ -127,8 +131,14 @@ services:
     environment:
       PORT: "8080"
     ports:
-      - "0.0.0.0:8080:8080"
+      - "8080:8080"
 ```
+
+## IPv6
+
+The examples turn on IPv6 for Outpost's Compose network, so the sign-in limit and the API's rate limit count each IPv6 client by its own address. Docker Engine 27 or later picks the IPv6 subnet on its own, and on a host without IPv6, you can delete the `networks` block. For `docker run`, create the network first with `docker network create --ipv6 outpost`, then add `--network outpost`.
+
+IPv6 addresses are often reachable from the internet, so it is recommended to check that your router or host firewall blocks inbound connections to port `22601`.
 
 ## Read-Only Root Filesystem
 

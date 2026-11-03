@@ -73,8 +73,13 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
           # update itself.
           - outpost-data:/data
         ports:
-          - "0.0.0.0:22601:22601"
+          - "22601:22601"
         restart: unless-stopped
+
+    # Lets the dashboard see each IPv6 visitor's own address.
+    networks:
+      default:
+        enable_ipv6: true
 
     volumes:
       outpost-data:
@@ -96,7 +101,7 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
       --env TZ=America/New_York \
       --volume /var/run/docker.sock:/var/run/docker.sock \
       --volume outpost-data:/data \
-      --publish 0.0.0.0:22601:22601 \
+      --publish 22601:22601 \
       cbnventures/outpost:latest
     ```
 

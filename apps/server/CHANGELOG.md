@@ -1,5 +1,10 @@
 # outpost-app-server
 
+## 1.0.2 - 2026-11-03
+
+### UPDATED
+- Updated the Compose file and Quick Start to publish port 22601 on IPv6 as well as IPv4, and gave Outpost's network IPv6 so the dashboard sees each IPv6 client's own address.
+
 ## 1.0.1 - 2026-11-03
 
 ### UPDATED

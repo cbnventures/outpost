@@ -22,7 +22,7 @@ services:
     # tokens for POST /v1/update, GET /v1/status, and GET /metrics are made
     # on the dashboard's Access tokens page.
     ports:
-      - "0.0.0.0:22601:22601"
+      - "22601:22601"
     restart: unless-stopped
 
     # Outpost follows the same labels for its own container, so it updates
@@ -37,6 +37,13 @@ services:
     # tmpfs:
     #   - /run
     #   - /tmp
+
+# Gives Outpost's network IPv6, so the dashboard sees each IPv6 visitor's own
+# address. Docker Engine 27 or later picks the subnet; on a host without IPv6,
+# delete this block.
+networks:
+  default:
+    enable_ipv6: true
 
 volumes:
   outpost-data:

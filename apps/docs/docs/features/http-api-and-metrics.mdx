@@ -29,7 +29,7 @@ Start a check on demand, read what the last run did, and feed Outpost into Prome
 
 ## Before You Start
 
-- **A published port** — The API listens on port `22601`, next to the dashboard. The [Quick Start](/docs/getting-started/quick-start/) publishes it as `0.0.0.0:22601:22601`, which makes it reachable through the Docker host's network addresses.
+- **A published port** — The API listens on port `22601`, next to the dashboard. The [Quick Start](/docs/getting-started/quick-start/) publishes it as `22601:22601`, which makes it reachable on every IPv4 and IPv6 address of the Docker host.
 - **An <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>** — Create one on the dashboard's **Access tokens** page with the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology> the client needs, as shown in [Access Tokens](/docs/features/access-tokens/).
 - **The base URL** — The address the dashboard is open at, such as `http://192.168.1.50:22601`. Every path starts at the root, so a sub-path isn't supported.
 
