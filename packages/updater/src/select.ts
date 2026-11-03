@@ -1,9 +1,15 @@
 import type {
+  Select_IsOutpostImage_Image,
+  Select_IsOutpostImage_LastSegment,
+  Select_IsOutpostImage_Name,
+  Select_IsOutpostImage_Returns,
   Select_SelectContainers_Containers,
   Select_SelectContainers_EnableLabel,
   Select_SelectContainers_Image,
+  Select_SelectContainers_IsNetworkNamespaceOwner,
   Select_SelectContainers_Labels,
   Select_SelectContainers_Name,
+  Select_SelectContainers_NetworkMode,
   Select_SelectContainers_Options,
   Select_SelectContainers_Returns,
   Select_SelectContainers_Selection,
@@ -18,6 +24,12 @@ import type {
   Select_SortByDependencies_Sorted,
   Select_SortByDependencies_Visit,
   Select_SortByDependencies_Visited,
+  Select_UsesNetworkNamespaceOf_Container,
+  Select_UsesNetworkNamespaceOf_Containers,
+  Select_UsesNetworkNamespaceOf_Names,
+  Select_UsesNetworkNamespaceOf_NetworkMode,
+  Select_UsesNetworkNamespaceOf_Reference,
+  Select_UsesNetworkNamespaceOf_Returns,
 } from './types/select.d.ts';
 
 /**
@@ -44,8 +56,8 @@ export const MONITOR_ONLY_LABEL = 'io.cbnventures.outpost.monitor-only';
  * Select - Containers.
  *
  * Splits running containers into update candidates and skipped ones,
- * applying the label mode and leaving out Outpost itself. Pinned images
- * are detected later from the inspected config.
+ * applying the label mode to every container, Outpost's own included.
+ * Pinned images are detected later from the inspected config.
  *
  * @param {Select_SelectContainers_Containers} containers - Containers.
  * @param {Select_SelectContainers_Options}    options    - Options.
@@ -76,12 +88,50 @@ export function selectContainers(containers: Select_SelectContainers_Containers,
       continue;
     }
 
-    if (options['selfId'] !== undefined && container['Id'].startsWith(options['selfId']) === true) {
+    // Without its own ID, Outpost can't tell which container it is, so it leaves every Outpost container alone.
+    if (options['selfId'] === undefined && isOutpostImage(image) === true) {
       selection['skipped'].push({
         container: name,
         image,
         status: 'skipped',
-        detail: 'Outpost does not update itself while running',
+        detail: 'Outpost couldn\'t find its own container, so it leaves Outpost containers alone',
+      });
+
+      continue;
+    }
+
+    const networkMode: Select_SelectContainers_NetworkMode = (container['HostConfig'] !== undefined) ? (container['HostConfig']['NetworkMode'] ?? '') : '';
+
+    if (networkMode.startsWith('container:') === true) {
+      selection['skipped'].push({
+        container: name,
+        image,
+        status: 'skipped',
+        detail: 'Shares another container\'s network namespace',
+      });
+
+      continue;
+    }
+
+    const isNetworkNamespaceOwner: Select_SelectContainers_IsNetworkNamespaceOwner = usesNetworkNamespaceOf(container, containers);
+
+    if (isNetworkNamespaceOwner === true) {
+      selection['skipped'].push({
+        container: name,
+        image,
+        status: 'skipped',
+        detail: 'Has containers sharing its network namespace',
+      });
+
+      continue;
+    }
+
+    if (container['HostConfig'] !== undefined && container['HostConfig']['AutoRemove'] === true) {
+      selection['skipped'].push({
+        container: name,
+        image,
+        status: 'skipped',
+        detail: 'Container is configured for automatic removal',
       });
 
       continue;
@@ -91,6 +141,58 @@ export function selectContainers(containers: Select_SelectContainers_Containers,
   }
 
   return selection;
+}
+
+/**
+ * Select - Is Outpost Image.
+ *
+ * Reports whether an image reference names an Outpost image, such as
+ * cbnventures/outpost:latest or ghcr.io/cbnventures/outpost, by its last
+ * path segment. Image IDs never match.
+ *
+ * @param {Select_IsOutpostImage_Image} image - Image.
+ *
+ * @returns {Select_IsOutpostImage_Returns}
+ *
+ * @since 1.0.0
+ */
+function isOutpostImage(image: Select_IsOutpostImage_Image): Select_IsOutpostImage_Returns {
+  const name: Select_IsOutpostImage_Name = image.split('@')[0] ?? '';
+  const lastSegment: Select_IsOutpostImage_LastSegment = name.split('/').pop() ?? '';
+
+  return lastSegment.split(':')[0] === 'outpost';
+}
+
+/**
+ * Select - Uses Network Namespace Of.
+ *
+ * Reports whether another running container joins the given container's
+ * network namespace. Updating the owner would strand that dependent on
+ * the removed container, so owners with dependents are not candidates.
+ *
+ * @param {Select_UsesNetworkNamespaceOf_Container}  container  - Container.
+ * @param {Select_UsesNetworkNamespaceOf_Containers} containers - Containers.
+ *
+ * @returns {Select_UsesNetworkNamespaceOf_Returns}
+ *
+ * @since 1.0.0
+ */
+function usesNetworkNamespaceOf(container: Select_UsesNetworkNamespaceOf_Container, containers: Select_UsesNetworkNamespaceOf_Containers): Select_UsesNetworkNamespaceOf_Returns {
+  const names: Select_UsesNetworkNamespaceOf_Names = new Set(container['Names'].map((name) => name.replace('/', '')));
+
+  return containers.some((candidate) => {
+    const networkMode: Select_UsesNetworkNamespaceOf_NetworkMode = (candidate['HostConfig'] !== undefined) ? (candidate['HostConfig']['NetworkMode'] ?? '') : '';
+
+    if (candidate['Id'] === container['Id'] || networkMode.startsWith('container:') === false) {
+      return false;
+    }
+
+    const reference: Select_UsesNetworkNamespaceOf_Reference = networkMode.slice('container:'.length);
+
+    return container['Id'].startsWith(reference) === true
+      || reference.startsWith(container['Id']) === true
+      || names.has(reference) === true;
+  });
 }
 
 /**

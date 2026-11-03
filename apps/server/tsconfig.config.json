@@ -12,6 +12,8 @@
   },
   "include": [
     "./eslint.config.mts",
+    "./mock-api.mts",
+    "./vite.config.mts",
     "./vitest.config.mts"
   ]
 }

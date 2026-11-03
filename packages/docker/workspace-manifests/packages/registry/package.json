@@ -1,15 +1,15 @@
 {
   "name": "outpost-package-registry",
-  "version": "0.0.1",
-  "description": "Container image reference parsing, registry credentials, and remote digest lookup.",
-  "type": "module",
-  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
       "default": "./build/index.js"
     }
   },
+  "type": "module",
+  "private": true,
   "scripts": {
     "check": "nova utility run-scripts --sequential \"check:*\"",
     "check:lint": "eslint ./ --max-warnings=0",
@@ -25,13 +25,13 @@
     "clean:build": "shx rm -rf ./build"
   },
   "engines": {
-    "node": "^22 || ^24"
+    "node": "^22 || ^24 || ^26"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@cbnventures/nova": "0.33.0",
+    "@cbnventures/nova": "0.38.0",
     "@types/node": "24.9.1",
     "eslint": "9.39.5",
     "shx": "0.4.0",

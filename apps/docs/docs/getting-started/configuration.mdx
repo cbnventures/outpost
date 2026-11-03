@@ -1,11 +1,12 @@
 ---
 id: configuration
 title: Configuration
-description: Configure Outpost entirely through environment variables, from the update schedule and label mode to the dashboard login, API token, and notifications.
+description: Configure update behavior in Outpost's dashboard and keep only bootstrap paths and container identity in Compose.
 sidebar_position: 2
 keywords:
   - outpost
   - configuration
+  - database settings
   - environment variables
   - schedule
   - cron
@@ -17,13 +18,14 @@ tags:
 
 import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
-Describe a whole Outpost instance with environment variables, so one Compose file is all the configuration you keep.
+Set update behavior from the **Settings** page. Outpost saves those choices in SQLite and applies them immediately, while Compose remains responsible for the paths and identity needed before that database can open.
 
-## Why Use Environment Variables?
+## Two Kinds of Configuration
 
-1. Keeps the full setup in your Compose file so an instance is easy to review, copy, and restore.
-2. Validates every value when the container starts so a typo stops Outpost with a clear message instead of being ignored.
-3. Treats an empty value the same as an unset one so blank lines in `.env` files fall back to the defaults.
+1. **Runtime behavior** — The schedule, label mode, monitor-only mode, cleanup, replacement timing, and private registry sign-ins live in the database. Change them on the **Settings** page without restarting Outpost.
+2. **Container bootstrap** — The Docker connection, data directory, process identity, time zone, and port remain in Compose because Outpost needs them before it can read the database.
+
+Back up the `outpost-data` volume to preserve the runtime settings with the account, access tokens, notification destinations, registry sign-ins, and history.
 
 ## Example
 
@@ -36,85 +38,72 @@ services:
       PUID: "1000"
       PGID: "1000"
       TZ: "Europe/London"
-      OUTPOST_SCHEDULE: "0 30 3 * * *"
-      OUTPOST_LABEL_MODE: "opt-in"
-      OUTPOST_CLEANUP: "true"
-      OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
-      OUTPOST_API_TOKEN: "${OUTPOST_API_TOKEN}"
-      OUTPOST_NTFY_URL: "https://ntfy.sh/my-outpost-updates"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config/config.json:ro
       - outpost-data:/data
-    secrets:
-      - outpost_admin_password
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped
-
-secrets:
-  outpost_admin_password:
-    file: ./outpost-admin-password.txt
 
 volumes:
   outpost-data:
 ```
 
-## Schedule
+After Outpost starts, open **Settings** to choose the schedule and update behavior, and to add sign-ins for [private registries](/docs/getting-started/private-registries/#add-a-sign-in).
 
-| Variable               | Description                                                                                                                                                                                                    |
-|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_SCHEDULE`     | Six-field cron expression with seconds first. Default `0 0 4 * * *` (every day at 04:00).                                                                                                                      |
-| `OUTPOST_RUN_ON_START` | `true` starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> as soon as Outpost starts, in addition to the schedule. Default `false`. |
+## Schedule Settings
 
-The schedule runs in the time zone set by `TZ`. The six fields are second, minute, hour, day of month, month, and day of week, for example:
+| Setting                       | Description                                                                                                                                                                                                                                     |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Schedule**                  | **Every hour**, **Every few hours** (2, 3, 4, 6, 8, or 12), **Every day** or **Every week** on the days you pick at a set time, or **Custom (cron)** for a cron expression. Default every day at 04:00. The line under it shows the next check. |
+| **Check when Outpost starts** | Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> as soon as Outpost starts, in addition to the schedule. Off by default.                                          |
+
+The schedule runs in the time zone set by `TZ`, which the next-check line names. **Custom (cron)** takes six fields, second, minute, hour, day of month, month, and day of week, for example:
 
 - `0 0 4 * * *` — Every day at 04:00.
 - `0 0 */6 * * *` — Every six hours.
 - `0 30 2 * * 0` — Sundays at 02:30.
 
-## Update Behavior
+Five-field patterns without the seconds field, such as `0 4 * * *`, also work, as do the nicknames `@yearly`, `@monthly`, `@weekly`, `@daily`, and `@hourly`.
 
-| Variable                 | Description                                                                                                        |
-|--------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_LABEL_MODE`     | `opt-out` updates every container unless labeled off; `opt-in` updates only labeled containers. Default `opt-out`. |
-| `OUTPOST_MONITOR_ONLY`   | `true` reports newer images without recreating any container. Default `false`.                                     |
-| `OUTPOST_CLEANUP`        | `true` removes the old image after a successful update when nothing else uses it. Default `true`.                  |
-| `OUTPOST_STOP_TIMEOUT`   | Seconds Docker waits for the old container to stop before killing it. Default `30`.                                |
-| `OUTPOST_HEALTH_TIMEOUT` | Seconds a new container with a healthcheck has to report healthy. Default `120`.                                   |
-| `OUTPOST_SETTLE_SECONDS` | Seconds a new container without a healthcheck must keep running before the update counts. Default `10`.            |
+If a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is still running when the schedule comes due, that scheduled run is dropped, not queued. The next one starts at its usual time.
+
+## Update Behavior Settings
+
+| Setting                 | Description                                                                                                              |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| **Container selection** | **Opt-out** updates every container unless labeled off; **Opt-in** updates only labeled containers. Default **Opt-out**. |
+| **Monitor only**        | Reports newer images without recreating any container. Off by default.                                                   |
+| **Clean up old images** | Removes the old image after a successful update when nothing else uses it. On by default.                                |
+| **Stop timeout**        | Seconds Docker waits for the old container to stop before killing it. Default `30`.                                      |
+| **Health timeout**      | Seconds a new container with a healthcheck has to report healthy. Default `120`.                                         |
+| **Settle time**         | Seconds a new container without a healthcheck must keep running before the update counts. Default `10`.                  |
 
 See [Labels and Modes](/docs/features/labels-and-modes/) for the label rules and [Updates and Rollback](/docs/features/updates-and-rollback/) for how the timeouts are used.
 
-## Dashboard
+## Data Directory
 
-| Variable                      | Description                                                                                                                          |
-|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_ADMIN_USERNAME`      | Username for the dashboard sign-in. Default `admin`.                                                                                 |
-| `OUTPOST_ADMIN_PASSWORD_FILE` | Path to a file holding the dashboard password, such as a Docker secret under `/run/secrets`. Recommended over the plain variable.    |
-| `OUTPOST_ADMIN_PASSWORD`      | Dashboard password as plain text. Used only when `OUTPOST_ADMIN_PASSWORD_FILE` is unset. Unset by default.                           |
-| `OUTPOST_DATA_DIRECTORY`      | Directory where `history.json`, the saved check history, is kept. Default `/data`.                                                   |
-| `OUTPOST_TRUST_PROXY`         | Set to `true` when one reverse proxy sits in front of Outpost, so HTTPS and client addresses come from its headers. Default `false`. |
+| Variable                 | Description                                                                                                                                                                                                                                                                               |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `OUTPOST_DATA_DIRECTORY` | Folder that holds the dashboard database (`outpost.sqlite3`), its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> (`keys/installation.key`), and the check history (`history.json`). Default `/data`. |
 
-With neither password variable set, the dashboard stays locked. See [Web Dashboard](/docs/features/dashboard/#enable-the-dashboard) for the full setup.
+The dashboard account, runtime settings, <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and private registry sign-ins are kept in the database in the data directory.
 
-## API and Notifications
+You create the account on the first visit, with a <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> from the container log, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account). <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">Destinations</Terminology> are added on the **Notifications** page, as shown in [Notifications](/docs/features/notifications/#add-a-destination).
 
-| Variable              | Description                                                                                                                                                                                            |
-|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_API_TOKEN`   | Bearer token that enables `POST /v1/update`, `GET /v1/status`, and `GET /metrics`. Unset by default.                                                                                                   |
-| `OUTPOST_NTFY_URL`    | Full ntfy topic URL, such as `https://ntfy.sh/my-topic`. Unset by default.                                                                                                                             |
-| `OUTPOST_NTFY_TOKEN`  | Access token sent to ntfy as a bearer token. Unset by default.                                                                                                                                         |
-| `OUTPOST_WEBHOOK_URL` | URL that receives a JSON summary of each <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> worth telling you about. Unset by default. |
+Only the default `/data` is created and handed to `PUID` when the container starts. A custom `OUTPOST_DATA_DIRECTORY` must already belong to `PUID`, or Outpost stops at startup with a permission error.
+
+:::info
+Behavior settings, such as the schedule, label mode, monitor-only, cleanup, and timeouts, live on the **Settings** page, not in environment variables. Private registry sign-ins are added there too, as described in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in), and a reverse proxy needs no setting, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
+:::
 
 ## Docker Connection
 
-| Variable        | Description                                                                                                    |
-|-----------------|----------------------------------------------------------------------------------------------------------------|
-| `DOCKER_HOST`   | Docker Engine address: a `unix://` socket or a plain `tcp://host:port`. Default `unix:///var/run/docker.sock`. |
-| `DOCKER_CONFIG` | Directory holding the `config.json` with registry logins. Default `/config`.                                   |
+| Variable      | Description                                                                                                    |
+|---------------|----------------------------------------------------------------------------------------------------------------|
+| `DOCKER_HOST` | Docker Engine address: a `unix://` socket or a plain `tcp://host:port`. Default `unix:///var/run/docker.sock`. |
 
-`DOCKER_HOST` doesn't support TLS, so a `tcp://` address is best kept to a socket proxy on a private network. See [Private Registries](/docs/getting-started/private-registries/) for the `config.json` format.
+`DOCKER_HOST` doesn't support TLS, so a `tcp://` address is best kept to a socket proxy on a private network.
 
 ## Container Identity
 
@@ -134,13 +123,42 @@ The dashboard and HTTP API listen on port `3000` inside the container. To use a 
 The `PORT` variable is read by the server, but the image sets it to `3000` when the service starts. Changing `PORT` on the container has no effect.
 :::
 
+## Read-Only Root Filesystem
+
+The image can run with a read-only root filesystem, as described in the repository's `compose.yml`. It needs `S6_READ_ONLY_ROOT` set to `1`, tmpfs mounts for the s6-overlay runtime paths `/run` and `/tmp`, and a writable mount at `/data`:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    environment:
+      S6_READ_ONLY_ROOT: "1"
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # Prepared for PUID on every start, so it must be writable.
+      - outpost-data:/data
+
+volumes:
+  outpost-data:
+```
+
 ## Validation
 
-Outpost checks every value at startup and refuses to start when one is invalid:
+The **Settings** page validates runtime behavior before saving it:
 
-- **Flags** — Must be exactly `true` or `false`.
-- **Timeouts** — Must be positive whole numbers.
-- **Label mode** — Must be `opt-in` or `opt-out`.
-- **Password file** — When `OUTPOST_ADMIN_PASSWORD_FILE` is set, the file must be readable and not empty.
+- **Timing values** — Must be positive whole numbers.
+- **Container selection** — Must be `opt-in` or `opt-out`.
+- **Schedule** — Must be a pattern the cron parser accepts. An invalid pattern remains unsaved and is highlighted on the page.
 
-The log names the variable and the value it received, for example `OUTPOST_LABEL_MODE must be "opt-in" or "opt-out", received "optin".`
+Outpost checks bootstrap values at startup and refuses to start when one is invalid:
+
+- **`PUID` and `PGID`** — Must be whole numbers from `1` to `2147483647`, so `0` is refused. The image's init step checks them and logs messages such as `PUID must be between 1 and 2147483647.`
+- **`TZ`** — Must name a time zone installed in the image, such as `America/Chicago`. Otherwise the init step logs `Unknown timezone:` followed by the value.
+- **<Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">Encryption key</Terminology>** — The key file in the data directory must belong to the database, or startup stops, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match). A missing key file doesn't stop startup, because Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the saved registry passwords.
+
+`DOCKER_HOST` and `OUTPOST_DATA_DIRECTORY` are not checked for format. A wrong `DOCKER_HOST`, or a data directory that `PUID` can't use, stops Outpost at startup instead.

@@ -1,6 +1,14 @@
 {
   "name": "outpost-tool-docker",
-  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
-  "version": "0.0.0"
+  "private": true,
+  "scripts": {
+    "check": "docker build --check --file ../../Dockerfile ../..",
+    "build": "docker compose --file ../../compose.yml --project-directory ../.. build"
+  },
+  "engines": {
+    "node": "^22 || ^24 || ^26"
+  }
 }

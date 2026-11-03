@@ -15,6 +15,8 @@ import { Runner } from './engine.js';
 
 import type {
   Engine_Engine_Engine,
+  Engine_Engine_ListsStoppedContainersByLabel_Containers,
+  Engine_Engine_ReadsTheExitCodeOfAStoppedContainer_Inspected,
   Engine_Engine_ReportsDaemonErrorMessages_Request,
   Engine_Engine_Server,
   Engine_Engine_SocketPath,
@@ -64,6 +66,41 @@ const server: Engine_Engine_Server = createServer((request, response) => {
       JSON.stringify({ error: 'manifest unknown' }),
       '',
     ].join('\n'));
+
+    return;
+  }
+
+  if (request.url === `/containers/json?all=true&filters=${encodeURIComponent(JSON.stringify({ label: ['io.cbnventures.outpost.self-update-helper'] }))}`) {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+
+    response.end(JSON.stringify([{
+      Id: 'helper',
+      Names: ['/outpost-outpost-self-update'],
+      Image: 'sha256:old',
+      ImageID: 'sha256:old',
+      Labels: { 'io.cbnventures.outpost.self-update-helper': 'abc' },
+      State: 'exited',
+    }]));
+
+    return;
+  }
+
+  if (request.url === '/containers/helper/json') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+
+    response.end(JSON.stringify({
+      Id: 'helper',
+      Name: '/outpost-outpost-self-update',
+      Image: 'sha256:old',
+      Config: {},
+      HostConfig: {},
+      NetworkSettings: {},
+      State: {
+        Running: false,
+        Status: 'exited',
+        ExitCode: 1,
+      },
+    }));
 
     return;
   }
@@ -130,6 +167,22 @@ describe('engine', () => {
     const containers: Engine_Engine_ValidatesContainerListResponses_Containers = await engine.listContainers();
 
     expect(containers.map((container) => container['Names'])).toStrictEqual([['/web']]);
+
+    return;
+  });
+
+  it('lists stopped containers by label', async () => {
+    const containers: Engine_Engine_ListsStoppedContainersByLabel_Containers = await engine.listContainersByLabel('io.cbnventures.outpost.self-update-helper');
+
+    expect(containers.map((container) => container['State'])).toStrictEqual(['exited']);
+
+    return;
+  });
+
+  it('reads the exit code of a stopped container', async () => {
+    const inspected: Engine_Engine_ReadsTheExitCodeOfAStoppedContainer_Inspected = await engine.inspectContainer('helper');
+
+    expect(inspected['State']['ExitCode']).toBe(1);
 
     return;
   });

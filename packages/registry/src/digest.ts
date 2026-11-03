@@ -12,6 +12,7 @@ import type {
   Digest_FetchRemoteDigest_Response,
   Digest_FetchRemoteDigest_Returns,
   Digest_FetchRemoteDigest_Target,
+  Digest_FetchRemoteDigest_Token,
   Digest_ParseChallenge_ClosingIndex,
   Digest_ParseChallenge_Cursor,
   Digest_ParseChallenge_EqualsIndex,
@@ -52,8 +53,8 @@ const manifestAccept = [
  * Digest - Fetch Remote Digest.
  *
  * Asks the registry for the current manifest digest of an image tag with
- * a HEAD request, answering a Bearer or Basic auth challenge when the
- * registry requires one. Returns undefined when no digest is reported.
+ * a HEAD request, answering its auth challenge. A registry that has no
+ * such image, or won't show it, is reported instead of thrown.
  *
  * @param {Digest_FetchRemoteDigest_Reference}     reference     - Reference.
  * @param {Digest_FetchRemoteDigest_Credentials}   credentials   - Credentials.
@@ -76,13 +77,18 @@ export async function fetchRemoteDigest(reference: Digest_FetchRemoteDigest_Refe
     let authorization: Digest_FetchRemoteDigest_Authorization = undefined;
 
     if (challenge['scheme'] === 'bearer') {
-      authorization = `Bearer ${await requestBearerToken(challenge, credentials, fetchFunction)}`;
+      const token: Digest_FetchRemoteDigest_Token = await requestBearerToken(challenge, credentials, fetchFunction);
+
+      authorization = (token !== undefined) ? `Bearer ${token}` : undefined;
     } else if (challenge['scheme'] === 'basic' && credentials !== undefined) {
       authorization = `Basic ${Buffer.from(`${credentials['username']}:${credentials['password']}`).toString('base64')}`;
     }
 
     if (authorization === undefined) {
-      throw new Error(`Registry "${target['registry']}" requires credentials for "${target['repository']}".`);
+      return {
+        status: 'denied',
+        digest: undefined,
+      };
     }
 
     response = await fetchFunction(manifestUrl, {
@@ -94,20 +100,38 @@ export async function fetchRemoteDigest(reference: Digest_FetchRemoteDigest_Refe
     });
   }
 
+  // Docker Hub answers 401 for a repository that doesn't exist, the same as for a private one.
+  if (response['status'] === 401 || response['status'] === 403) {
+    return {
+      status: 'denied',
+      digest: undefined,
+    };
+  }
+
+  if (response['status'] === 404) {
+    return {
+      status: 'not-found',
+      digest: undefined,
+    };
+  }
+
   if (response['ok'] === false) {
     throw new Error(`Registry "${target['registry']}" returned HTTP ${String(response['status'])} for "${target['repository']}:${target['tag']}".`);
   }
 
   const digest: Digest_FetchRemoteDigest_Digest = response['headers'].get('Docker-Content-Digest');
 
-  return (digest !== null && digest !== '') ? digest : undefined;
+  return {
+    status: 'found',
+    digest: (digest !== null && digest !== '') ? digest : undefined,
+  };
 }
 
 /**
  * Digest - Request Bearer Token.
  *
  * Exchanges an auth challenge for a short-lived pull token, using Basic
- * credentials when available and anonymous access otherwise.
+ * credentials when available. Returns undefined when access is refused.
  *
  * @param {Digest_RequestBearerToken_Challenge}     challenge     - Challenge.
  * @param {Digest_RequestBearerToken_Credentials}   credentials   - Credentials.
@@ -142,6 +166,10 @@ async function requestBearerToken(challenge: Digest_RequestBearerToken_Challenge
       Authorization: `Basic ${Buffer.from(`${credentials['username']}:${credentials['password']}`).toString('base64')}`,
     } : {},
   });
+
+  if (response['status'] === 401 || response['status'] === 403) {
+    return undefined;
+  }
 
   if (response['ok'] === false) {
     throw new Error(`Registry token request failed with HTTP ${String(response['status'])}.`);

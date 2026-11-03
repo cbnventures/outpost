@@ -5,6 +5,19 @@ import type {
 } from './shared.d.ts';
 
 /**
+ * Select - Is Outpost Image.
+ *
+ * @since 1.0.0
+ */
+export type Select_IsOutpostImage_Image = string;
+
+export type Select_IsOutpostImage_Returns = boolean;
+
+export type Select_IsOutpostImage_Name = string;
+
+export type Select_IsOutpostImage_LastSegment = string;
+
+/**
  * Select - Select Containers.
  *
  * @since 0.0.1
@@ -31,6 +44,10 @@ export type Select_SelectContainers_EnableLabel = string | undefined;
 export type Select_SelectContainers_Name = string;
 
 export type Select_SelectContainers_Image = string;
+
+export type Select_SelectContainers_NetworkMode = string;
+
+export type Select_SelectContainers_IsNetworkNamespaceOwner = boolean;
 
 /**
  * Select - Sort By Dependencies.
@@ -60,3 +77,20 @@ export type Select_SortByDependencies_Dependency = string;
 export type Select_SortByDependencies_DependsOn = Select_SortByDependencies_Dependency[];
 
 export type Select_SortByDependencies_DependencyContainer = Shared_ContainerSummary | undefined;
+
+/**
+ * Select - Uses Network Namespace Of.
+ *
+ * @since 1.0.0
+ */
+export type Select_UsesNetworkNamespaceOf_Container = Shared_ContainerSummary;
+
+export type Select_UsesNetworkNamespaceOf_Containers = Shared_ContainerSummary[];
+
+export type Select_UsesNetworkNamespaceOf_Returns = boolean;
+
+export type Select_UsesNetworkNamespaceOf_Names = Set<string>;
+
+export type Select_UsesNetworkNamespaceOf_NetworkMode = string;
+
+export type Select_UsesNetworkNamespaceOf_Reference = string;

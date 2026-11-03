@@ -18,6 +18,8 @@
     "./src/**/*.ts"
   ],
   "exclude": [
-    "./src/**/*.test.ts"
+    "./src/**/*.test.ts",
+    "./src/types/web/**/*.ts",
+    "./src/web/**/*.ts"
   ]
 }

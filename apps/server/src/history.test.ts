@@ -15,6 +15,8 @@ import type {
   History_Directory,
   History_History_KeepsTheNewestReportsAcrossRestarts_History,
   History_History_KeepsTheNewestReportsAcrossRestarts_Reloaded,
+  History_History_KeepsWhatStartedEachCheck_History,
+  History_History_KeepsWhatStartedEachCheck_Reloaded,
 } from './types/history.test.d.ts';
 
 /**
@@ -70,6 +72,32 @@ describe('history', () => {
     expect(readFileSync(join(directory, 'nested', 'history.json'), 'utf-8')).toContain('03:00:05');
 
     expect(new History(join(directory, 'missing.json'), 2).list()).toStrictEqual([]);
+
+    return;
+  });
+
+  it('keeps what started each check', () => {
+    const history: History_History_KeepsWhatStartedEachCheck_History = new History(join(directory, 'triggers.json'), 10);
+
+    history.add({
+      startedAt: '2026-10-24T04:00:00.000Z',
+      finishedAt: '2026-10-24T04:00:05.000Z',
+      results: [],
+    });
+
+    history.add({
+      startedAt: '2026-10-24T05:00:00.000Z',
+      finishedAt: '2026-10-24T05:00:05.000Z',
+      results: [],
+      trigger: 'api',
+    });
+
+    const reloaded: History_History_KeepsWhatStartedEachCheck_Reloaded = new History(join(directory, 'triggers.json'), 10);
+
+    expect(reloaded.list().map((report) => report['trigger'])).toStrictEqual([
+      'api',
+      undefined,
+    ]);
 
     return;
   });

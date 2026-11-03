@@ -23,9 +23,9 @@ const identity = new NovaIdentity().forDocs();
 const config: DocusaurusNovaConfig = {
   // Site Metadata.
   title: identity['title'] ?? 'Outpost',
-  titleDelimiter: ' - ',
+  titleDelimiter: '-',
   tagline: identity['tagline'] ?? 'Self-hosted container auto-updater for Docker, a modern Watchtower replacement',
-  favicon: 'images/nova.svg',
+  favicon: './favicon.ico',
 
   // Deployment.
   url: identity['url'] ?? 'https://outpost.cbnventures.io',
@@ -33,6 +33,7 @@ const config: DocusaurusNovaConfig = {
   organizationName: identity['organizationName'] ?? 'cbnventures',
   projectName: identity['projectName'] ?? 'outpost',
   trailingSlash: true,
+  noIndex: false,
 
   // Error Handling.
   onBrokenLinks: 'throw',
@@ -40,13 +41,47 @@ const config: DocusaurusNovaConfig = {
   onDuplicateRoutes: 'throw',
 
   // Head Tags.
-  headTags: [{
-    tagName: 'meta',
-    attributes: {
-      property: 'og:type',
-      content: 'website',
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        property: 'og:type',
+        content: 'website',
+      },
     },
-  }],
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'apple-touch-icon',
+        sizes: '180x180',
+        href: `${identity['baseUrl'] ?? '/'}apple-touch-icon.png`,
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '96x96',
+        href: `${identity['baseUrl'] ?? '/'}favicon-96x96.png`,
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: `${identity['baseUrl'] ?? '/'}favicon.svg`,
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'manifest',
+        href: `${identity['baseUrl'] ?? '/'}site.webmanifest`,
+      },
+    },
+  ],
 
   // Markdown.
   markdown: {
@@ -68,7 +103,32 @@ const config: DocusaurusNovaConfig = {
     '@cbnventures/docusaurus-preset-nova',
     {
       // Preset Identity.
-      preset: 'signal',
+      preset: 'foundry',
+
+      // Preset Overrides (undefined = use preset default).
+      overrides: {
+        colors: {
+          primary: {
+            light: '#1565C0',
+            dark: '#1565C0',
+          },
+          secondary: {
+            light: '#D97706',
+            dark: '#D97706',
+          },
+          text: undefined,
+          border: undefined,
+          warning: undefined,
+          danger: undefined,
+        },
+        fonts: {
+          display: undefined,
+          body: undefined,
+          code: undefined,
+        },
+        navbar: undefined,
+        footer: undefined,
+      },
 
       // Plugins.
       plugins: {
@@ -131,10 +191,12 @@ const config: DocusaurusNovaConfig = {
       logo: {
         alt: 'Outpost',
         src: {
-          light: '/images/nova.svg',
+          light: '/images/navbar.svg',
+          dark: undefined,
         },
         href: '/',
       },
+      image: '/thumbnails/brand.png',
       metadata: [
         {
           name: 'description',

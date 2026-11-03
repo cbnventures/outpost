@@ -1,14 +1,14 @@
 import type { ReactElement } from 'react';
 
 /**
- * Index - Blog Enabled.
+ * Pages - Home - Blog Enabled.
  *
  * @since 0.0.0
  */
 export type Pages_Index_Home_BlogEnabled = boolean;
 
 /**
- * Index.
+ * Pages - Home.
  *
  * @since 0.0.0
  */

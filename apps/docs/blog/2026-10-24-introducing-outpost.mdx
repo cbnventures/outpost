@@ -43,19 +43,24 @@ Up-to-date containers cost a single digest lookup, so nothing is downloaded unle
 
 - **Labels** — Update everything except what you label off, or only what you label on.
 - **Monitor-only** — Hear about new images for your database without Outpost touching it.
-- **Notifications** — ntfy or a JSON webhook, sent only when something changed or failed.
+- **Notifications** — ntfy, Telegram, Discord, Slack, email, and six more services, and nothing at all when every container is current.
 - **HTTP API and metrics** — Trigger a run from CI and scrape Prometheus counters.
 
 ## Try It
 
-All it needs is the Docker socket:
+All it needs is the Docker socket and a volume for its data:
 
 ```bash
 docker run --detach \
   --name outpost \
   --restart unless-stopped \
   --volume /var/run/docker.sock:/var/run/docker.sock \
+  --volume outpost-data:/data \
   cbnventures/outpost:latest
 ```
+
+:::info
+No release has been published yet, so until the first one ships, [build the image from source](/docs/getting-started/quick-start/#build-from-source) instead of pulling it.
+:::
 
 Head to the [Quick Start](/docs/getting-started/quick-start/) for the Compose version. Coming from Watchtower, [Migrating from Watchtower](/docs/reference/migrating-from-watchtower/) maps your settings and labels.

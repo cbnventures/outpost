@@ -26,7 +26,6 @@ outpost/
 ├── packages/
 │   ├── docker/            — s6-overlay image assembly (manifest.json, rootfs)
 │   ├── docker-engine/     — Typed Docker Engine API client over the unix socket
-│   ├── notifiers/         — ntfy and webhook notifications
 │   ├── registry/          — Image references, registry credentials, remote digests
 │   └── updater/           — Selection, recreation, rollback, and the update cycle
 ├── tests/                 — Root tooling tests
@@ -59,9 +58,11 @@ Every TypeScript workspace uses the same layout:
 | `packages/registry/src/digest.ts`                          | Registry digest lookup and auth         | Supporting new registry auth flows                 |
 | `packages/docker-engine/src/engine.ts`                     | Docker Engine API calls                 | Adding Engine endpoints                            |
 | `apps/server/src/config.ts`                                | Environment variables                   | Adding or changing settings                        |
-| `apps/server/src/app.ts`                                   | HTTP API and metrics                    | Adding endpoints or metrics                        |
-| `apps/server/src/admin.ts`                                 | Dashboard routes and API                | Changing what the dashboard shows or can do        |
-| `apps/server/public/admin/`                                | Dashboard page, script, and styles      | Changing the dashboard UI                          |
+| `apps/server/src/app.ts`                                   | HTTP app, limits, and route wiring      | Adding middleware or route modules                 |
+| `apps/server/src/routes/`                                  | API, sign-in, dashboard, and metrics    | Adding or changing endpoints or metrics            |
+| `apps/server/src/lib/state.ts`                             | SQLite account, sessions, and tokens    | Changing what the server stores                    |
+| `apps/server/src/web/`                                     | Dashboard (React + Vite)                | Changing the dashboard UI                          |
+| `apps/server/src/self-update.ts`                           | Self-update helper and hand-off         | Changing how Outpost updates itself                |
 | `packages/docker/manifest.json`                            | s6 services                             | Changing services, health, or writable paths       |
 | `packages/docker/rootfs/etc/s6-overlay/s6-rc.d/server/run` | Service start and socket group          | Changing how the server process starts             |
 | `Dockerfile`                                               | Image build                             | Changing stages, base images, or build order       |
@@ -90,7 +91,7 @@ Every TypeScript workspace uses the same layout:
 
 ### Environment Variables
 
-The image is configured only through environment variables (`OUTPOST_*`, `DOCKER_HOST`, `DOCKER_CONFIG`, `PUID`, `PGID`, `TZ`). `apps/server/src/config.ts` is the source of truth; `compose.yml` documents the common ones.
+Environment variables carry only what Outpost needs before its database opens: `DOCKER_HOST`, `OUTPOST_DATA_DIRECTORY`, `PORT`, `PUID`, `PGID`, and `TZ`. Update behavior (the schedule, label mode, monitor-only mode, cleanup, replacement timing, and private registry sign-ins) is saved in SQLite and changed on the dashboard's **Settings** page. `apps/server/src/config.ts` reads the server's variables and holds the behavior defaults; `compose.yml` documents the common ones.
 
 ## Workspace Rules
 
@@ -100,7 +101,7 @@ The image is configured only through environment variables (`OUTPOST_*`, `DOCKER
 |------------------|-----------------------------------|----------------------------------------|
 | Source files     | kebab-case                        | `docker-engine`, `recreate.ts`         |
 | Workspace names  | `outpost-<role>-<name>`           | `outpost-package-updater`              |
-| Environment vars | `OUTPOST_` + UPPER_SNAKE          | `OUTPOST_LABEL_MODE`                   |
+| Environment vars | `OUTPOST_` + UPPER_SNAKE          | `OUTPOST_DATA_DIRECTORY`               |
 | Container labels | `io.cbnventures.outpost.<name>`   | `io.cbnventures.outpost.enable`        |
 | Type files       | Mirror source path under `types/` | `packages/updater/src/types/plan.d.ts` |
 | Test files       | Next to the module, `.test.ts`    | `packages/updater/src/plan.test.ts`    |
@@ -108,14 +109,15 @@ The image is configured only through environment variables (`OUTPOST_*`, `DOCKER
 ### Do / Don't
 
 **Do:**
-- Keep Docker, registry, notification, and update logic in their packages; `apps/server` only wires them together.
+- Keep Docker, registry, and update logic in their packages; `apps/server` wires them together and owns notifications, which share their design with the other Docker apps.
 - Inject I/O (engine, fetch, clock, sleep) into the updater so every decision is unit-testable without Docker.
 - Validate every Docker Engine and registry response with Zod.
 - Roll back on any failure after the old container has been stopped.
+- Keep the database readable by the previous release; a self-update that rolls back starts the old Outpost on it.
 
 **Don't:**
 - Don't remove volumes when removing containers.
-- Don't update Outpost's own container while it is running.
+- Don't swap Outpost's own container from inside it; the self-update helper container does that.
 - Don't run the server process as root; grant access through the socket's group instead.
 - Don't let notification failures affect an update cycle.
 
@@ -124,23 +126,29 @@ The image is configured only through environment variables (`OUTPOST_*`, `DOCKER
 ### Architecture
 
 ```
-Cron schedule ─┐
-POST /v1/update ┴─> Scheduler (one cycle at a time)
-                       |
-                       v
-               runUpdateCycle
-  list containers -> select (labels, self, pinned) -> sort (depends_on)
+Cron schedule ───────┐
+POST /v1/update ─────┤
+Dashboard check now ─┴─> Scheduler (one cycle at a time)
+                             |
+                             v
+                       runUpdateCycle
+  list containers -> select (labels) -> sort (depends_on, then Outpost last)
        |
        v  for each container
-  inspect -> registry digest == running digest? -> up-to-date
+  inspect -> pinned to a digest or ID?           -> skipped
+          -> shares another container's network? -> skipped
+          -> registry digest == running digest?  -> up-to-date
+          -> monitor-only, registry answered?    -> available
           -> pull -> same image ID?              -> up-to-date
-          -> monitor-only?                        -> available
+          -> monitor-only?                       -> available
           -> recreate (stop, rename, create, connect, start, wait healthy)
                 -> success: remove old (+ old image if cleanup) -> updated
                 -> failure: remove new, restore old             -> rolled-back
+          -> Outpost itself (last): a helper container runs the same recreate,
+             and the Outpost running afterwards records the result
        |
        v
-  report -> notifications (ntfy / webhook), /v1/status, /metrics
+  report -> notifications (the destinations on the Notifications page), /v1/status, /metrics
 ```
 
 ### Data Flow and Ownership
@@ -148,7 +156,7 @@ POST /v1/update ┴─> Scheduler (one cycle at a time)
 1. **Schedule or API** — The scheduler starts a cycle unless one is already running.
 2. **Select** — Running containers are filtered by label mode and ordered by Compose dependencies.
 3. **Check** — The registry digest (or a pull and image ID comparison) decides whether an update exists.
-4. **Recreate** — The container is swapped with rollback on failure.
+4. **Recreate** — The container is swapped with rollback on failure. Outpost's own container is checked last and swapped by a short-lived helper container, so the swap survives Outpost stopping.
 5. **Report** — Results are stored for the API and metrics and sent to notification targets.
 
 ### Error Strategy
@@ -157,8 +165,9 @@ POST /v1/update ┴─> Scheduler (one cycle at a time)
 |---------------|-------------------------------------------------------------------------------------------|
 | Config        | Invalid environment values stop startup with a readable message.                          |
 | Engine client | Non-2xx responses throw with the daemon's error message.                                  |
-| Registry      | Lookup failures fall back to pull-and-compare.                                            |
+| Registry      | Unreachable registries fall back to pull-and-compare; a missing image is a local build.   |
 | Recreation    | Any failure after stopping triggers rollback; rollback failures are reported as `failed`. |
+| Self-update   | An image that rolled back or never started is skipped until a newer one appears.          |
 | Cycle         | One container's failure is recorded and the cycle continues.                              |
 | Notifications | Failures are collected and never thrown.                                                  |
 

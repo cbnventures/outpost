@@ -5,7 +5,7 @@ import { registerTerminologySuite } from '@cbnventures/nova/rules/vitest';
 import * as vitest from 'vitest';
 
 /**
- * Terminology - Current File Path.
+ * Tests - Terminology - Current File Path.
  *
  * This site self-checks its Terminology components THROUGH the published kit.
  * The suite logic lives in @cbnventures/nova/rules/vitest; this wrapper

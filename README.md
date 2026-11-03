@@ -43,7 +43,7 @@
 <!-- nova-region: introduction -->
 ## Introduction
 
-Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, ntfy and webhook notifications, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image.
+Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, notifications to ntfy, Telegram, Discord, email, and more, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image.
 <!-- nova-region-end: introduction -->
 
 <!-- nova-region: documentation -->

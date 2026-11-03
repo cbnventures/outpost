@@ -1,0 +1,110 @@
+---
+id: access-tokens
+title: Access Tokens
+description: Create, edit, and revoke Outpost access tokens on the dashboard, and give each script or Prometheus server only the scopes it needs to do its job.
+sidebar_position: 7
+keywords:
+  - outpost
+  - access tokens
+  - scopes
+  - api
+  - expiration
+  - revocation
+tags:
+  - features
+  - access tokens
+---
+
+import ThemedImage from '@theme/ThemedImage';
+import { Frame, Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+import accessTokensOneLight from './_assets_/access-tokens-1-light.png';
+import accessTokensOneDark from './_assets_/access-tokens-1-dark.png';
+import accessTokensTwoLight from './_assets_/access-tokens-2-light.png';
+import accessTokensTwoDark from './_assets_/access-tokens-2-dark.png';
+import accessTokensThreeLight from './_assets_/access-tokens-3-light.png';
+import accessTokensThreeDark from './_assets_/access-tokens-3-dark.png';
+import accessTokensFourLight from './_assets_/access-tokens-4-light.png';
+import accessTokensFourDark from './_assets_/access-tokens-4-dark.png';
+
+Create an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> for each script or app that calls Outpost, and edit or revoke it on the dashboard whenever you need to.
+
+## Why Use Separate Tokens?
+
+1. Gives each client only the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology> it needs so a metrics scraper can't start updates.
+2. Lets you revoke one client without affecting the others.
+3. Shows when each token was last used so unused ones are easy to spot.
+4. Ends temporary access on its own when you set an expiry.
+
+## Create a Token
+
+<Frame caption="The Access tokens page">
+  <ThemedImage sources={{ light: accessTokensOneLight, dark: accessTokensOneDark }} alt="Outpost Access tokens page listing the Prometheus, GitHub Actions, and Home Assistant tokens with their scopes, last use, and expiry" width={1280} height={389} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+1. Open **Access tokens** and select **Create token**.
+2. Enter a **Name** you'll recognize, like the app that uses it, up to 80 characters. Each token needs its own name, and names that differ only in letter case count as the same.
+3. Under **Scopes**, choose what the client can do. Each one lists the paths it opens.
+   - **`status:read`** — See the overview, containers, history, and settings.
+   - **`updates:run`** — Start checks, and update containers unless Outpost is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.
+   - **`metrics:read`** — Read the Prometheus metrics.
+4. Under **Expires**, choose **Never**, **In 30 days**, **In 90 days**, or **In 1 year**.
+5. Select **Create token**.
+
+<Frame caption="Creating a token" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: accessTokensTwoLight, dark: accessTokensTwoDark }} alt="Create token dialog with the name Uptime Kuma, the status:read scope checked, and Expires set to In 1 year" width={584} height={759} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+## Store the Token Once
+
+The new token appears once, at the top of **Access tokens**, under **Token for** and its name.
+
+<Frame caption="A new token, shown once">
+  <ThemedImage sources={{ light: accessTokensThreeLight, dark: accessTokensThreeDark }} alt="Token for Uptime Kuma, with the new token, a copy button, and a Done button" width={984} height={204} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+1. Select the copy button next to the token, and save it where the client keeps its secrets.
+2. Select **Done**.
+
+Outpost keeps only a hash of the token, so it can't show it again. If you lose a token, create a new one and revoke the old one.
+
+A token is `outpost_` followed by 43 letters, numbers, dashes, and underscores. Clients send it in the `Authorization` header as `Bearer outpost_…`.
+
+## Edit a Token
+
+- **Edit** changes a token's name, <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology>, and expiry, and the token's value stays the same. Changes apply to the client's next request.
+- Under **Expires**, **Keep** and the current date leave the expiry as it is, and **Never** removes it.
+
+## Revoke a Token
+
+Select **Revoke**, then **Revoke** again to confirm. The token is deleted, clients using it are refused on their next request, and its name is free to use again.
+
+## Rotate a Token
+
+1. Create a replacement with a new name and the same <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology>.
+2. Update the client and check that one request works.
+3. Revoke the old token.
+
+## Expired Tokens
+
+An expired token stays in the list, marked as expired, and requests that use it are refused. Edit it to set a new expiry, or revoke it.
+
+## Calling the API
+
+The **Calling the API** section shows the address clients call, the `Authorization` header they send, and each path with the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> it needs. Select the copy button next to **Base URL** to copy the address the dashboard is open at.
+
+<Frame caption="The Calling the API panel">
+  <ThemedImage sources={{ light: accessTokensFourLight, dark: accessTokensFourDark }} alt="Calling the API panel showing the base URL https://outpost.example.net, the Authorization header, and each path with the scope it needs" width={984} height={545} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+To test a token, ask Outpost which token is calling, with the token in the `OUTPOST_TOKEN` shell variable:
+
+```bash
+curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:3000/api/v1/auth/me
+```
+
+The reply holds the token's name and <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology>. See [HTTP API and Metrics](/docs/features/http-api-and-metrics/) for every route.
+
+:::info
+An <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> can't sign in to the dashboard or change tokens, passwords, sign-in methods, or notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>. Those need a browser sign-in, so a leaked token can't make more tokens or redirect alerts.
+:::

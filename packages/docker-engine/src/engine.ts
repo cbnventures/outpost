@@ -35,6 +35,10 @@ import type {
   Engine_Runner_InspectImage_Returns,
   Engine_Runner_ListContainers_Response,
   Engine_Runner_ListContainers_Returns,
+  Engine_Runner_ListContainersByLabel_Filters,
+  Engine_Runner_ListContainersByLabel_Label,
+  Engine_Runner_ListContainersByLabel_Response,
+  Engine_Runner_ListContainersByLabel_Returns,
   Engine_Runner_ParseDockerHost_DockerHost,
   Engine_Runner_ParseDockerHost_Returns,
   Engine_Runner_ParseDockerHost_Url,
@@ -140,6 +144,25 @@ export class Runner {
    */
   public async listContainers(): Engine_Runner_ListContainers_Returns {
     const response: Engine_Runner_ListContainers_Response = await this.send('GET', '/containers/json', undefined, {});
+
+    return containerSummariesSchema.parse(Runner.expect(response, [200]));
+  }
+
+  /**
+   * Engine - List Containers By Label.
+   *
+   * Lists every container that has a label, running or stopped, such as
+   * the self-update helpers Outpost removes once they have exited.
+   *
+   * @param {Engine_Runner_ListContainersByLabel_Label} label - Label.
+   *
+   * @returns {Engine_Runner_ListContainersByLabel_Returns}
+   *
+   * @since 1.0.0
+   */
+  public async listContainersByLabel(label: Engine_Runner_ListContainersByLabel_Label): Engine_Runner_ListContainersByLabel_Returns {
+    const filters: Engine_Runner_ListContainersByLabel_Filters = encodeURIComponent(JSON.stringify({ label: [label] }));
+    const response: Engine_Runner_ListContainersByLabel_Response = await this.send('GET', `/containers/json?all=true&filters=${filters}`, undefined, {});
 
     return containerSummariesSchema.parse(Runner.expect(response, [200]));
   }

@@ -1,28 +1,55 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+
+import {
+  cgroupContainerIdPattern,
+  containerHostnamePattern,
+  mountInfoContainerIdPattern,
+} from './regex.js';
 
 import type {
+  Config_ApplyRuntimeSettings_Config,
+  Config_ApplyRuntimeSettings_Returns,
+  Config_ApplyRuntimeSettings_Settings,
+  Config_DefaultRuntimeSettings,
   Config_LoadConfig_Environment,
-  Config_LoadConfig_LabelMode,
   Config_LoadConfig_Returns,
-  Config_ReadFlag_Fallback,
-  Config_ReadFlag_Name,
-  Config_ReadFlag_Returns,
-  Config_ReadFlag_Value,
   Config_ReadNumber_Fallback,
   Config_ReadNumber_Name,
   Config_ReadNumber_Parsed,
   Config_ReadNumber_Returns,
   Config_ReadNumber_Value,
-  Config_ReadSecret_FilePath,
-  Config_ReadSecret_FileValue,
-  Config_ReadSecret_Name,
-  Config_ReadSecret_Returns,
-  Config_ReadSecret_Value,
+  Config_ReadSelfId_Cgroup,
+  Config_ReadSelfId_CgroupMatch,
+  Config_ReadSelfId_Hostname,
+  Config_ReadSelfId_MountInfo,
+  Config_ReadSelfId_MountInfoMatch,
+  Config_ReadSelfId_ReadFile,
+  Config_ReadSelfId_Returns,
   Config_ReadString_Fallback,
   Config_ReadString_Returns,
   Config_ReadString_Value,
+  Config_RuntimeSettingsFromConfig_Config,
+  Config_RuntimeSettingsFromConfig_Returns,
 } from './types/config.d.ts';
+
+/**
+ * Config - Default Runtime Settings.
+ *
+ * Seeds a new installation's database. After the first start, the Settings
+ * page owns these values and environment variables do not override them.
+ *
+ * @since 1.0.0
+ */
+export const defaultRuntimeSettings: Config_DefaultRuntimeSettings = {
+  schedule: '0 0 4 * * *',
+  runOnStart: false,
+  labelMode: 'opt-out',
+  monitorOnly: false,
+  cleanup: true,
+  stopTimeoutSeconds: 30,
+  healthTimeoutSeconds: 120,
+  settleSeconds: 10,
+};
 
 /**
  * Config - Load Config.
@@ -37,64 +64,73 @@ import type {
  * @since 0.0.1
  */
 export function loadConfig(environment: Config_LoadConfig_Environment): Config_LoadConfig_Returns {
-  const labelMode: Config_LoadConfig_LabelMode = readString(environment['OUTPOST_LABEL_MODE'], 'opt-out');
-
-  if (labelMode !== 'opt-in' && labelMode !== 'opt-out') {
-    throw new Error(`OUTPOST_LABEL_MODE must be "opt-in" or "opt-out", received "${labelMode}".`);
-  }
-
   return {
     port: readNumber('PORT', environment['PORT'], 3000),
     dockerHost: readString(environment['DOCKER_HOST'], 'unix:///var/run/docker.sock'),
-    schedule: readString(environment['OUTPOST_SCHEDULE'], '0 0 4 * * *'),
-    runOnStart: readFlag('OUTPOST_RUN_ON_START', environment['OUTPOST_RUN_ON_START'], false),
-    apiToken: readString(environment['OUTPOST_API_TOKEN'], undefined),
-    adminUsername: readString(environment['OUTPOST_ADMIN_USERNAME'], 'admin'),
-    adminPassword: readSecret('OUTPOST_ADMIN_PASSWORD', environment['OUTPOST_ADMIN_PASSWORD'], environment['OUTPOST_ADMIN_PASSWORD_FILE']),
+    schedule: defaultRuntimeSettings['schedule'],
+    runOnStart: defaultRuntimeSettings['runOnStart'],
     dataDirectory: readString(environment['OUTPOST_DATA_DIRECTORY'], '/data'),
-    trustProxy: readFlag('OUTPOST_TRUST_PROXY', environment['OUTPOST_TRUST_PROXY'], false),
     updater: {
-      labelMode,
-      monitorOnly: readFlag('OUTPOST_MONITOR_ONLY', environment['OUTPOST_MONITOR_ONLY'], false),
-      cleanup: readFlag('OUTPOST_CLEANUP', environment['OUTPOST_CLEANUP'], true),
-      stopTimeoutSeconds: readNumber('OUTPOST_STOP_TIMEOUT', environment['OUTPOST_STOP_TIMEOUT'], 30),
-      healthTimeoutSeconds: readNumber('OUTPOST_HEALTH_TIMEOUT', environment['OUTPOST_HEALTH_TIMEOUT'], 120),
-      settleSeconds: readNumber('OUTPOST_SETTLE_SECONDS', environment['OUTPOST_SETTLE_SECONDS'], 10),
-      selfId: readString(environment['HOSTNAME'], undefined),
-      dockerConfigPath: join(readString(environment['DOCKER_CONFIG'], '/config'), 'config.json'),
-      notificationTargets: {
-        ntfyUrl: readString(environment['OUTPOST_NTFY_URL'], undefined),
-        ntfyToken: readString(environment['OUTPOST_NTFY_TOKEN'], undefined),
-        webhookUrl: readString(environment['OUTPOST_WEBHOOK_URL'], undefined),
-      },
+      labelMode: defaultRuntimeSettings['labelMode'],
+      monitorOnly: defaultRuntimeSettings['monitorOnly'],
+      cleanup: defaultRuntimeSettings['cleanup'],
+      stopTimeoutSeconds: defaultRuntimeSettings['stopTimeoutSeconds'],
+      healthTimeoutSeconds: defaultRuntimeSettings['healthTimeoutSeconds'],
+      settleSeconds: defaultRuntimeSettings['settleSeconds'],
+      selfId: readSelfId(environment['HOSTNAME']),
     },
   };
 }
 
 /**
- * Config - Read Flag.
+ * Config - Apply Runtime Settings.
  *
- * Reads a "true"/"false" variable. Unset or empty values use the
- * fallback; anything else is rejected so typos do not pass silently.
+ * Copies the database-backed behavior into the live configuration object.
+ * Existing closures keep the same object reference and see changes immediately.
  *
- * @param {Config_ReadFlag_Name}     name     - Name.
- * @param {Config_ReadFlag_Value}    value    - Value.
- * @param {Config_ReadFlag_Fallback} fallback - Fallback.
+ * @param {Config_ApplyRuntimeSettings_Config}   config   - Config.
+ * @param {Config_ApplyRuntimeSettings_Settings} settings - Settings.
  *
- * @returns {Config_ReadFlag_Returns}
+ * @returns {Config_ApplyRuntimeSettings_Returns}
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
-function readFlag(name: Config_ReadFlag_Name, value: Config_ReadFlag_Value, fallback: Config_ReadFlag_Fallback): Config_ReadFlag_Returns {
-  if (value === undefined || value === '') {
-    return fallback;
-  }
+export function applyRuntimeSettings(config: Config_ApplyRuntimeSettings_Config, settings: Config_ApplyRuntimeSettings_Settings): Config_ApplyRuntimeSettings_Returns {
+  Reflect.set(config, 'schedule', settings['schedule']);
+  Reflect.set(config, 'runOnStart', settings['runOnStart']);
+  Reflect.set(config['updater'], 'labelMode', settings['labelMode']);
+  Reflect.set(config['updater'], 'monitorOnly', settings['monitorOnly']);
+  Reflect.set(config['updater'], 'cleanup', settings['cleanup']);
+  Reflect.set(config['updater'], 'stopTimeoutSeconds', settings['stopTimeoutSeconds']);
+  Reflect.set(config['updater'], 'healthTimeoutSeconds', settings['healthTimeoutSeconds']);
+  Reflect.set(config['updater'], 'settleSeconds', settings['settleSeconds']);
 
-  if (value !== 'true' && value !== 'false') {
-    throw new Error(`${name} must be "true" or "false", received "${value}".`);
-  }
+  return;
+}
 
-  return value === 'true';
+/**
+ * Config - Runtime Settings From Config.
+ *
+ * Projects the mutable behavior out of the full live configuration without
+ * exposing the container's socket or data path.
+ *
+ * @param {Config_RuntimeSettingsFromConfig_Config} config - Config.
+ *
+ * @returns {Config_RuntimeSettingsFromConfig_Returns}
+ *
+ * @since 1.0.0
+ */
+export function runtimeSettingsFromConfig(config: Config_RuntimeSettingsFromConfig_Config): Config_RuntimeSettingsFromConfig_Returns {
+  return {
+    schedule: config['schedule'],
+    runOnStart: config['runOnStart'],
+    labelMode: config['updater']['labelMode'],
+    monitorOnly: config['updater']['monitorOnly'],
+    cleanup: config['updater']['cleanup'],
+    stopTimeoutSeconds: config['updater']['stopTimeoutSeconds'],
+    healthTimeoutSeconds: config['updater']['healthTimeoutSeconds'],
+    settleSeconds: config['updater']['settleSeconds'],
+  };
 }
 
 /**
@@ -126,37 +162,43 @@ function readNumber(name: Config_ReadNumber_Name, value: Config_ReadNumber_Value
 }
 
 /**
- * Config - Read Secret.
+ * Config - Read Self ID.
  *
- * Reads a secret from its variable or, preferably, from the file named
- * by the matching _FILE variable (such as a Docker secret).
+ * Finds the current container ID in cgroup or mount metadata, which remains
+ * available when host networking makes HOSTNAME unreliable. A Docker-style
+ * hostname is retained only as a final fallback.
  *
- * @param {Config_ReadSecret_Name}     name     - Name.
- * @param {Config_ReadSecret_Value}    value    - Value.
- * @param {Config_ReadSecret_FilePath} filePath - File path.
+ * @param {Config_ReadSelfId_Hostname} hostname   - Hostname.
+ * @param {Config_ReadSelfId_ReadFile} [readFile] - Read file.
  *
- * @returns {Config_ReadSecret_Returns}
+ * @returns {Config_ReadSelfId_Returns}
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
-function readSecret(name: Config_ReadSecret_Name, value: Config_ReadSecret_Value, filePath: Config_ReadSecret_FilePath): Config_ReadSecret_Returns {
-  if (filePath !== undefined && filePath !== '') {
-    let fileValue: Config_ReadSecret_FileValue = '';
+export function readSelfId(hostname: Config_ReadSelfId_Hostname, readFile: Config_ReadSelfId_ReadFile = readFileSync): Config_ReadSelfId_Returns {
+  try {
+    const cgroup: Config_ReadSelfId_Cgroup = readFile('/proc/self/cgroup', 'utf-8');
+    const cgroupMatch: Config_ReadSelfId_CgroupMatch = new RegExp(cgroupContainerIdPattern, 'm').exec(cgroup);
 
-    try {
-      fileValue = readFileSync(filePath, 'utf-8').trim();
-    } catch {
-      throw new Error(`${name}_FILE points at "${filePath}", which cannot be read.`);
+    if (cgroupMatch !== null && cgroupMatch[1] !== undefined) {
+      return cgroupMatch[1];
     }
-
-    if (fileValue === '') {
-      throw new Error(`${name}_FILE points at "${filePath}", which is empty.`);
-    }
-
-    return fileValue;
+  } catch {
+    // /proc is unavailable outside Linux containers.
   }
 
-  return (value === undefined || value === '') ? undefined : value;
+  try {
+    const mountInfo: Config_ReadSelfId_MountInfo = readFile('/proc/self/mountinfo', 'utf-8');
+    const mountInfoMatch: Config_ReadSelfId_MountInfoMatch = new RegExp(mountInfoContainerIdPattern, 'm').exec(mountInfo);
+
+    if (mountInfoMatch !== null && mountInfoMatch[1] !== undefined) {
+      return mountInfoMatch[1];
+    }
+  } catch {
+    // /proc is unavailable outside Linux containers.
+  }
+
+  return (hostname !== undefined && containerHostnamePattern.test(hostname) === true) ? hostname : undefined;
 }
 
 /**

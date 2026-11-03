@@ -8,8 +8,10 @@ keywords:
   - troubleshooting
   - permission denied
   - rate limit
-  - credential helpers
+  - private registry
   - network mode
+  - setup code
+  - encryption key
 tags:
   - reference
   - troubleshooting
@@ -31,16 +33,38 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 - For rootless Docker, mount the user socket to the default path, such as `/run/user/1000/docker.sock:/var/run/docker.sock`.
 - Check that the socket is a socket on the host (`ls -l /var/run/docker.sock` shows a leading `s`), not a directory Docker created because the path was wrong.
 
-## Startup Stops With an Invalid Value
+## A Setting Will Not Save
 
-**Symptom**: The logs show a message such as `OUTPOST_CLEANUP must be "true" or "false", received "yes".`, repeated each time the server restarts.
+**Symptom**: The **Settings** page highlights a schedule or timing value and does not save it.
 
-**Cause**: Outpost validates every variable at startup and refuses to guess.
+**Cause**: Outpost validates runtime behavior before writing it to the database and refuses to guess an invalid value.
 
 **Solution**:
 
-- Fix the named variable using [Configuration](/docs/getting-started/configuration/#validation).
-- Flags must be exactly `true` or `false`, and timeouts positive whole numbers.
+- Fix the highlighted field using [Configuration](/docs/getting-started/configuration/#validation).
+- Timing values must be positive whole numbers, and the schedule must be a valid cron expression.
+
+## Startup Stops With an Encryption Key Error
+
+**Symptom**: The logs repeat `The encryption key at "/data/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/data/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` or `The encryption key file at "..." is not 64 hexadecimal characters.`, and the container reports unhealthy.
+
+**Cause**: The <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> in `keys/installation.key`, next to the database, belongs to another database or is damaged. A missing key file doesn't stop startup, because Outpost makes a new key, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key).
+
+**Solution**:
+
+- Restore `keys/installation.key` from the same backup as the database, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match).
+- Without that key, delete the key file and restart, so Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the saved registry passwords. Then enter them again from the notice in the dashboard.
+
+## Startup Stops With a Permission Error
+
+**Symptom**: The logs repeat `unable to open database file`, or an `EACCES` or `EPERM` error for the data directory.
+
+**Cause**: The data directory or the files in it belong to a different user than `PUID`. This happens after changing `PUID` or `PGID`, or with a custom `OUTPOST_DATA_DIRECTORY` that another user owns.
+
+**Solution**:
+
+- Change the owner of the files to `PUID` and `PGID`, as shown in [Backup and Recovery](/docs/reference/backup-and-recovery/#change-puid-or-pgid-with-existing-data).
+- For a custom `OUTPOST_DATA_DIRECTORY`, give that folder to `PUID` too, since only `/data` is prepared at startup.
 
 ## Docker Hub Rate Limits
 
@@ -50,32 +74,32 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Solution**:
 
-- Add a Docker Hub login, even a free account, as shown in [Private Registries](/docs/getting-started/private-registries/).
+- Add a Docker Hub sign-in, even for a free account, as shown in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in).
 - Run the schedule less often, such as once a day instead of every hour.
 - Pull images from a mirror such as `ghcr.io` where the project publishes one.
 
-## Private Images Fail With Credential Helpers
+## Private Images Fail to Update
 
-**Symptom**: Private images show `failed` with `requires credentials`, `unauthorized`, or `pull access denied`, even though `docker pull` works on the host.
+**Symptom**: Private images show `failed` with `unauthorized` or `pull access denied`, even though `docker pull` works on the host.
 
-**Cause**: Your `config.json` uses `credsStore` or `credHelpers`, so it contains no passwords. Outpost doesn't run credential helpers.
+**Cause**: Outpost signs in with the sign-ins on its **Settings** page, not with the host's `config.json` or a credential helper. The registry has no sign-in there, its host doesn't match the image name, or the password is wrong, expired, or was removed.
 
 **Solution**:
 
-- Write a separate `config.json` for Outpost with an `auth` entry per registry.
-- Mount it at `/config/config.json` and check that `PUID` can read it.
-- See [Private Registries](/docs/getting-started/private-registries/#supported-file-format) for the format.
+- Add a sign-in under **Private registries** on the **Settings** page, as shown in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in).
+- Check that the host matches the image name, such as `ghcr.io` for `ghcr.io/your-org/app`. Docker Hub images use `docker.io`.
+- If the password expired or a lost <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> removed it, select **Edit** and enter a new one.
 
 ## Container Is Skipped for Its Network Mode
 
-**Symptom**: A container shows `skipped` with `Shares another container's network namespace`.
+**Symptom**: A container shows `skipped` with `Shares another container's network namespace` or `Has containers sharing its network namespace`.
 
-**Cause**: The container uses `network_mode: container:...`, or `network_mode: service:...` in Compose, which Docker turns into the same thing. Outpost doesn't recreate these yet.
+**Cause**: The container uses `network_mode: container:...`, or `network_mode: service:...` in Compose, which Docker turns into the same thing, or another running container joins this container's namespace. Outpost skips both the dependent and the namespace owner so an update cannot strand the dependent on a removed container.
 
 **Solution**:
 
 - Update the pair by hand, for example `docker compose pull && docker compose up --detach`.
-- Or label the container `io.cbnventures.outpost.monitor-only: "true"` so you still hear about new images.
+- Watch their images some other way, such as the image's release notes. Outpost never checks these containers, so it can't report new images for them, even with the <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> label.
 
 ## Container Is Skipped as Pinned
 
@@ -88,6 +112,17 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 - Start it from a tag, such as `nginx:1.27`, if you want Outpost to update it.
 - Otherwise this is expected and nothing needs to change.
 
+## Container Is Skipped as Locally Built
+
+**Symptom**: A container shows `skipped` with `Image is locally built or has no published registry digest` or `Image is locally built, or its registry needs credentials Outpost doesn't have`.
+
+**Cause**: The first message means Docker built the image on this host, so there's no registry image to follow. The second appears only on Docker 28 or older with the containerd image store, where Docker keeps no build record: the registry wouldn't answer without a login, which Docker Hub also does for a name it doesn't have.
+
+**Solution**:
+
+- For an image you build yourself, this is expected. Rebuild and restart it yourself, or push it to a registry and run it from there.
+- For an image you pulled from a private registry, the second message means Outpost can't log in. Add a sign-in for its registry as described in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in).
+
 ## Updates Keep Rolling Back
 
 **Symptom**: A container shows `rolled-back` every <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>.
@@ -96,101 +131,164 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Solution**:
 
-- Read the detail, such as `New container stopped (exited)` or `did not become healthy within 120s`.
+- Read the detail, such as `New container is not running (exited)` or `New container did not become healthy within 120s`.
 - Start the new image by hand with `docker run` to see its logs.
-- For slow starters, raise `OUTPOST_HEALTH_TIMEOUT`.
+- For slow starters, raise **Health timeout** on the **Settings** page.
 - Mark the container <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> until a fixed image is released.
 
-## Outpost Updated Itself or Stopped Mid-Run
+## Outpost Didn't Update Itself
 
-**Symptom**: The Outpost container stops during a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, or the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> doesn't show Outpost as `skipped`.
+**Symptom**: A newer Outpost image exists, but Outpost's line in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> is `skipped`, `rolled-back`, or `failed`, or the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> has no line for Outpost at all.
 
-**Cause**: Outpost recognizes itself through its hostname. A custom `hostname` on the Outpost container hides it.
+**Cause**: The line's detail names the reason:
 
-**Solution**:
-
-- Remove the `hostname` setting from the Outpost container.
-- As a safeguard, label Outpost `io.cbnventures.outpost.enable: "false"`.
-
-## API Returns 404 or 401
-
-**Symptom**: `/v1/update`, `/v1/status`, or `/metrics` returns `404` or `401`.
-
-**Cause**: `404` means `OUTPOST_API_TOKEN` isn't set. `401` means the `Authorization` header is missing or the token doesn't match.
+- **No volume at `/data`** — `Outpost can't update itself because /data isn't on a volume, so its account and history would be lost`.
+- **No socket from the host** — `Outpost can't update itself because the Docker socket at /var/run/docker.sock isn't mounted from the host`.
+- **Own container not found** — `Outpost couldn't find its own container, so it leaves Outpost containers alone`, shown for every container running an image named `outpost`.
+- **Image failed before** — `The new image (3f2a9c1b7d4e) didn't start last time, so Outpost waits for a newer one`, after an earlier check rolled that image back.
+- **Update still open** — `An earlier self-update hasn't finished`.
+- **Helper failed** — A `failed` line, such as `Couldn't start the self-update helper: ...`, or a detail that ends in `; see docker logs outpost-outpost-self-update`.
+- **No line** — The label rules leave Outpost out, such as `io.cbnventures.outpost.enable=false`, or opt-in mode without `io.cbnventures.outpost.enable=true`.
 
 **Solution**:
 
-- Set `OUTPOST_API_TOKEN` and recreate the container.
-- Send the header as `Authorization: Bearer <token>`, with exactly one space.
+- Mount a volume at `/data` and the socket from the host, as in the [Quick Start](/docs/getting-started/quick-start/#start-outpost), then let the next check run.
+- If Outpost can't find its own container, run it on Docker Engine and keep Docker's default hostname, which is the container ID that Outpost falls back to.
+- For an image that failed before, read the earlier `rolled-back` line in **History** to see why. Outpost tries again once a newer image is published.
+- If `An earlier self-update hasn't finished` keeps coming back, restart Outpost with `docker restart outpost`, which finishes that update first.
+- When a detail ends in `; see docker logs ...`, run that command to read the helper's log. Outpost removes the stopped helper the next time it starts.
+- To keep Outpost on its current image on purpose, label it `io.cbnventures.outpost.enable: "false"`. The missing line is then expected.
 
-## Dashboard Says It Is Locked
+## API Requests Get 401, 403, or 404
 
-**Symptom**: The sign-in page says the dashboard is locked, and the startup log shows `(locked: set OUTPOST_ADMIN_PASSWORD_FILE)`.
+**Symptom**: A request to `/api/v1`, `/v1/update`, `/v1/status`, or `/metrics` gets `401`, `403`, or `404`.
 
-**Cause**: Neither `OUTPOST_ADMIN_PASSWORD_FILE` nor `OUTPOST_ADMIN_PASSWORD` is set, so there is no password to sign in with.
+**Cause**: The status code says which check failed:
 
-**Solution**:
-
-- Create a password file, for example with `openssl rand -base64 24 > ./outpost-admin-password.txt`.
-- Pass it as a Docker secret and set `OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password`, as shown in [Web Dashboard](/docs/features/dashboard/#enable-the-dashboard).
-- Recreate the container with `docker compose up --detach`.
-
-## Startup Stops on the Password File
-
-**Symptom**: The logs show `OUTPOST_ADMIN_PASSWORD_FILE points at "/run/secrets/outpost_admin_password", which cannot be read.` or `which is empty.`, repeated each time the server restarts.
-
-**Cause**: The file is missing from the container, isn't readable by `PUID`, or contains only whitespace.
+- **`401`** — The `Authorization` header is missing, or the token is mistyped, expired, or revoked. The message is `Sign in, or send a valid API token.` or `A valid personal access token is required.`
+- **`403`** — The token doesn't have the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> the route needs, such as `This token doesn't have the metrics:read scope.` A route only the dashboard can use, such as `/api/v1/notifications`, answers every token with `An administrator browser session is required.`
+- **`404`** — The request used `GET` on `/v1/update` or `/api/v1/checks`, which only accept `POST`. Plain `curl` sends `GET` unless you add `--request POST`.
 
 **Solution**:
 
-- Check that the secret is listed under the service's `secrets` and that its `file` path exists next to `compose.yml`.
-- Make sure the file on the host is readable by the user ID in `PUID`, such as with `chmod 644 ./outpost-admin-password.txt`.
-- Write a non-empty password into the file.
+- Check the token on the dashboard's **Access tokens** page. An expired token is marked there, and a revoked one is gone.
+- Add a missing <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> with **Edit**, which applies to the next request.
+- Send the header as `Authorization: Bearer outpost_…`, with the whole token.
+
+## Setup Code Is Wrong or Expired
+
+**Symptom**: Setup fails with `That setup code is wrong or expired. Restart the container to print a new one.`
+
+**Cause**: The code was mistyped, it is more than 30 minutes old, or the container restarted since it was printed, which replaces the code.
+
+**Solution**:
+
+- Read the newest <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> with `docker logs outpost` and enter it again. Letter case, spaces, and dashes don't matter.
+- If the code expired, restart the container with `docker restart outpost` to print a new one.
+- After 10 wrong codes from one address within 15 minutes, setup answers `Too many setup attempts. Try again in 15 minutes.` Wait for the window to pass, or restart Outpost, which clears the count.
+
+## Forgot the Dashboard Password
+
+**Symptom**: You can't sign in to the dashboard because nobody remembers the password.
+
+**Cause**: Outpost keeps only a hash of the password, so it can't be read back, and there's no password reset.
+
+**Solution**:
+
+- If you added a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>, sign in with it. You can use the dashboard, but changing the password asks for the current one.
+- Otherwise, restore a backup from a time you knew the password, or start over as shown in [Backup and Recovery](/docs/reference/backup-and-recovery/#start-over). Starting over keeps the history, but it removes the account, every <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>, and every sign-in method.
+
+## Lost the Authenticator App
+
+**Symptom**: Sign-in asks for a code, and the phone with the authenticator app is gone.
+
+**Cause**: Password sign-in needs a code once the authenticator app is turned on.
+
+**Solution**:
+
+- Enter one of your <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> instead, or sign in with a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.
+- Then open **Security**, turn the authenticator app off, and set it up again on your new phone.
+- Without either, follow [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-authenticator).
 
 ## History Is Empty After a Restart
 
-**Symptom**: The dashboard's **History** section, or `lastReport` in `/v1/status`, is empty after the container was recreated.
+**Symptom**: The dashboard's **History** page, or `lastReport` in `/v1/status`, is empty after the container was recreated.
 
 **Cause**: The history is saved to `/data/history.json`. Without a volume at `/data`, it is lost whenever the container is replaced.
 
 **Solution**:
 
 - Mount a volume at `/data`, such as `outpost-data:/data`.
-- If you changed `OUTPOST_DATA_DIRECTORY`, mount the volume at that path instead.
+- If you changed `OUTPOST_DATA_DIRECTORY`, mount the volume at that path instead and make sure it belongs to `PUID`, since only `/data` is prepared at startup.
 - Look for `Could not save update history` in `docker logs outpost`, which means the directory isn't writable by `PUID`.
+
+## Dashboard Asks for Setup Again
+
+**Symptom**: After the container was recreated, the dashboard shows **Set up your account** again.
+
+**Cause**: The account is saved in `outpost.sqlite3` in the data directory. Without a volume at `/data`, it is lost whenever the container is replaced.
+
+**Solution**:
+
+- Mount a volume at `/data`, such as `outpost-data:/data`, then set up the account once more.
+- If you had a volume, check that the new container uses the same one. `docker volume ls` lists them, and Compose puts the project name in front of each name.
 
 ## Too Many Failed Sign-Ins
 
-**Symptom**: Signing in fails with `Too many failed sign-ins. Wait 15 minutes and try again.`
+**Symptom**: Signing in fails with `Too many sign-in attempts. Try again in 15 minutes.`, or a change on the **Security** page fails with `Too many attempts. Try again in 15 minutes.`
 
-**Cause**: Ten sign-ins failed from the same address within 15 minutes. Behind a reverse proxy without `OUTPOST_TRUST_PROXY=true`, every client shares the proxy's address, so other people's attempts count too.
+**Cause**: Ten attempts failed from the same address within 15 minutes. Wrong passwords, wrong codes, rejected <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, and wrong passwords on the **Security** page all count.
 
 **Solution**:
 
 - Wait 15 minutes, then sign in with the correct password.
-- Read the password from the file with `cat ./outpost-admin-password.txt` to rule out a typo.
-- Behind a reverse proxy, set `OUTPOST_TRUST_PROXY=true` so each client is counted separately.
-- Restarting Outpost also clears the counter, and signs out every session.
+- Behind a reverse proxy that doesn't send `X-Forwarded-For`, every client shares the proxy's address, so other people's attempts count too. Check the proxy as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
+- If nobody remembers the password, see [Forgot the Dashboard Password](/docs/reference/troubleshooting/#forgot-the-dashboard-password).
+- If a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to **Sign-in locked**, its alert names the address that reached the limit.
+- Restarting Outpost also clears the count.
 
 ## Dashboard Keeps Signing You Out
 
-**Symptom**: The dashboard returns to the sign-in page.
+**Symptom**: The dashboard returns to the sign-in screen.
 
-**Cause**: Sessions expire after 30 minutes without requests and are kept in memory, so a restart or update of Outpost ends them.
+**Cause**: A sign-in lasts 24 hours. Changing the password in another browser also signs this one out.
 
 **Solution**:
 
-- Sign in again. This is expected after a restart.
-- Keep a dashboard tab open if you want the session to stay alive, since it refreshes itself every 30 seconds.
+- Sign in again. Nothing else is lost.
+- Restarts and updates don't sign you out, because sign-ins are saved in the database.
+
+## Passkeys Aren't Offered
+
+**Symptom**: The **Security** page says <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> need https and a domain name, or <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> sign-in fails with `Passkeys need https and a domain name. Open this page at its domain, or use your password.`
+
+**Cause**: The dashboard is open at an IP address, such as `192.168.1.20`, or over plain HTTP at a name other than `localhost`.
+
+**Solution**:
+
+- Open the dashboard at its HTTPS domain name through a reverse proxy, or at `localhost`.
+- Check that the proxy sends `X-Forwarded-Proto`, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
+
+## Passkey Sign-In Fails
+
+**Symptom**: Sign-in fails with `That passkey wasn't accepted. It may belong to a different address for this app.`
+
+**Cause**: The <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> was added at a different address, and it works only there.
+
+**Solution**:
+
+- Open the dashboard at the address the **Passkeys** list shows for that <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.
+- If your browser or password manager no longer has it, sign in another way, remove it, and add it again.
 
 ## No Notifications Arrive
 
-**Symptom**: Updates happen, but nothing reaches ntfy or the webhook.
+**Symptom**: Updates happen, but no alert reaches a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>.
 
-**Cause**: Notifications are only sent when a container is `updated`, `available`, `rolled-back`, or `failed`, or the target rejected the request.
+**Cause**: No <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to that <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> is paused until removed secrets are entered again, or the service refused the send.
 
 **Solution**:
 
-- Check `docker logs outpost` to confirm the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> had something to report, and look for lines such as `ntfy notification failed with HTTP 403.`
-- Send a test message to the same URL with `curl` from the Docker host.
-- If the topic needs a token, set `OUTPOST_NTFY_TOKEN`.
+- Open **Notifications** and read the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s row. The red **Last attempt failed** line shows the service's answer, such as `HTTP 401: unauthorized`, or `No answer within 10 seconds.`
+- Select **Send test** to try the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> right away, and fix its fields with **Edit**.
+- Check under **Edit** that the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, such as **Containers updated**. A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> where every container is `up-to-date` or `skipped` sends nothing.
+- If the row asks you to enter a secret again, a lost <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> removed it, as described in [Notifications](/docs/features/notifications/#lost-encryption-key).

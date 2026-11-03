@@ -1,4 +1,5 @@
 export { buildCreatePlan } from './plan.js';
+export { recreateContainer } from './recreate.js';
 export { runUpdateCycle } from './run.js';
 export {
   ENABLE_LABEL,
@@ -14,4 +15,5 @@ export type {
   Shared_Report as UpdateReport,
   Shared_Result as UpdateResult,
   Shared_ResultStatus as UpdateStatus,
+  Shared_SelfUpdateRequest as SelfUpdateRequest,
 } from './types/shared.d.ts';

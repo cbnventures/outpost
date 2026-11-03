@@ -22,13 +22,10 @@
   ],
   "workspaces": [
     {
-      "buildDirectory": "build",
       "packageName": "outpost-app-server",
       "path": "apps/server",
       "profile": "http-service",
-      "runtimePaths": [
-        "public"
-      ]
+      "runtimePaths": []
     }
   ]
 }

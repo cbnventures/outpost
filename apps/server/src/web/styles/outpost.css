@@ -1,0 +1,474 @@
+/**
+ * ============================
+ * Overview
+ * ============================
+ */
+
+/* The schedule in words sits above its cron expression. */
+.details .details-schedule {
+  flex-direction: column;
+  gap: 0.125rem;
+  align-items: flex-start;
+
+  & code {
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+  }
+}
+
+/**
+ * ============================
+ * Containers
+ * ============================
+ */
+
+.table-card {
+  overflow: hidden;
+
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+}
+
+/* Small screens stack each container into one block; wider screens get the table. */
+.container-table {
+  display: block;
+  width: 100%;
+
+  border-collapse: collapse;
+
+  & thead {
+    display: none;
+  }
+
+  & tbody,
+  & tr {
+    display: block;
+  }
+
+  & tr {
+    padding: var(--space-3) var(--space-4);
+
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  & td {
+    display: block;
+    padding: 0;
+
+    font-size: var(--text-md);
+    color: var(--color-text-soft);
+  }
+}
+
+.container-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.container-table .column-wide {
+  display: none;
+}
+
+.cell-container {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.container-name {
+  font-weight: 550;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.container-note {
+  display: block;
+
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.container-note.mono {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+/* An image name wraps only between its parts; a part wider than the line breaks inside. */
+.image-name {
+  overflow-wrap: anywhere;
+
+  & > span {
+    display: inline-block;
+  }
+}
+
+.container-status {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+
+  color: var(--color-text);
+}
+
+.container-inline-image {
+  margin-top: var(--space-1);
+}
+
+.container-inline {
+  display: grid;
+  gap: 0.125rem;
+  margin-top: var(--space-1);
+}
+
+.container-table .cell-actions:not(:empty) {
+  margin-top: var(--space-3);
+}
+
+.cell-image .image-name {
+  font-size: var(--text-sm);
+}
+
+@media (min-width: 720px) {
+  .container-table {
+    display: table;
+
+    & thead {
+      display: table-header-group;
+    }
+
+    & tbody {
+      display: table-row-group;
+    }
+
+    & tr {
+      display: table-row;
+      padding: 0;
+    }
+
+    & th {
+      height: 2.5rem;
+      padding: 0 var(--space-3);
+
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--color-muted);
+      text-align: left;
+      white-space: nowrap;
+
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    & td {
+      display: table-cell;
+      padding: var(--space-3);
+
+      vertical-align: top;
+
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    & .column-wide {
+      display: table-cell;
+    }
+  }
+
+  .container-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .container-table th:first-child,
+  .container-table td:first-child {
+    padding-left: var(--space-4);
+  }
+
+  .container-table .cell-actions {
+    width: 1%;
+    padding-right: var(--space-4);
+
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .container-table .cell-actions:not(:empty) {
+    margin-top: 0;
+  }
+
+  .container-table .container-name,
+  .container-table .container-id {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .container-table .cell-result {
+    width: 13rem;
+  }
+
+  .container-table .cell-managed {
+    width: 8.5rem;
+  }
+
+  .container-inline {
+    display: none;
+  }
+
+  .container-table .cell-image {
+    display: none;
+  }
+}
+
+/* The image gets its own column once there is room; until then it sits under the name. */
+@media (min-width: 1280px) {
+  .container-table .cell-image {
+    display: table-cell;
+  }
+
+  .container-inline-image {
+    display: none;
+  }
+}
+
+/* A skipped container keeps the hollow dot in result lists too. */
+.activity-row .status-queued.status-dot {
+  background: transparent;
+}
+/**
+ * ============================
+ * History
+ * ============================
+ */
+
+.history-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+
+  /* Keeps a tinted first or last check inside the panel's rounded corners. */
+  border-radius: calc(var(--radius-lg) - 1px);
+
+  overflow: hidden;
+}
+
+/* An open check and a hovered one share one tint, so the header and its results read as one block. */
+.history-item {
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &:hover,
+  &.history-item-open {
+    background: var(--color-surface-hover);
+  }
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+
+  color: var(--color-text);
+  text-align: left;
+
+  background: transparent;
+  border: 0;
+
+  /* The list clips anything past its edges, so the focus ring sits inside. */
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+
+  & > .icon {
+    color: var(--color-muted);
+  }
+}
+
+.history-main {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+
+  & small {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+}
+
+.history-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+
+  font-weight: 550;
+}
+
+.history-results {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+
+  & .activity-list {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+}
+
+/* On wider screens the results line up under the check's text, past its status dot. */
+@media (min-width: 720px) {
+  .history-results {
+    padding-left: calc(var(--space-4) + 0.5rem + var(--space-3));
+  }
+}
+
+/**
+ * ============================
+ * Settings
+ * ============================
+ */
+
+.settings-panel .form-section-head > div {
+  display: grid;
+  gap: var(--space-1);
+
+  & > p {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+}
+
+.settings-segmented {
+  min-width: 11rem;
+}
+
+/* The label key is one long word, so it may break anywhere on narrow screens. */
+.setting-copy code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.setting-unit {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+/**
+ * ============================
+ * Schedule Picker
+ * ============================
+ */
+
+.schedule-picker {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* The rows under the picker start below a divider, like the rows between them. */
+.schedule-picker + .setting-list {
+  padding-top: var(--space-3);
+
+  border-top: 1px solid var(--color-border);
+}
+
+/* The frequency fills the row until the time or interval needs the space beside it. */
+.schedule-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 480px) {
+  .schedule-fields-split {
+    grid-template-columns: minmax(0, 1fr) 11rem;
+  }
+}
+
+.schedule-days {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+
+  border: 0;
+
+  & legend {
+    margin-bottom: var(--space-2);
+    padding: 0;
+
+    font-size: var(--text-sm);
+    font-weight: 550;
+    color: var(--color-text-soft);
+  }
+
+  & > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  & button {
+    min-width: 3.25rem;
+    min-height: var(--control-height);
+    padding: 0 var(--space-3);
+
+    font-size: var(--text-sm);
+    font-weight: 550;
+    color: var(--color-text-soft);
+
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+
+    &:hover {
+      background: var(--color-surface-hover);
+    }
+
+    &[aria-pressed="true"] {
+      color: var(--color-accent);
+
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+    }
+  }
+}
+
+.schedule-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+
+  & .icon {
+    display: inline-block;
+    margin-right: var(--space-1);
+
+    vertical-align: -0.1875rem;
+  }
+
+  & strong {
+    font-weight: 550;
+    color: var(--color-text);
+  }
+
+  & code {
+    font-family: var(--font-mono);
+    color: var(--color-text-soft);
+    overflow-wrap: anywhere;
+  }
+}

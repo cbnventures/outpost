@@ -10,12 +10,17 @@ keywords:
   - recreation
   - healthcheck
   - volumes
+  - self-update
 tags:
   - features
   - updates
 ---
 
-import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+import ThemedImage from '@theme/ThemedImage';
+import { Frame, Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+import updatesAndRollbackOneLight from './_assets_/updates-and-rollback-1-light.png';
+import updatesAndRollbackOneDark from './_assets_/updates-and-rollback-1-dark.png';
 
 Replace a container with one running the new image, keep everything that made it yours, and get the old one back if the new one fails.
 
@@ -25,14 +30,19 @@ Replace a container with one running the new image, keep everything that made it
 2. Reattaches anonymous volumes by name so data that lives in an unnamed volume is still there after the update.
 3. Drops settings that were only defaults of the old image so the new image's command, ports, and environment defaults take effect.
 4. Checks the registry before pulling so containers that are already current are never downloaded again.
+5. Updates Outpost's own container too, with the same rollback, so the updater never needs a manual pull.
 
 ## Checking for a New Image
 
 For each container, Outpost decides whether a newer image exists:
 
-1. **Ask the registry** — Outpost requests the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology> for the container's image tag. If it matches the running image, the container is `up-to-date` and nothing is downloaded.
-2. **Pull and compare** — If the digests differ, or the registry can't be asked, Outpost pulls the tag. If the pulled image is the one already running, the container is `up-to-date`.
-3. **Decide** — A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container is reported as `available`. Every other container goes on to <Terminology title="swapping a container onto the new image" to="/docs/reference/terminology#recreation">recreation</Terminology>.
+1. **Ask the registry** — Outpost requests the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology> for the container's image tag. A digest that matches the running image means `up-to-date`, and a different one on a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container means `available`, both without downloading anything.
+2. **Pull and compare** — Outpost pulls the tag for every other container whose digest differs, and for any container when the registry can't report a digest. If the pulled image is the one already running, the container is `up-to-date`.
+3. **Decide** — A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container whose pulled image is new is reported as `available` and left as it is. Every other container goes on to <Terminology title="swapping a container onto the new image" to="/docs/reference/terminology#recreation">recreation</Terminology>.
+
+:::info
+Digest lookups always use HTTPS, so a registry served over plain HTTP can't report a digest. Images from such a registry are always pulled to compare, including those of <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers.
+:::
 
 ## Recreating the Container
 
@@ -63,16 +73,16 @@ Settings that were inherited unchanged from the old image are removed so the new
 - Environment variables, labels, exposed ports, and volume declarations that match the old image entry for entry.
 - The hostname, when it was just the old container's ID.
 
-Anything you set yourself, such as an environment variable in your Compose file, is kept even if the new image changes its default.
+Anything you set yourself, such as an environment variable in your Compose file, is kept even if the new image changes its default. The exception is a value identical to the old image's default, which can't be told apart from that default and is dropped with it.
 
 ## Health and Settle Checks
 
 After starting the new container, Outpost checks on it every second:
 
-- **With a healthcheck** — It must report `healthy` within `OUTPOST_HEALTH_TIMEOUT` seconds (default `120`).
-- **Without a healthcheck** — It must still be running after the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology>, `OUTPOST_SETTLE_SECONDS` (default `10`).
+- **With a healthcheck** — It must report `healthy` within the **Health timeout** from **Settings** (default `120` seconds).
+- **Without a healthcheck** — It must still be running after the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology>, set by **Settle time** in **Settings** (default `10` seconds).
 
-The update fails as soon as the container stops or reports `unhealthy`. It is recommended to keep the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology> shorter than the health timeout, since the health timeout also ends the wait.
+The update fails as soon as the container stops, reports a state other than `running`, enters `restarting`, increases its restart count, or reports `unhealthy`. It is recommended to keep the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology> shorter than the health timeout, since the health timeout also ends the wait.
 
 ## Rollback
 
@@ -86,19 +96,51 @@ The result is `rolled-back`, with the reason in its detail, such as `New contain
 
 ## Cleanup
 
-With `OUTPOST_CLEANUP` on (the default), the old image is removed after a successful update. If another container still uses that image, it is kept and the update still counts as successful.
+With **Clean up old images** on in **Settings** (the default), the old image is removed after a successful update. If another container still uses that image, it is kept and the update still counts as successful.
+
+An unexpected daemon error while removing the image also leaves the result as `updated`, with a warning appended to its detail.
+
+## How Outpost Updates Itself
+
+Outpost keeps itself current too, updating its own container like any other, as the last one in each <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. Because Outpost can't stop itself and still watch its replacement, a short-lived helper container does the swap:
+
+1. **Hand over** — When Outpost finds a newer image of itself, it saves the check so far to `self-update.json` in the data directory. It then starts a helper named `<container name>-outpost-self-update` from the image it runs now.
+2. **Swap** — The helper stops Outpost, renames it, creates and starts the new Outpost, and waits until it's healthy, the same <Terminology title="swapping a container onto the new image" to="/docs/reference/terminology#recreation">recreation</Terminology> every container gets. If the new Outpost fails, the helper puts the old one back.
+3. **Finish the check** — The Outpost running afterwards, new or restored, finishes the check, so the whole check gets one History entry and one round of notifications. On success it removes the helper and, with **Clean up old images** on, the previous image.
+
+<Frame caption="One History entry for a check that updated Outpost last">
+  <ThemedImage sources={{ light: updatesAndRollbackOneLight, dark: updatesAndRollbackOneDark }} alt="Expanded scheduled check from the Outpost History page that updated nextcloud and then outpost, the last line, with Recreated with cbnventures/outpost:latest, and found the other containers up to date, with an update available, or skipped" width={958} height={685} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+The dashboard loses its connection while Outpost restarts, and reconnects on its own. A check started from Outpost's own row on the **Containers** page asks first, as described in [Web Dashboard](/docs/features/dashboard/#checking-a-single-container).
+
+### Requirements
+
+- **`/data` on a volume** — The new Outpost needs the account and the history, so the data directory has to be a volume or a bind mount. Otherwise Outpost's line is `skipped` with `Outpost can't update itself because /data isn't on a volume, so its account and history would be lost`.
+- **The Docker socket from the host** — With a `unix://` `DOCKER_HOST`, the helper mounts the same socket, so it has to come from the host. Otherwise the line is `skipped` with `Outpost can't update itself because the Docker socket at /var/run/docker.sock isn't mounted from the host`.
+- **Its own container** — Outpost has to recognize its own container, as described in [Labels and Modes](/docs/features/labels-and-modes/#outpost-itself). Otherwise it leaves every Outpost container alone with `Outpost couldn't find its own container, so it leaves Outpost containers alone`.
+
+### When It Fails
+
+- **New image fails** — If the new Outpost stops, turns unhealthy, or isn't healthy in time, the helper starts the old one again, and Outpost's line is `rolled-back`. Later checks skip that image until a newer one appears, with `The new image (3f2a9c1b7d4e) didn't start last time, so Outpost waits for a newer one`.
+- **Helper fails after stopping Outpost** — Outpost's line is `failed`, and the helper is kept so its log shows why, with a detail that ends in `; see docker logs outpost-outpost-self-update` for a container named `outpost`. Outpost removes stopped helpers the next time it starts.
+- **Helper fails before stopping Outpost** — Outpost's line is `failed` with a reason such as `Couldn't start the self-update helper: ...`, `The self-update helper didn't finish in time`, or `The self-update helper stopped before it finished (exit code 1)`. The next check tries again.
+
+See [Troubleshooting](/docs/reference/troubleshooting/#outpost-didnt-update-itself) for each reason and what to do about it.
 
 ## Result Statuses
 
 Every container in a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> gets one of these statuses in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>:
 
-| Status        | Meaning                                                                                                                                                                                        |
-|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `updated`     | Recreated on the new image and passed the health or settle check.                                                                                                                              |
-| `available`   | A newer image exists, but the container is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.         |
-| `up-to-date`  | The running image is already the newest one for its tag.                                                                                                                                       |
-| `skipped`     | Outpost itself, a pinned image, or a shared network namespace.                                                                                                                                 |
-| `rolled-back` | The new container failed and the previous one was restored.                                                                                                                                    |
-| `failed`      | The check, pull, or <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology> failed. The detail holds the error. |
+| Status        | Meaning                                                                                                                                                                                                                                 |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `updated`     | Recreated on the new image and passed the health or settle check.                                                                                                                                                                       |
+| `available`   | A newer image exists, but the container is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.                                                  |
+| `up-to-date`  | The running image is already the newest one for its tag.                                                                                                                                                                                |
+| `skipped`     | A pinned or local-only image, a shared network namespace, its owner, a container configured for automatic removal, or Outpost itself when it [can't update itself](#how-outpost-updates-itself).                                        |
+| `rolled-back` | The new container failed and the previous one was restored.                                                                                                                                                                             |
+| `failed`      | The check, the pull, the <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology>, or the helper that updates Outpost failed. The detail holds the error. |
 
-One container's failure never stops the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>; Outpost records it and moves on to the next container. Only one <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs at a time, whether it was started by the schedule or the API.
+One container's failure never stops the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>; Outpost records it and moves on to the next container. A whole-cycle failure, such as an unreachable Docker socket, is also saved as a failed <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> and sent as the **Update failed** alert, as described in [Notifications](/docs/features/notifications/#choose-events).
+
+Only one <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs at a time, whether it was started by the schedule, the API, or the dashboard.

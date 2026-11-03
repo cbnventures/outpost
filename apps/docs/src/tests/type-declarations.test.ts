@@ -2,7 +2,7 @@ import { registerTypeDeclarationSuite } from '@cbnventures/nova/rules/vitest';
 import * as vitest from 'vitest';
 
 /**
- * Type Declarations.
+ * Tests - Type Declarations.
  *
  * This site self-checks its type declarations THROUGH the published kit. The
  * inspector rules live in @cbnventures/nova/rules/vitest; this wrapper

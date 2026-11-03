@@ -4,23 +4,19 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 /**
- * Vitest - Current File Path.
- *
- * Runs the documentation conformance suites from @cbnventures/nova/rules/vitest
- * against this site. The suites scan from the project root (process.cwd()), so
- * vitest must run from this workspace directory.
+ * Vitest Configuration.
  *
  * @since 0.20.0
  */
 const currentFilePath = fileURLToPath(import.meta.url);
 
 /**
- * Vitest - Root Directory.
+ * Vitest Configuration - Root directory.
  *
- * Resolves the generated documentation workspace for the @site alias.
- * This keeps the conformance suites independent from the caller's shell path.
+ * Stores this module-level value in one named location.
+ * Related code reuses it instead of duplicating the definition.
  *
- * @since 0.20.0
+ * @since 0.0.0
  */
 const rootDirectory = dirname(currentFilePath);
 

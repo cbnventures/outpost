@@ -1,7 +1,11 @@
 import type { z } from 'zod';
 
 import type { tokenResponseSchema } from '../schema.js';
-import type { Shared_Credentials, Shared_ImageReference } from './shared.d.ts';
+import type {
+  Shared_Credentials,
+  Shared_ImageReference,
+  Shared_RemoteDigest,
+} from './shared.d.ts';
 
 /**
  * Digest - Fetch Function.
@@ -35,7 +39,7 @@ export type Digest_FetchRemoteDigest_Credentials = Shared_Credentials | undefine
 
 export type Digest_FetchRemoteDigest_FetchFunction = Digest_FetchFunction;
 
-export type Digest_FetchRemoteDigest_Returns = Promise<string | undefined>;
+export type Digest_FetchRemoteDigest_Returns = Promise<Shared_RemoteDigest>;
 
 export type Digest_FetchRemoteDigest_Target = Shared_ImageReference;
 
@@ -46,6 +50,8 @@ export type Digest_FetchRemoteDigest_Response = Response;
 export type Digest_FetchRemoteDigest_Challenge = Digest_Challenge;
 
 export type Digest_FetchRemoteDigest_Authorization = string | undefined;
+
+export type Digest_FetchRemoteDigest_Token = string | undefined;
 
 export type Digest_FetchRemoteDigest_Digest = string | null;
 
@@ -81,7 +87,7 @@ export type Digest_RequestBearerToken_Credentials = Shared_Credentials | undefin
 
 export type Digest_RequestBearerToken_FetchFunction = Digest_FetchFunction;
 
-export type Digest_RequestBearerToken_Returns = Promise<string>;
+export type Digest_RequestBearerToken_Returns = Promise<string | undefined>;
 
 export type Digest_RequestBearerToken_Realm = string | undefined;
 

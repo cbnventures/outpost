@@ -35,6 +35,7 @@ import type {
 const reportsSchema = z.array(z.object({
   startedAt: z.string(),
   finishedAt: z.string(),
+  error: z.string().optional(),
   results: z.array(z.object({
     container: z.string(),
     image: z.string(),
@@ -48,6 +49,12 @@ const reportsSchema = z.array(z.object({
     ]),
     detail: z.string(),
   })),
+  trigger: z.enum([
+    'api',
+    'dashboard',
+    'schedule',
+    'startup',
+  ]).optional(),
 }));
 
 /**

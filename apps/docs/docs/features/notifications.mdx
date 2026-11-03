@@ -1,107 +1,341 @@
 ---
 id: notifications
 title: Notifications
-description: Send an ntfy push or a JSON webhook whenever an Outpost update cycle updates a container, finds a newer image, rolls back, or fails.
+description: Send Outpost alerts to ntfy, Telegram, Discord, Slack, email, and six other services when containers are updated, new images appear, or an update fails.
 sidebar_position: 3
 keywords:
   - outpost
   - notifications
-  - ntfy
-  - webhook
   - alerts
+  - ntfy
+  - telegram
+  - email
+  - webhook
+  - apprise
 tags:
   - features
   - notifications
 ---
 
-import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+import ThemedImage from '@theme/ThemedImage';
+import { Frame, Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
-Hear about updates, new images, and failures as they happen, and stay undisturbed when there is nothing to report.
+import notificationsOneLight from './_assets_/notifications-1-light.png';
+import notificationsOneDark from './_assets_/notifications-1-dark.png';
+import notificationsTwoLight from './_assets_/notifications-2-light.png';
+import notificationsTwoDark from './_assets_/notifications-2-dark.png';
+import notificationsThreeLight from './_assets_/notifications-3-light.png';
+import notificationsThreeDark from './_assets_/notifications-3-dark.png';
+import notificationsFourLight from './_assets_/notifications-4-light.png';
+import notificationsFourDark from './_assets_/notifications-4-dark.png';
+import notificationsFiveLight from './_assets_/notifications-5-light.png';
+import notificationsFiveDark from './_assets_/notifications-5-dark.png';
+import notificationsSixLight from './_assets_/notifications-6-light.png';
+import notificationsSixDark from './_assets_/notifications-6-dark.png';
+import notificationsSevenLight from './_assets_/notifications-7-light.png';
+import notificationsSevenDark from './_assets_/notifications-7-dark.png';
+import notificationsEightLight from './_assets_/notifications-8-light.png';
+import notificationsEightDark from './_assets_/notifications-8-dark.png';
+
+Send an alert to your phone, chat, or inbox when Outpost updates containers, finds new images, or can't finish an update, and stay undisturbed when there's nothing to report.
 
 ## Why Use This Feature?
 
-1. Tells you right away when an update was rolled back or failed so you can look before anyone notices.
-2. Lists new images for <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers so you know when to schedule a manual update.
-3. Stays silent when every container is current so the notifications you get are worth reading.
+1. Delivers to 11 services, from ntfy and Telegram to email and plain webhooks, so alerts land in an app you already watch.
+2. Lets each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> pick its own <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> so failures can reach your phone while a team chat gets every update.
+3. Groups each check's results into one alert per <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, listing every container involved, so a busy night doesn't flood you.
+4. Seals tokens, passwords, and webhook URLs with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> so neither the dashboard nor the API shows them again.
+5. Stays silent when every container is current so the alerts you get are worth reading.
 
-## Setup
+## Add a Destination
 
-Set one or both targets on the Outpost container:
+Each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> is one place alerts go, such as an ntfy topic, a Telegram chat, or an email inbox.
 
-```yaml title="compose.yml"
-services:
-  outpost:
-    image: cbnventures/outpost:latest
-    environment:
-      # ntfy topic, on ntfy.sh or your own server.
-      OUTPOST_NTFY_URL: "https://ntfy.example.com/outpost"
-      OUTPOST_NTFY_TOKEN: "tk_yourtoken"
+<Frame caption="The Notifications page with three destinations">
+  <ThemedImage sources={{ light: notificationsOneLight, dark: notificationsOneDark }} alt="Outpost Notifications page listing the Email, Homelab chat, and My phone destinations with their services, event counts, and last sends, where the last email failed to sign in" width={1280} height={423} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
 
-      # Any endpoint that accepts a JSON POST.
-      OUTPOST_WEBHOOK_URL: "https://hooks.example.com/outpost"
+1. Open **Notifications**, under **Settings** in the sidebar, and select **Add notification**. On a phone, **Notifications** is in the account menu.
+2. Choose a **Service**. Its fields appear below it, as described in [Services](#services).
+3. Enter a **Name** you'll recognize, like the device or chat it goes to, of up to 80 characters. Each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> needs its own name, and names that differ only in letter case count as the same.
+4. Fill in the service's fields.
+5. Under **Events**, check the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> this <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> should hear about. All five start checked, and at least one is needed.
+6. Select **Add notification**.
+
+<Frame caption="Adding an ntfy destination" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: notificationsTwoLight, dark: notificationsTwoDark }} alt="Add notification dialog with ntfy selected, the name Work laptop, a topic URL, an empty optional access token, and all five events checked" width={584} height={851} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+The new <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> appears under **Destinations**, newest first. It is recommended to select **Send test** next to it right away, as described in [Send a Test](#send-a-test).
+
+:::info
+The service can't be changed after the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> is added. To move alerts to another service, add a new <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> and remove the old one.
+:::
+
+## Services
+
+The dialog offers these services, in this order:
+
+| Service                | Fields                                                                                                      | What to enter                                                                                                                                                                                                               |
+|------------------------|-------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ntfy                   | **Topic URL**, **Access token** (optional)                                                                  | The full topic URL on ntfy.sh or your own server, such as `https://ntfy.sh/my-alerts`. The token is only for topics that need one.                                                                                          |
+| Reverse Proxy for ntfy | **Context URL**, **Context token** (optional)                                                               | The `https://` URL of the context, with its interpreter set to `outpost`. The token is only for contexts that need one.                                                                                                     |
+| Telegram               | **Bot token**, **Chat ID**                                                                                  | A bot token from @BotFather, such as `123456:ABC-DEF`, and a user, group, or channel the bot can post to.                                                                                                                   |
+| Discord                | **Webhook URL**                                                                                             | The URL from the channel's Integrations settings, starting with `https://discord.com/api/webhooks/`.                                                                                                                        |
+| Slack                  | **Webhook URL**                                                                                             | The URL of an incoming webhook in your Slack app, starting with `https://hooks.slack.com/`.                                                                                                                                 |
+| Gotify                 | **Server URL**, **App token**                                                                               | Your Gotify server's URL, and the token of an application you made in it.                                                                                                                                                   |
+| Pushover               | **User key**, **App token**                                                                                 | Your user key, and the API token of an application you made in Pushover.                                                                                                                                                    |
+| Matrix                 | **Homeserver URL**, **Room ID**, **Access token**                                                           | An `https://` homeserver, a room ID such as `!room:example.com`, and the Matrix access token of an account that's already in the room. Room aliases that start with `#` aren't accepted, because sending needs the room ID. |
+| Email                  | **SMTP server**, **Port**, **Security**, **Username** (optional), **Password** (optional), **From**, **To** | An SMTP server and the addresses to send from and to, as described in [Email](#email).                                                                                                                                      |
+| Apprise                | **Apprise URL**, **Service URLs** (optional)                                                                | The notify URL of your Apprise API server with its config key, such as `http://apprise:8000/notify/alerts`. **Service URLs**, separated by spaces, are only for a stateless server.                                         |
+| Webhook                | **URL**, **Bearer token** (optional)                                                                        | Any `http://` or `https://` endpoint that accepts a JSON `POST`, as described in [Webhook Payload](#webhook-payload). The token is sent as `Authorization: Bearer`.                                                         |
+
+### Secret Fields
+
+These <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> are sealed with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> when you save, and the dashboard and the API never show them again:
+
+- **Tokens and keys** — The ntfy **Access token**, the Reverse Proxy for ntfy **Context token**, the Telegram **Bot token**, the Gotify and Pushover **App token**, the Pushover **User key**, the Matrix **Access token**, and the webhook **Bearer token**.
+- **URLs that work like passwords** — The Discord and Slack **Webhook URL**, the **Apprise URL** and **Service URLs**, and the webhook **URL**.
+- **Passwords** — The email **Password**.
+
+Every other field, such as a topic URL, a chat ID, or an email address, is saved as entered and shown when you edit the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>.
+
+### Email
+
+- **SMTP server** and **Port** — The server Outpost hands each alert to. **Port** starts at `587`.
+- **Security** — **STARTTLS**, the default, switches the connection to TLS and won't send without it. **TLS** uses TLS from the start, usually on port `465`, and **None** sends without encryption.
+- **Username** and **Password** — Leave **Username** blank when the server doesn't need a login, and Outpost won't sign in.
+- **From** and **To** — The sender's address, and one or more recipients separated by commas.
+
+<Frame caption="The email fields" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: notificationsThreeLight, dark: notificationsThreeDark }} alt="Add notification dialog with Email selected, showing the SMTP server, Port, Security, Username, Password, From, and To fields filled in" width={584} height={894} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+Each alert arrives as a plain-text email, with the alert's title, such as `Outpost: Update failed`, as the subject.
+
+## Choose Events
+
+Each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> gets only the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> checked under **Events**, so you can send failures to one place and everything to another:
+
+| Event                          | Key                 | Sent when                                                                                                                                                                                                                                                                                                                                                                 |
+|--------------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Saved secrets were removed** | `secrets-removed`   | Outpost started without its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> and removed the secrets the old key sealed. Only <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> that still work can get it. |
+| **Sign-in locked**             | `sign-in-locked`    | Ten failed sign-ins from one address within 15 minutes paused sign-in from it. Each address is reported at most once every 15 minutes.                                                                                                                                                                                                                                    |
+| **Containers updated**         | `updates-applied`   | A check updated one or more containers.                                                                                                                                                                                                                                                                                                                                   |
+| **New images available**       | `updates-available` | A check found newer images for <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers. Every check sends it again until you apply the update.                                                                                                                              |
+| **Update failed**              | `update-failed`     | An update failed or was rolled back, or a whole check couldn't run, such as when Docker can't be reached.                                                                                                                                                                                                                                                                 |
+
+Wrong codes, rejected <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, and wrong passwords on the **Security** page count toward the sign-in limit too, as described in [Web Dashboard](/docs/features/dashboard/#failed-sign-ins). Wrong <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup codes</Terminology> have their own count and never send **Sign-in locked**.
+
+### When Alerts Are Sent
+
+- **One alert per event** — A check sends at most one alert for each <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, listing every container it applies to. A check where every container is up to date or skipped sends nothing.
+- **Every check** — Scheduled checks, checks started from the dashboard or the API, and single-container checks all send alerts.
+- **Titles** — Services that show a title get the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>'s name after `Outpost:`, such as `Outpost: Containers updated`.
+- **Priority** — **Update failed**, **Saved secrets were removed**, and **Sign-in locked** are sent as high priority, and the others as default. ntfy gets `4` or `3`, Gotify `8` or `5`, Pushover `1` or `0`, Apprise `warning` or `info`, and Discord a red or blue message.
+
+The title and message of two typical alerts read like this:
+
+```text title="Example alerts"
+Outpost: Containers updated
+Updated 2 containers: web (ghcr.io/example/web:latest), worker (ghcr.io/example/worker:latest).
+
+Outpost: Update failed
+Couldn't update 1 container: api (ghcr.io/example/api:2) was rolled back: New container is unhealthy; rolled back to the previous container.
 ```
 
-`OUTPOST_NTFY_TOKEN` is optional and only needed when the topic requires an access token.
+## Send a Test
 
-## When a Notification Is Sent
+Select **Send test** next to a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> to check its settings without waiting for an update. It sends this message right away:
 
-Outpost sends one summary per <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and only when at least one container is `updated`, `available`, `rolled-back`, or `failed`. A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> where everything is `up-to-date` or `skipped` sends nothing.
-
-The summary lists only the containers that need attention, one per line:
-
-```text
-web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest
-api (ghcr.io/example/api:2): rolled-back - New container is unhealthy; rolled back to the previous container
+```text title="Test notification"
+Outpost: Test notification
+This is a test from Outpost. Alerts for the events you chose will look like this.
 ```
 
-## ntfy
+- A notification in the corner then says **Test sent to** and the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s name, or **The test to … couldn't be sent:** followed by the reason, such as `HTTP 401: unauthorized` or `No answer within 10 seconds.`
+- The test counts as the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s last send, so its status changes too.
+- **Send test** is unavailable while a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> waits for removed secrets, as described in [Lost Encryption Key](#lost-encryption-key).
 
-Outpost sends the summary as plain text in a `POST` to the topic URL, with these headers:
+<Frame caption="A destination after Send test">
+  <ThemedImage sources={{ light: notificationsFourLight, dark: notificationsFourDark }} alt="Destinations list where the My phone row shows last sent just now, with a Test sent to My phone. notification in the corner" width={992} height={386} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
 
-| Header          | Value                                                             |
-|-----------------|-------------------------------------------------------------------|
-| `Title`         | `Outpost: 2 containers need attention`                            |
-| `Tags`          | `warning` when something rolled back or failed, otherwise `whale` |
-| `Priority`      | `high` when something rolled back or failed, otherwise `default`  |
-| `Authorization` | `Bearer <OUTPOST_NTFY_TOKEN>`, when a token is set                |
+## Delivery Status
 
-ntfy shows the `warning` and `whale` tags as emoji, so a failed <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> stands out on your phone.
+Each row under **Destinations** shows the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s name, its service, how many <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> it gets, and how its last send went:
 
-## Webhook
+- **not sent yet** — Nothing has been sent to it, not even a test.
+- **last sent** and a time — The service accepted the last alert or test.
+- **Last attempt failed**, a time, and a reason — The service refused the send or didn't answer. This shows in red on its own line, with the same reasons a failed test shows.
 
-The webhook receives a JSON `POST` with the same title, message, tags, and priority, plus the full <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `payload`:
+Alerts go out in the background, so a slow service never holds up a check or a sign-in. Each send has 10 seconds to finish.
+
+A failed send never affects the check or sign-in that caused it, and Outpost doesn't retry it. The reason stays on the row until the next send works.
+
+## Edit a Destination
+
+1. Select **Edit** next to the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>.
+2. Change its **Name**, its fields, or its **Events**. The **Service** is fixed.
+3. Select **Save**.
+
+<Frame caption="Editing a destination with a saved secret" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: notificationsFiveLight, dark: notificationsFiveDark }} alt="Edit Email dialog with the service fixed to Email, the SMTP server, Port, Security, Username, From, and To fields filled in, and the Password field showing Saved with Remove saved value below it" width={584} height={963} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Saved secrets** — Saved <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> show **Saved** and stay empty, because Outpost never shows them again. Leave a saved secret blank to keep it, or type a new value to replace it.
+- **Optional secrets** — Select **Remove saved value** below an optional secret, such as an ntfy **Access token**, to delete it when you save, or **Keep saved value** to undo that. After a lost key, a removed optional secret offers **Continue without this value** instead, which resumes alerts without it, and **Require this value** undoes that.
+- **When changes apply** — The next alert uses the new settings.
+
+<Frame caption="Editing a destination after a lost key" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: notificationsSixLight, dark: notificationsSixDark }} alt="Edit Email dialog after a lost key, where the empty Password field's hint says a lost key removed it and Continue without this value shows below it" width={584} height={963} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+## Remove a Destination
+
+Select **Remove** next to the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>, then **Remove** in the dialog that asks to confirm. Alerts stop going to it right away, and its name is free to use again.
+
+<Frame caption="Confirming a removal" style={{ maxWidth: 490, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: notificationsSevenLight, dark: notificationsSevenDark }} alt="Remove Email? dialog saying alerts stop going to this destination and that it can be added again later, with Cancel and Remove buttons" width={488} height={235} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+## Lost Encryption Key
+
+Outpost seals <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> in `keys/installation.key`, inside the data directory. If it starts without that file, it makes a new key, and the secrets the old key sealed can't be opened anymore:
+
+- **Secrets removed** — Each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> are removed, but the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> stays with its name, service, <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology>, and other fields.
+- **Alerts paused** — A <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> that lost a secret is skipped until you enter it again with **Edit**. Its row says what's missing, such as `Enter the bot token again. Alerts are paused until you do.`
+- **Notice** — The **Saved secrets were removed** notice at the top of the dashboard lists each one, such as **Set up the Homelab chat notification again**, which opens **Notifications**. **Dismiss** hides the notice, but the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> stays paused until its secrets are entered again.
+- **Alert** — <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">Destinations</Terminology> without <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology>, such as an ntfy topic without a token, keep working and get the **Saved secrets were removed** alert if they chose it.
+
+<Frame caption="Destinations paused after a lost key">
+  <ThemedImage sources={{ light: notificationsEightLight, dark: notificationsEightDark }} alt="Notifications page under the Saved secrets were removed notice, which links to the authenticator app, the Email and Homelab chat notifications, and two registry sign-ins, where the paused Email and Homelab chat rows ask for their password and bot token again with Send test unavailable, and My phone isn't paused" width={1280} height={745} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+See [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key) for everything a lost key removes, and for keeping the key with your backups.
+
+## Webhook Payload
+
+The **Webhook** and **Reverse Proxy for ntfy** services get each alert as JSON in a `POST`, with `Content-Type: application/json`. When a token is set, it's sent as `Authorization: Bearer` too.
 
 ```json title="Webhook body"
 {
-  "title": "Outpost: 1 container needs attention",
-  "message": "web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest",
-  "tags": ["whale"],
-  "priority": "default",
-  "payload": {
-    "startedAt": "2026-10-24T04:00:00.012Z",
-    "finishedAt": "2026-10-24T04:01:12.480Z",
-    "results": [
+  "version": 1,
+  "app": "outpost",
+  "event": "update-failed",
+  "title": "Update failed",
+  "message": "Couldn't update 1 container: api (ghcr.io/example/api:2) was rolled back: New container is unhealthy; rolled back to the previous container.",
+  "priority": 4,
+  "tags": ["whale", "warning"],
+  "occurredAt": "2026-10-26T04:01:12.503Z",
+  "details": {
+    "containers": [
       {
-        "container": "web",
-        "image": "ghcr.io/example/web:latest",
-        "status": "updated",
-        "detail": "Recreated with ghcr.io/example/web:latest"
-      },
-      {
-        "container": "postgres",
-        "image": "postgres:17",
-        "status": "up-to-date",
-        "detail": "sha256:9c1d..."
+        "container": "api",
+        "image": "ghcr.io/example/api:2",
+        "status": "rolled-back",
+        "detail": "New container is unhealthy; rolled back to the previous container"
       }
-    ]
+    ],
+    "finishedAt": "2026-10-26T04:01:12.480Z"
   }
 }
 ```
 
-Unlike the message, `payload.results` includes every container in the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, so you can store or chart the full picture.
+| Field        | Description                                                                                                                                                                                                   |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `version`    | The payload format, `1`.                                                                                                                                                                                      |
+| `app`        | Always `outpost`.                                                                                                                                                                                             |
+| `event`      | The key from [Choose Events](#choose-events), or `test` for **Send test**.                                                                                                                                    |
+| `title`      | The <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>'s name, such as `Update failed`, without the `Outpost:` prefix. |
+| `message`    | The same text the other services show.                                                                                                                                                                        |
+| `priority`   | `4` for high-priority <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology>, otherwise `3`.                              |
+| `tags`       | ntfy tag names, listed below.                                                                                                                                                                                 |
+| `occurredAt` | When the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology> happened, as an ISO 8601 time in UTC.                      |
+| `details`    | Data about the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, listed below.                                       |
 
-## Delivery Failures
+| `event`             | `tags`                      | `details`                                                                                                                                                     |
+|---------------------|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `secrets-removed`   | `key`, `warning`            | `items`, the list of secrets to enter again.                                                                                                                  |
+| `sign-in-locked`    | `lock`                      | `address`, the address that reached the limit.                                                                                                                |
+| `updates-applied`   | `whale`, `white_check_mark` | `containers`, the results that were `updated`, and `finishedAt`.                                                                                              |
+| `updates-available` | `whale`                     | `containers`, the results that were `available`, and `finishedAt`.                                                                                            |
+| `update-failed`     | `whale`, `warning`          | `containers`, the `failed` and `rolled-back` results, and `finishedAt`. A whole check that couldn't run sends `error`, `startedAt`, and `finishedAt` instead. |
+| `test`              | `bell`                      | An empty object.                                                                                                                                              |
 
-A notification that fails, such as an unreachable URL or a non-2xx response, never affects the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. Outpost doesn't retry it, but it writes the error to the container log so you can fix the target.
+Each entry in `containers` has the `container`, `image`, `status`, and `detail` of one result, as the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> records it.
 
-It is recommended to test a new URL by hand once, for example with `curl --data "test" https://ntfy.example.com/outpost`.
+## API Routes
+
+The **Notifications** page calls these routes. They work only for a browser that is signed in to the dashboard, so an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> gets `403` with the code `session_required` and can't read or change where alerts go.
+
+| Method   | Path                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|----------|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`    | `/api/v1/notifications`                      | Lists every <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>, newest first.                                                                                                                                                                                                                                                                                                              |
+| `GET`    | `/api/v1/notifications/events`               | Lists the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> in the dialog's order, with `defaultEnabled` for the ones a new <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> starts with.                                                                                                       |
+| `POST`   | `/api/v1/notifications`                      | Adds a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> and answers `201` with it.                                                                                                                                                                                                                                                                                                       |
+| `PUT`    | `/api/v1/notifications/:notificationId`      | Changes a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s name, fields, and <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology>, and answers with it. `clearSecrets` lists optional secrets to clear, saved or removed by a lost key, each once and never with a new value for the same field. |
+| `DELETE` | `/api/v1/notifications/:notificationId`      | Removes a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> and answers `204`.                                                                                                                                                                                                                                                                                                            |
+| `POST`   | `/api/v1/notifications/:notificationId/test` | Sends the test message and answers `{"delivered":true}`, or `{"delivered":false}` with a `message`.                                                                                                                                                                                                                                                                                                                                                                 |
+
+- **CSRF** — Changes need the sign-in's CSRF token in the `X-CSRF-Token` header, like every change the dashboard makes.
+- **No secret values** — Answers never include a secret value. `secrets` names the saved <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology>, and `secretsMissing` names the ones a lost key removed.
+- **Errors** — A taken name gets `409` with the code `notification_exists`, and an unknown ID gets `404` with `notification_not_found`. A body that breaks a rule gets `422` with `invalid_request`, and `issues` names each field, such as `settings.url`.
+
+### Request Body
+
+```json title="POST /api/v1/notifications"
+{
+  "service": "ntfy",
+  "name": "My phone",
+  "settings": {
+    "url": "https://ntfy.sh/my-alerts",
+    "token": "tk_..."
+  },
+  "events": ["update-failed", "sign-in-locked"]
+}
+```
+
+- **`service`** — A key from the table below. `PUT` can leave it out, since the service can't change.
+- **`name`** — 1 to 80 characters, unique without regard to letter case.
+- **`settings`** — The service's fields, each as a string, the email `port` included, where a blank optional field counts as unset. On `PUT`, a saved secret that is left out or blank keeps its value, while any other field that is left out is cleared.
+- **`clearSecrets`** — On `PUT`, the optional secrets to clear, such as `["token"]`: saved ones, or ones a lost key removed, each listed once. A field can't be cleared and given a new value at once.
+- **`events`** — One or more <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology> keys, each listed once.
+
+| Service                | `service`            | `settings` keys                                                                                 |
+|------------------------|----------------------|-------------------------------------------------------------------------------------------------|
+| ntfy                   | `ntfy`               | `url`, `token`                                                                                  |
+| Reverse Proxy for ntfy | `ntfy-reverse-proxy` | `url`, `token`                                                                                  |
+| Telegram               | `telegram`           | `botToken`, `chatId`                                                                            |
+| Discord                | `discord`            | `webhookUrl`                                                                                    |
+| Slack                  | `slack`              | `webhookUrl`                                                                                    |
+| Gotify                 | `gotify`             | `url`, `token`                                                                                  |
+| Pushover               | `pushover`           | `userKey`, `appToken`                                                                           |
+| Matrix                 | `matrix`             | `homeserverUrl`, `roomId`, `accessToken`                                                        |
+| Email                  | `email`              | `host`, `port`, `security` (`starttls`, `tls`, or `none`), `username`, `password`, `from`, `to` |
+| Apprise                | `apprise`            | `url`, `urls`                                                                                   |
+| Webhook                | `webhook`            | `url`, `token`                                                                                  |
+
+### Response Body
+
+```json title="A destination in a response"
+{
+  "id": "ntf-1b3d5f7a9c0e2b48",
+  "name": "My phone",
+  "service": "ntfy",
+  "settings": {
+    "url": "https://ntfy.sh/my-alerts"
+  },
+  "secrets": {
+    "token": true
+  },
+  "secretsMissing": [],
+  "events": ["update-failed", "sign-in-locked"],
+  "lastAttemptAt": null,
+  "lastError": null,
+  "createdAt": "2026-10-26T09:12:40.118Z",
+  "updatedAt": "2026-10-26T09:12:40.118Z"
+}
+```
+
+`lastAttemptAt` and `lastError` are what the row's status shows, with `lastError` set to `null` after a send that worked.

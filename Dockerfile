@@ -10,7 +10,6 @@ COPY packages/docker/pnpm-workspace.yaml ./pnpm-workspace.yaml
 # This package manager does not need generated build configuration.
 COPY ["packages/docker/workspace-manifests/packages/docker-engine/package.json","packages/docker-engine/package.json"]
 COPY ["packages/docker/workspace-manifests/packages/registry/package.json","packages/registry/package.json"]
-COPY ["packages/docker/workspace-manifests/packages/notifiers/package.json","packages/notifiers/package.json"]
 COPY ["packages/docker/workspace-manifests/packages/updater/package.json","packages/updater/package.json"]
 COPY ["packages/docker/workspace-manifests/apps/server/package.json","apps/server/package.json"]
 RUN corepack enable npm && npm install
@@ -18,15 +17,12 @@ COPY ["packages/docker-engine","packages/docker-engine"]
 COPY ["packages/docker/workspace-manifests/packages/docker-engine/package.json","packages/docker-engine/package.json"]
 COPY ["packages/registry","packages/registry"]
 COPY ["packages/docker/workspace-manifests/packages/registry/package.json","packages/registry/package.json"]
-COPY ["packages/notifiers","packages/notifiers"]
-COPY ["packages/docker/workspace-manifests/packages/notifiers/package.json","packages/notifiers/package.json"]
 COPY ["packages/updater","packages/updater"]
 COPY ["packages/docker/workspace-manifests/packages/updater/package.json","packages/updater/package.json"]
 COPY ["apps/server","apps/server"]
 COPY ["packages/docker/workspace-manifests/apps/server/package.json","apps/server/package.json"]
 RUN npm run build --workspace='outpost-package-docker-engine'
 RUN npm run build --workspace='outpost-package-registry'
-RUN npm run build --workspace='outpost-package-notifiers'
 RUN npm run build --workspace='outpost-package-updater'
 RUN npm run build --workspace='outpost-app-server'
 RUN npm prune --omit=dev && npm cache clean --force
@@ -78,7 +74,6 @@ RUN apt-get update \
     tzdata \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
-  DOCKER_CONFIG=/config \
   PGID=1000 \
   PUID=1000 \
   TZ=UTC

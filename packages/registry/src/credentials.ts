@@ -1,84 +1,28 @@
-import { existsSync, readFileSync } from 'node:fs';
-
 import { DOCKER_HUB_REGISTRY } from './reference.js';
-import { dockerConfigSchema } from './schema.js';
 
 import type {
   Credentials_EncodeRegistryAuth_Credentials,
   Credentials_EncodeRegistryAuth_Registry,
   Credentials_EncodeRegistryAuth_Returns,
-  Credentials_FindCredentials_Auths,
-  Credentials_FindCredentials_Candidates,
-  Credentials_FindCredentials_ConfigPath,
-  Credentials_FindCredentials_Decoded,
-  Credentials_FindCredentials_Entry,
-  Credentials_FindCredentials_Registry,
-  Credentials_FindCredentials_Returns,
-  Credentials_FindCredentials_SeparatorIndex,
+  Credentials_NormalizeRegistryHost_Host,
+  Credentials_NormalizeRegistryHost_Registry,
+  Credentials_NormalizeRegistryHost_Returns,
+  Credentials_NormalizeRegistryHost_SlashIndex,
 } from './types/credentials.d.ts';
 
 /**
- * Credentials - Find Credentials.
+ * Credentials - Docker Hub Hosts.
  *
- * Looks up the username and password for a registry in a Docker client
- * config.json, the same file "docker login" writes. Returns undefined for
- * anonymous access or when the file is missing.
+ * Names Docker Hub goes by in image references, "docker login", and its
+ * registry API. A sign-in saved under any of them belongs to Docker Hub.
  *
- * @param {Credentials_FindCredentials_ConfigPath} configPath - Config path.
- * @param {Credentials_FindCredentials_Registry}   registry   - Registry.
- *
- * @returns {Credentials_FindCredentials_Returns}
- *
- * @since 0.0.1
+ * @since 1.0.0
  */
-export function findCredentials(configPath: Credentials_FindCredentials_ConfigPath, registry: Credentials_FindCredentials_Registry): Credentials_FindCredentials_Returns {
-  if (existsSync(configPath) === false) {
-    return undefined;
-  }
-
-  const auths: Credentials_FindCredentials_Auths = dockerConfigSchema.parse(JSON.parse(readFileSync(configPath, 'utf-8')))['auths'] ?? {};
-
-  // Docker Hub logins are stored under the legacy index URL.
-  const candidates: Credentials_FindCredentials_Candidates = (registry === DOCKER_HUB_REGISTRY) ? [
-    'https://index.docker.io/v1/',
-    'index.docker.io',
-    'docker.io',
-    registry,
-  ] : [
-    registry,
-    `https://${registry}`,
-    `https://${registry}/`,
-  ];
-
-  for (const candidate of candidates) {
-    const entry: Credentials_FindCredentials_Entry = auths[candidate];
-
-    if (entry === undefined) {
-      continue;
-    }
-
-    if (entry['username'] !== undefined && entry['password'] !== undefined) {
-      return {
-        username: entry['username'],
-        password: entry['password'],
-      };
-    }
-
-    if (entry['auth'] !== undefined) {
-      const decoded: Credentials_FindCredentials_Decoded = Buffer.from(entry['auth'], 'base64').toString('utf-8');
-      const separatorIndex: Credentials_FindCredentials_SeparatorIndex = decoded.indexOf(':');
-
-      if (separatorIndex > 0) {
-        return {
-          username: decoded.slice(0, separatorIndex),
-          password: decoded.slice(separatorIndex + 1),
-        };
-      }
-    }
-  }
-
-  return undefined;
-}
+const dockerHubHosts = [
+  'docker.io',
+  'index.docker.io',
+  DOCKER_HUB_REGISTRY,
+];
 
 /**
  * Credentials - Encode Registry Auth.
@@ -103,4 +47,36 @@ export function encodeRegistryAuth(credentials: Credentials_EncodeRegistryAuth_C
     password: credentials['password'],
     serveraddress: (registry === DOCKER_HUB_REGISTRY) ? 'https://index.docker.io/v1/' : registry,
   })).toString('base64url');
+}
+
+/**
+ * Credentials - Normalize Registry Host.
+ *
+ * Reduces a registry, as typed for a sign-in or parsed from an image name, to
+ * the host its sign-in is saved under. Letter case, a scheme, and any path
+ * are dropped, and every Docker Hub name becomes docker.io.
+ *
+ * @param {Credentials_NormalizeRegistryHost_Registry} registry - Registry.
+ *
+ * @returns {Credentials_NormalizeRegistryHost_Returns}
+ *
+ * @since 1.0.0
+ */
+export function normalizeRegistryHost(registry: Credentials_NormalizeRegistryHost_Registry): Credentials_NormalizeRegistryHost_Returns {
+  let host: Credentials_NormalizeRegistryHost_Host = registry.trim().toLowerCase();
+
+  if (host.startsWith('https://') === true) {
+    host = host.slice('https://'.length);
+  } else if (host.startsWith('http://') === true) {
+    host = host.slice('http://'.length);
+  }
+
+  // A path such as the "/v1/" in Docker Hub's legacy index URL isn't part of the host.
+  const slashIndex: Credentials_NormalizeRegistryHost_SlashIndex = host.indexOf('/');
+
+  if (slashIndex !== -1) {
+    host = host.slice(0, slashIndex);
+  }
+
+  return (dockerHubHosts.includes(host) === true) ? 'docker.io' : host;
 }

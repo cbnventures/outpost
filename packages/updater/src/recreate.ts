@@ -2,10 +2,12 @@ import { buildCreatePlan } from './plan.js';
 
 import type {
   Recreate_RecreateContainer_Container,
+  Recreate_RecreateContainer_Created,
   Recreate_RecreateContainer_Dependencies,
   Recreate_RecreateContainer_Engine,
   Recreate_RecreateContainer_ErrorMessage,
   Recreate_RecreateContainer_ImageConfig,
+  Recreate_RecreateContainer_InitialRestartCount,
   Recreate_RecreateContainer_NewId,
   Recreate_RecreateContainer_Options,
   Recreate_RecreateContainer_Plan,
@@ -19,9 +21,11 @@ import type {
   Recreate_WaitUntilHealthy_Dependencies,
   Recreate_WaitUntilHealthy_HealthStatus,
   Recreate_WaitUntilHealthy_Id,
+  Recreate_WaitUntilHealthy_InitialRestartCount,
   Recreate_WaitUntilHealthy_Inspected,
   Recreate_WaitUntilHealthy_Options,
   Recreate_WaitUntilHealthy_Poll,
+  Recreate_WaitUntilHealthy_RestartCount,
   Recreate_WaitUntilHealthy_Returns,
   Recreate_WaitUntilHealthy_SettleDeadline,
 } from './types/recreate.d.ts';
@@ -63,9 +67,12 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
       await engine.connectNetwork(extraNetwork['name'], newId, extraNetwork['endpoint']);
     }
 
+    const created: Recreate_RecreateContainer_Created = await engine.inspectContainer(newId);
+    const initialRestartCount: Recreate_RecreateContainer_InitialRestartCount = created['RestartCount'] ?? 0;
+
     await engine.startContainer(newId);
 
-    await waitUntilHealthy(newId, options, dependencies);
+    await waitUntilHealthy(newId, initialRestartCount, options, dependencies);
 
     await engine.removeContainer(container['Id']);
 
@@ -113,15 +120,16 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
  * report healthy before the timeout; others must still be running after
  * the settle period. Throws when either condition fails.
  *
- * @param {Recreate_WaitUntilHealthy_Id}           id           - Id.
- * @param {Recreate_WaitUntilHealthy_Options}      options      - Options.
- * @param {Recreate_WaitUntilHealthy_Dependencies} dependencies - Dependencies.
+ * @param {Recreate_WaitUntilHealthy_Id}                  id                  - Id.
+ * @param {Recreate_WaitUntilHealthy_InitialRestartCount} initialRestartCount - Initial restart count.
+ * @param {Recreate_WaitUntilHealthy_Options}             options             - Options.
+ * @param {Recreate_WaitUntilHealthy_Dependencies}        dependencies        - Dependencies.
  *
  * @returns {Recreate_WaitUntilHealthy_Returns}
  *
  * @since 0.0.1
  */
-async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, options: Recreate_WaitUntilHealthy_Options, dependencies: Recreate_WaitUntilHealthy_Dependencies): Recreate_WaitUntilHealthy_Returns {
+async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestartCount: Recreate_WaitUntilHealthy_InitialRestartCount, options: Recreate_WaitUntilHealthy_Options, dependencies: Recreate_WaitUntilHealthy_Dependencies): Recreate_WaitUntilHealthy_Returns {
   const deadline: Recreate_WaitUntilHealthy_Deadline = dependencies.now().getTime() + (options['healthTimeoutSeconds'] * 1000);
   const settleDeadline: Recreate_WaitUntilHealthy_SettleDeadline = dependencies.now().getTime() + (options['settleSeconds'] * 1000);
 
@@ -137,9 +145,18 @@ async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, options: Recre
    */
   const poll: Recreate_WaitUntilHealthy_Poll = async () => {
     const inspected: Recreate_WaitUntilHealthy_Inspected = await dependencies['engine'].inspectContainer(id);
+    const restartCount: Recreate_WaitUntilHealthy_RestartCount = inspected['RestartCount'] ?? 0;
 
-    if (inspected['State']['Running'] === false) {
-      throw new Error(`New container stopped (${inspected['State']['Status']})`);
+    if (inspected['State']['Restarting'] === true) {
+      throw new Error('New container is restarting');
+    }
+
+    if (inspected['State']['Running'] === false || inspected['State']['Status'] !== 'running') {
+      throw new Error(`New container is not running (${inspected['State']['Status']})`);
+    }
+
+    if (restartCount > initialRestartCount) {
+      throw new Error(`New container restarted (restart count rose from ${String(initialRestartCount)} to ${String(restartCount)})`);
     }
 
     const healthStatus: Recreate_WaitUntilHealthy_HealthStatus = (inspected['State']['Health'] !== undefined && inspected['State']['Health'] !== null) ? inspected['State']['Health']['Status'] : undefined;

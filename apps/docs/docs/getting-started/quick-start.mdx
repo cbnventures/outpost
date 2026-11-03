@@ -28,20 +28,35 @@ Start Outpost next to your other containers and let it check them for new images
 
 ## Pick an Image
 
-The same multi-platform image is published to two registries:
+Each release publishes the same multi-platform image to both registries:
 
 - `cbnventures/outpost` on [Docker Hub](https://hub.docker.com/r/cbnventures/outpost)
 - `ghcr.io/cbnventures/outpost` on the GitHub Container Registry
+
+:::info
+No release has been published yet, so neither registry has the image. Until the first release, build it from source with the repository's own `compose.yml`, as shown below.
+:::
+
+### Build From Source
+
+Clone the repository and let Docker Compose build and start Outpost from its `compose.yml`:
+
+```bash
+git clone https://github.com/cbnventures/outpost.git
+cd outpost
+
+# Build the image and start Outpost in the background.
+docker compose up --build --detach
+```
+
+The image is built and tagged `cbnventures/outpost:latest` on your host, and Outpost starts with the settings in that `compose.yml`, which reads overrides such as `TZ` from a `.env` file next to it. Skip ahead to [Check That It Started](/docs/getting-started/quick-start/#check-that-it-started), and run `docker compose logs outpost` from the clone wherever this page uses `docker logs outpost`.
+
+Outpost skips this image as locally built, so it doesn't update itself. On Docker 28 or older with the containerd image store, Docker doesn't record that the image was built here, so once a release is published Outpost could replace your build with it; label the container `io.cbnventures.outpost.enable=false` to keep it.
 
 ## Start Outpost
 
 <Tabs groupId="deployment-method">
   <TabItem value="compose" label="Docker Compose" default>
-
-    ```bash
-    # Create the dashboard password once, next to compose.yml.
-    openssl rand -base64 24 > ./outpost-admin-password.txt
-    ```
 
     ```yaml title="compose.yml"
     services:
@@ -52,27 +67,16 @@ The same multi-platform image is published to two registries:
           PUID: "1000"
           PGID: "1000"
           TZ: "America/New_York"
-
-          # Six-field cron (with seconds). Default: every day at 04:00.
-          OUTPOST_SCHEDULE: "0 0 4 * * *"
-          OUTPOST_LABEL_MODE: "opt-out"
-
-          # Unlocks the dashboard at http://localhost:3000/admin/.
-          OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
-        secrets:
-          - outpost_admin_password
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
 
-          # Keeps the dashboard history across restarts.
+          # Keeps the dashboard account, access tokens, notification destinations,
+          # registry sign-ins, and history across restarts, and lets Outpost
+          # update itself.
           - outpost-data:/data
         ports:
           - "127.0.0.1:3000:3000"
         restart: unless-stopped
-
-    secrets:
-      outpost_admin_password:
-        file: ./outpost-admin-password.txt
 
     volumes:
       outpost-data:
@@ -98,15 +102,15 @@ The same multi-platform image is published to two registries:
       cbnventures/outpost:latest
     ```
 
-    Plain `docker run` has no secrets, so the dashboard starts locked. See [Web Dashboard](/docs/features/dashboard/#enable-the-dashboard) for how to unlock it.
-
   </TabItem>
 </Tabs>
 
-With these settings, Outpost checks every running container at 04:00 in your time zone. New images are pulled and the containers are recreated on them.
+By default, Outpost checks every running container at 04:00 in your time zone. New images are pulled and the containers are recreated on them. The schedule and update behavior can be changed later from the dashboard's **Settings** page.
 
-:::warning
-Outpost recognizes its own container through the hostname Docker assigns it, so it never updates itself mid-run. It is recommended not to set a custom `hostname` on the Outpost container.
+:::info
+Outpost checks its own container last and hands it to a short-lived helper container, which swaps it onto the new image, as described in [Updates and Rollback](/docs/features/updates-and-rollback/#how-outpost-updates-itself). Outpost finds that container from Linux process metadata, with Docker's container-ID hostname only as a fallback, so host networking or a custom hostname doesn't hide it.
+
+If Outpost can't find its own container, it leaves alone every container running an image named `outpost`, such as `cbnventures/outpost:latest`, so it never stops itself in the middle of a check.
 :::
 
 ## Check That It Started
@@ -117,35 +121,45 @@ Read the container logs:
 docker logs outpost
 ```
 
-A healthy start prints the dashboard address, the schedule with its next run time, and the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>:
+A healthy start prints the dashboard address, the schedule with its next run time in UTC, and the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>. Until the dashboard account exists, it also prints a <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology>:
 
 ```text
 Outpost
   Dashboard: http://localhost:3000/admin/
-  Schedule: 0 0 4 * * * (next run 2026-10-25T04:00:00.000Z)
+  Schedule: 0 0 4 * * * (next run 2026-10-25T08:00:00.000Z)
   Mode: opt-out
+No account exists yet. Open the dashboard to create it with the setup code.
+  Setup code: K7Q2M-XR9TD-P4W8N
+  Expires: 2026-10-24T22:30:00.000Z
 ```
-
-When no dashboard password is set, the dashboard line ends with `(locked: set OUTPOST_ADMIN_PASSWORD_FILE)`.
 
 If Outpost can't reach the Docker socket, the server stops before printing this and the error repeats in the logs. See [Troubleshooting](/docs/reference/troubleshooting/#permission-denied-on-the-docker-socket) for the fix.
 
 ## Open the Dashboard
 
-Open [http://localhost:3000/admin/](http://localhost:3000/admin/) on the Docker host and sign in as `admin` with the password from `outpost-admin-password.txt`. The dashboard shows every running container, the next scheduled check, and the results of past checks.
+Open [http://localhost:3000/admin/](http://localhost:3000/admin/) on the Docker host. The first time, it asks you to set up your account:
+
+1. Enter the <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> from the log under **One-time code**. A code works for 30 minutes, and restarting the container prints a new one.
+2. Choose a username and a password of at least 12 characters, and repeat the password under **Confirm password**.
+3. Select **Create account**.
+
+The dashboard then opens signed in. It shows every running container, the next scheduled check, and the results of past checks.
 
 ## Run a First Check Now
 
 You don't have to wait for the schedule. Pick one of these:
 
 - **Use the dashboard** — Select **Check now** on the overview.
-- **Check on every start** — Set `OUTPOST_RUN_ON_START: "true"` and restart the container.
-- **Trigger it over HTTP** — Set `OUTPOST_API_TOKEN`, publish port `3000`, and call the update endpoint as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#trigger-an-update).
+- **Check on every start** — Turn on **Check when Outpost starts** on the **Settings** page.
+- **Trigger it over HTTP** — Create an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> with the `updates:run` <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> on the dashboard's **Access tokens** page, then call the checks endpoint as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#start-a-check).
 
 ```bash
+# Paste the token and press Enter. It isn't shown or saved to the shell history.
+read -r -s OUTPOST_TOKEN
+
 curl --request POST \
-  --header "Authorization: Bearer your-long-random-token" \
-  http://127.0.0.1:3000/v1/update
+  --header "Authorization: Bearer $OUTPOST_TOKEN" \
+  http://127.0.0.1:3000/api/v1/checks
 ```
 
 Each container gets one line in the logs when the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes:
@@ -153,17 +167,19 @@ Each container gets one line in the logs when the <Terminology title="one pass o
 ```text
 postgres (postgres:17): up-to-date - sha256:9c1d...
 web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest
-outpost (cbnventures/outpost:latest): skipped - Outpost does not update itself while running
+outpost (cbnventures/outpost:latest): up-to-date - sha256:4e7b...
 ```
 
 :::tip
-To try Outpost without changing anything, set `OUTPOST_MONITOR_ONLY: "true"` first. Outpost then only reports which containers have a newer image.
+To try Outpost without changing any container, turn on **Monitor only** on the **Settings** page first. Outpost then only reports which containers have a newer image, though it still pulls an image when the registry can't report a digest.
 :::
 
 ## What Is Next
 
-- **[Configuration](/docs/getting-started/configuration/)** — Every environment variable and its default.
-- **[Web Dashboard](/docs/features/dashboard/)** — Sign-in, sessions, and security notes for the dashboard.
+- **[Configuration](/docs/getting-started/configuration/)** — Dashboard settings, bootstrap variables, and their defaults.
+- **[Web Dashboard](/docs/features/dashboard/)** — Account setup, sign-in, every dashboard page, and running it behind a reverse proxy.
+- **[Account Security](/docs/features/account-security/)** — Change the password, and add an authenticator app or <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>.
+- **[Access Tokens](/docs/features/access-tokens/)** — Give scripts and Prometheus their own keys to the API.
 - **[Labels and Modes](/docs/features/labels-and-modes/)** — Opt containers in or out, or keep them <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.
-- **[Notifications](/docs/features/notifications/)** — Get told when something was updated or failed.
+- **[Notifications](/docs/features/notifications/)** — Get alerts in ntfy, Telegram, email, and more when something was updated or failed.
 - **[Private Registries](/docs/getting-started/private-registries/)** — Check images that need a login.

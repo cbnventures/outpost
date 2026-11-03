@@ -1,6 +1,5 @@
 packages:
   - 'packages/docker-engine'
   - 'packages/registry'
-  - 'packages/notifiers'
   - 'packages/updater'
   - 'apps/server'

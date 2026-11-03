@@ -1,15 +1,15 @@
 ---
 id: http-api-and-metrics
 title: HTTP API and Metrics
-description: Trigger an Outpost update cycle, read the latest report, and scrape Prometheus metrics through a small HTTP API protected by a bearer token.
+description: Read the status, start checks, follow live events, and scrape Prometheus metrics through Outpost's JSON API, with an access token that holds the right scopes.
 sidebar_position: 4
 keywords:
   - outpost
   - http api
+  - access tokens
   - prometheus
   - metrics
-  - bearer token
-  - status
+  - server-sent events
 tags:
   - features
   - api
@@ -17,77 +17,102 @@ tags:
 
 import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
-Start an update on demand, check what the last run did, and feed Outpost into Prometheus, all over plain HTTP.
+Start a check on demand, read what the last run did, and feed Outpost into Prometheus, all over plain HTTP with an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>.
 
 ## Why Use This Feature?
 
-1. Lets a CI pipeline trigger an update right after it pushes an image so you don't wait for the schedule.
-2. Shows the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as JSON so dashboards and scripts can read it without parsing logs.
-3. Exposes Prometheus counters so you can alert on failed or rolled-back updates.
+1. Lets a CI pipeline start a check right after it pushes an image so you don't wait for the schedule.
+2. Returns the overview, containers, and history as JSON so scripts can read them without parsing logs.
+3. Streams live events so a script knows the moment a check finishes.
+4. Exposes Prometheus counters so you can alert on failed or rolled-back updates.
+5. Keeps Watchtower's `/v1/update`, `/v1/status`, and `/metrics` paths so existing clients keep working.
 
-## Enable the API
+## Before You Start
 
-The health endpoint is always on. The others stay disabled until you set a token and publish the port:
+- **A published port** — The API listens on port `3000`, next to the dashboard. The [Quick Start](/docs/getting-started/quick-start/) publishes it as `127.0.0.1:3000:3000`, which keeps it off your network.
+- **An <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>** — Create one on the dashboard's **Access tokens** page with the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology> the client needs, as shown in [Access Tokens](/docs/features/access-tokens/).
+- **The base URL** — The address the dashboard is open at, such as `http://127.0.0.1:3000`. Every path starts at the root, so a sub-path isn't supported.
 
-```yaml title="compose.yml"
-services:
-  outpost:
-    image: cbnventures/outpost:latest
-    environment:
-      OUTPOST_API_TOKEN: "${OUTPOST_API_TOKEN}"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "127.0.0.1:3000:3000"
+## Authentication
+
+Send the token in the `Authorization` header of every request:
+
+```bash
+# Read the token without showing it or saving it to the shell history.
+read -r -s OUTPOST_TOKEN
+
+curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:3000/api/v1/overview
 ```
 
-It is recommended to use a long random token, such as the output of `openssl rand -hex 32`. Binding the port to `127.0.0.1` keeps the API off your network unless you put a reverse proxy in front of it.
+- The word `Bearer` is matched without regard to letter case. A token is `outpost_` followed by 43 URL-safe base64 characters.
+- A missing, mistyped, expired, or revoked token gets `401` with the code `authentication_required`.
+- A valid token without the route's <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> gets `403` with the code `scope_required`.
+- `GET /api/v1/auth/me` works with any valid token and returns its name and <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology>, which makes it a handy first test.
 
-:::info
-The API token is separate from the [web dashboard](/docs/features/dashboard/) login. Signing in to the dashboard doesn't unlock these endpoints, and the token doesn't open the dashboard.
-:::
+The `/api/v1` data routes also accept a browser that is signed in to the dashboard, and a token in the header wins over the browser's cookie. The Watchtower-style paths take tokens only.
+
+## Scopes
+
+| Scope          | What it allows                                                                                                                                                                                    | Routes                                                                                                                                                        |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `status:read`  | See the overview, containers, history, and settings.                                                                                                                                              | `GET /api/v1/overview`, `GET /api/v1/containers`, `GET /api/v1/history`, `GET /api/v1/settings`, `GET /api/v1/status`, `GET /api/v1/events`, `GET /v1/status` |
+| `updates:run`  | Start checks, and update containers unless Outpost is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>. | `POST /api/v1/checks`, `POST /v1/update`                                                                                                                      |
+| `metrics:read` | Read the Prometheus metrics.                                                                                                                                                                      | `GET /metrics`                                                                                                                                                |
+
+<Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">Scopes</Terminology> are exact, so none includes another. Changes you make to a token apply to its next request, with no restart.
 
 ## Endpoints
 
-| Method | Path         | Token    | Description                                                                                                                                                       |
-|--------|--------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET`  | `/`          | No       | Redirects to the [web dashboard](/docs/features/dashboard/) at `/admin/`.                                                                                         |
-| `GET`  | `/health`    | No       | Returns `{"status":"ok"}`. Used by the image's own healthcheck.                                                                                                   |
-| `POST` | `/v1/update` | Required | Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> in the background.                 |
-| `GET`  | `/v1/status` | Required | Returns the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>, error, and running totals. |
-| `GET`  | `/metrics`   | Required | Returns Prometheus metrics in text format.                                                                                                                        |
+| Method | Path                 | Scope           | Description                                                                                                                                                                                                                                                                                                                                  |
+|--------|----------------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/health`            | None            | Returns `{"status":"ok"}`. Used by the image's own healthcheck.                                                                                                                                                                                                                                                                              |
+| `GET`  | `/api/v1/overview`   | `status:read`   | The scheduler state, the schedule, the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>, and whether <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> is on. |
+| `GET`  | `/api/v1/containers` | `status:read`   | Every running container, whether Outpost manages it and why not, its last result, and `self`, which is `true` only for Outpost's own container.                                                                                                                                                                                              |
+| `GET`  | `/api/v1/history`    | `status:read`   | The last 50 <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">reports</Terminology>, newest first.                                                                                                                                                                                               |
+| `GET`  | `/api/v1/settings`   | `status:read`   | The editable runtime settings and read-only container bootstrap details shown on the dashboard's **Settings** page.                                                                                                                                                                                                                          |
+| `PUT`  | `/api/v1/settings`   | Browser session | Replaces the complete runtime settings document. This administrative route requires the signed-in dashboard session and its CSRF token; personal access tokens cannot call it.                                                                                                                                                               |
+| `GET`  | `/api/v1/status`     | `status:read`   | The same body as `GET /v1/status`.                                                                                                                                                                                                                                                                                                           |
+| `POST` | `/api/v1/checks`     | `updates:run`   | Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, for one container when you send its ID.                                                                                                                                                                      |
+| `GET`  | `/api/v1/events`     | `status:read`   | Live updates as server-sent events.                                                                                                                                                                                                                                                                                                          |
+| `POST` | `/v1/update`         | `updates:run`   | Starts a full <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, the Watchtower way.                                                                                                                                                                                     |
+| `GET`  | `/v1/status`         | `status:read`   | The scheduler state, the latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>, and running totals.                                                                                                                                                                      |
+| `GET`  | `/metrics`           | `metrics:read`  | Prometheus metrics in text format.                                                                                                                                                                                                                                                                                                           |
 
-Send the token in the `Authorization` header:
+Lists come back as `{"items":[...]}`. Opening `/` in a browser redirects to the [web dashboard](/docs/features/dashboard/) at `/admin/`.
 
-```bash
-curl --header "Authorization: Bearer $OUTPOST_API_TOKEN" http://127.0.0.1:3000/v1/status
-```
-
-### Error Responses
-
-| Status | When                                        | Body                                                         |
-|--------|---------------------------------------------|--------------------------------------------------------------|
-| `404`  | `OUTPOST_API_TOKEN` is not set              | `{"error":"Set OUTPOST_API_TOKEN to enable this endpoint."}` |
-| `401`  | The header is missing or the token is wrong | `{"error":"Invalid or missing bearer token."}`               |
-
-## Trigger an Update
+## Start a Check
 
 ```bash
 curl --request POST \
-  --header "Authorization: Bearer $OUTPOST_API_TOKEN" \
-  http://127.0.0.1:3000/v1/update
+  --header "Authorization: Bearer $OUTPOST_TOKEN" \
+  http://127.0.0.1:3000/api/v1/checks
 ```
 
-| Status | Body                | Meaning                                                                                                                                                          |
-|--------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `202`  | `{"started":true}`  | A new <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> started.                             |
-| `409`  | `{"started":false}` | A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is already running, so none was started. |
+To check one container, send its 12-character ID from `GET /api/v1/containers`:
 
-The request returns right away. Poll `/v1/status` until `running` is `false` to read the results.
+```bash
+curl --request POST \
+  --header "Authorization: Bearer $OUTPOST_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"containerId":"3f2a9c1b7d4e"}' \
+  http://127.0.0.1:3000/api/v1/checks
+```
+
+| Status | Meaning                                                                                                                                                                                       |
+|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `202`  | A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> started, and the body is `{"started":true}`.                          |
+| `409`  | A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is already running, so none was started. The code is `check_running`. |
+| `422`  | The `containerId` isn't 12 to 64 hexadecimal characters, or the body has another field. The code is `invalid_request`.                                                                        |
+
+- The request returns right away. Watch `GET /api/v1/events`, or poll `GET /api/v1/status` until `running` is `false`, to read the results.
+- Without `Content-Type: application/json`, the body isn't read, so Outpost checks every container.
+- An ID of a container that Outpost doesn't manage starts a check that changes nothing.
+- Outpost's own ID, from the row where `self` is `true`, checks Outpost itself. If it has a newer image, Outpost restarts, so the event stream closes until it's back, and the check shows in the history once it's done.
+- The dashboard's **History** page shows **API** as what started the check.
 
 ## Read the Status
 
-```json title="GET /v1/status"
+```json title="GET /api/v1/status"
 {
   "running": false,
   "nextRun": "2026-10-25T04:00:00.000Z",
@@ -101,7 +126,8 @@ The request returns right away. Poll `/v1/status` until `running` is `false` to 
         "status": "updated",
         "detail": "Recreated with ghcr.io/example/web:latest"
       }
-    ]
+    ],
+    "trigger": "schedule"
   },
   "totals": {
     "cycles": 3,
@@ -111,20 +137,132 @@ The request returns right away. Poll `/v1/status` until `running` is `false` to 
 }
 ```
 
-- **`nextRun`** — When the schedule starts the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>. While one is running, `startedAt` shows when it began.
-- **`lastReport`** — The newest entry in the saved history, so it survives a restart when `/data` is on a volume. Missing until the first <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes.
+- **`running`** — `true` while a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs, and `startedAt` then shows when it began.
+- **`nextRun`** — When the schedule starts the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>.
+- **`lastReport`** — The newest entry in the saved history, so it survives a restart when `/data` is on a volume. Its `trigger` names what started it: `schedule`, `startup`, `api`, or `dashboard`.
 - **`lastError`** — Present only when the last <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> failed as a whole, for example because the Docker socket was unreachable.
 - **`totals`** — Counted since Outpost started, and reset when it restarts.
 
+`GET /api/v1/overview` returns the same fields, plus `schedule`, `timeZone`, `labelMode`, and `monitorOnly`. `timeZone` is the time zone the schedule runs in, which `TZ` sets.
+
+## Live Events
+
+`GET /api/v1/events` keeps the connection open and sends server-sent events:
+
+```bash
+curl --no-buffer \
+  --header "Authorization: Bearer $OUTPOST_TOKEN" \
+  http://127.0.0.1:3000/api/v1/events
+```
+
+```text title="Event stream"
+retry: 3000
+
+event: state
+data: {"running":false,"nextRun":"2026-10-25T04:00:00.000Z","totals":{"cycles":0,"updated":0,"failed":0},"schedule":"0 0 4 * * *","timeZone":"UTC","labelMode":"opt-out","monitorOnly":false}
+
+: keep-alive
+```
+
+- **`state`** — The overview object, sent when you connect and whenever a check starts or finishes.
+- **`check`** — The <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> of a check that just finished.
+- **Keep-alive** — A comment line every 15 seconds keeps proxies from closing the stream. A revoked token or a signed-out browser stops getting events at the next one.
+
+## Errors
+
+Failed requests return the same JSON shape, with a stable `code` for scripts and a `message` for people. The one exception is `POST /v1/update`, which answers a running check with `{"started":false}`.
+
+```json title="A failed request"
+{
+  "error": {
+    "code": "scope_required",
+    "message": "This token doesn't have the updates:run scope."
+  }
+}
+```
+
+A body that fails validation also lists each problem in `issues`, with the `field`, a `message`, and the `path`:
+
+```json title="A body that failed validation"
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Use a container ID of 12 to 64 hexadecimal characters.",
+    "issues": [
+      {
+        "field": "containerId",
+        "message": "Use a container ID of 12 to 64 hexadecimal characters.",
+        "path": ["containerId"]
+      }
+    ]
+  }
+}
+```
+
+| Status | Code                      | When                                                                                                                                                      |
+|--------|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `400`  | `invalid_json`            | The body isn't valid JSON.                                                                                                                                |
+| `401`  | `authentication_required` | The token is missing, mistyped, expired, or revoked, or no browser is signed in.                                                                          |
+| `403`  | `scope_required`          | The token doesn't have the route's <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology>. |
+| `403`  | `session_required`        | A token was sent to a route that only the dashboard can use.                                                                                              |
+| `403`  | `csrf_invalid`            | A signed-in browser sent a change without its CSRF token.                                                                                                 |
+| `404`  | `not_found`               | No route matches the method and path, such as `GET /v1/update`.                                                                                           |
+| `409`  | `check_running`           | A check is already running.                                                                                                                               |
+| `413`  | `payload_too_large`       | The body is larger than 64 KB.                                                                                                                            |
+| `415`  | `unsupported_encoding`    | The body isn't UTF-8, or it uses a compression Outpost can't read.                                                                                        |
+| `422`  | `invalid_request`         | A field is missing or breaks a rule, and `issues` names it.                                                                                               |
+| `429`  | `rate_limited`            | The client sent too many requests.                                                                                                                        |
+| `500`  | `internal_error`          | Something unexpected went wrong, and the container log has the cause.                                                                                     |
+| `502`  | `docker_unreachable`      | Outpost can't reach Docker.                                                                                                                               |
+
+Outpost checks a request in this order, so the first problem it finds decides the answer:
+
+1. The JSON body, for `400`, `413`, or `415`.
+2. The rate limit, for `429`.
+3. The token or the browser sign-in, for `401` or `403`.
+4. The fields in the body, for `422`.
+
+## Rate Limits
+
+- Every request to a path under `/api/v1`, `/v1`, or `/metrics` counts toward 120 requests per minute for each client address. The dashboard's own requests count too.
+- Responses carry the `RateLimit-Policy`, `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. A `429` also carries `Retry-After` in seconds.
+- Sign-in has its own limit on failed attempts, described in [Web Dashboard](/docs/features/dashboard/#failed-sign-ins).
+- Behind a reverse proxy, the client address comes from `X-Forwarded-For`, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
+
+## Watchtower-Style Endpoints
+
+`POST /v1/update`, `GET /v1/status`, and `GET /metrics` keep the bodies that Watchtower-style clients expect. They take an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> only, never a browser sign-in.
+
+### Trigger an Update
+
+```bash
+curl --request POST \
+  --header "Authorization: Bearer $OUTPOST_TOKEN" \
+  http://127.0.0.1:3000/v1/update
+```
+
+| Status | Body                | Meaning                                                                                                                                                          |
+|--------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `202`  | `{"started":true}`  | A new <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> started.                             |
+| `409`  | `{"started":false}` | A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is already running, so none was started. |
+
+- `POST /v1/update` always runs a full <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> and ignores query parameters. To check one container, use `POST /api/v1/checks` instead.
+- Other failures, such as a missing token, use the error shape described in [Errors](#errors).
+
+### Status and Metrics
+
+`GET /v1/status` returns the same body as `GET /api/v1/status`, described in [Read the Status](#read-the-status). `GET /metrics` returns the Prometheus text described in [Metrics](#metrics).
+
 ## Metrics
 
-Point Prometheus at `/metrics` with the token as a bearer credential:
+Point Prometheus at `/metrics` with a token that has the `metrics:read` <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology>:
 
 ```yaml title="prometheus.yml"
 scrape_configs:
   - job_name: outpost
     authorization:
-      credentials: your-long-random-token
+      # A token with the metrics:read scope.
+      credentials: outpost_...
     static_configs:
       - targets:
           - outpost:3000
@@ -132,10 +270,33 @@ scrape_configs:
 
 | Metric                                 | Type    | Description                                                                                                                                                               |
 |----------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `outpost_cycles_total`                 | counter | Update cycles finished since start.                                                                                                                                       |
+| `outpost_cycles_total`                 | counter | Update cycles finished since start, including single-container checks and cycles that failed as a whole.                                                                  |
 | `outpost_containers_updated_total`     | counter | Containers updated since start.                                                                                                                                           |
 | `outpost_containers_failed_total`      | counter | Container updates that failed or rolled back since start.                                                                                                                 |
 | `outpost_cycle_running`                | gauge   | `1` while a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is running, otherwise `0`.              |
 | `outpost_last_cycle_timestamp_seconds` | gauge   | Unix time the last <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finished. Missing until one has. |
 
 A useful alert is `increase(outpost_containers_failed_total[1d]) > 0`, which fires when any update failed or rolled back in the last day.
+
+## Dashboard Routes
+
+The dashboard itself calls these routes. Their errors use the same shape, and the dashboard shows each message next to the field it belongs to.
+
+| Routes                                                                                                                                         | Who can call them    | What they do                                                                                                                                                                                                                                                                                                                                                                                                   |
+|------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/setup/status`, `POST /api/v1/setup/claim`                                                                                         | Anyone               | Says whether setup is needed, and creates the account with the <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology>.                                                                                                                                                                                                     |
+| `POST /api/v1/auth/login`, `POST /api/v1/auth/login/second-factor`                                                                             | Anyone               | Signs in with a password, then an authenticator or <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery code</Terminology> when one is needed.                                                                                                                                                                                     |
+| `POST /api/v1/auth/passkeys/login/options`, `POST /api/v1/auth/passkeys/login/verify`                                                          | Anyone               | Signs in with a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.                                                                                                                                                                                                                                                                 |
+| `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`                                                                                              | A browser or a token | Says who is calling, and signs a browser out.                                                                                                                                                                                                                                                                                                                                                                  |
+| `DELETE /api/v1/auth/removed-secrets`                                                                                                          | A browser            | Dismisses the **Saved secrets were removed** notice.                                                                                                                                                                                                                                                                                                                                                           |
+| `GET /api/v1/auth/security`, `POST /api/v1/auth/password`, `POST /api/v1/auth/username`                                                        | A browser            | Loads the **Security** page, and changes the password or username.                                                                                                                                                                                                                                                                                                                                             |
+| `POST /api/v1/auth/totp/setup`, `POST /api/v1/auth/totp/enable`, `POST /api/v1/auth/totp/disable`, `POST /api/v1/auth/recovery-codes`          | A browser            | Turns the authenticator app on or off, and makes new <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>.                                                                                                                                                                                                     |
+| `POST /api/v1/auth/passkeys/register/options`, `POST /api/v1/auth/passkeys/register/verify`, `DELETE /api/v1/auth/passkeys/:passkeyId`         | A browser            | Adds or removes a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.                                                                                                                                                                                                                                                               |
+| `GET /api/v1/auth/tokens`, `POST /api/v1/auth/tokens`, `PUT /api/v1/auth/tokens/:tokenId`, `DELETE /api/v1/auth/tokens/:tokenId`               | A browser            | Lists, creates, edits, and revokes <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>.                                                                                                                                                                                                                                 |
+| `GET /api/v1/notifications`, `GET /api/v1/notifications/events`, `POST /api/v1/notifications`                                                  | A browser            | Lists and adds notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and lists the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> they can choose, as described in [Notifications](/docs/features/notifications/#api-routes). |
+| `PUT /api/v1/notifications/:notificationId`, `DELETE /api/v1/notifications/:notificationId`, `POST /api/v1/notifications/:notificationId/test` | A browser            | Edits, removes, and tests a notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>.                                                                                                                                                                                                                                          |
+
+- Routes for a browser need one that is signed in to the dashboard. A token gets `403` with the code `session_required`, so a token can't change sign-in settings, make more tokens, or read or change notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>.
+- Every change from a browser also needs the sign-in's CSRF token in the `X-CSRF-Token` header, or it gets `403` with the code `csrf_invalid`.
+- For a browser, `GET /api/v1/auth/me` also returns `removedSecrets`, an empty list normally. After a lost <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, it holds `{"kind":"authenticator","removedAt":"2026-10-25T08:30:00.000Z"}` for the authenticator app, and `{"kind":"notification","name":"Homelab chat","notificationId":"ntf-6a8c0e2b4d6f8a13","removedAt":"2026-10-25T08:30:00.000Z"}` for each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> that lost secrets.
+- An entry leaves the list when its secret is entered again, and `DELETE /api/v1/auth/removed-secrets`, which answers `204`, empties it.

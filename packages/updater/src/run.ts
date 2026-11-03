@@ -1,5 +1,8 @@
-import { sendNotification } from 'outpost-package-notifiers';
-import { encodeRegistryAuth, fetchRemoteDigest, parseImageReference } from 'outpost-package-registry';
+import {
+  encodeRegistryAuth,
+  fetchRemoteDigest,
+  parseImageReference,
+} from 'outpost-package-registry';
 
 import { recreateContainer } from './recreate.js';
 import {
@@ -9,38 +12,44 @@ import {
 } from './select.js';
 
 import type {
+  Run_CheckContainer_CleanupErrorMessage,
+  Run_CheckContainer_CleanupNote,
   Run_CheckContainer_Container,
+  Run_CheckContainer_CredentialCache,
   Run_CheckContainer_Credentials,
   Run_CheckContainer_CurrentImage,
+  Run_CheckContainer_Cycle,
   Run_CheckContainer_Dependencies,
   Run_CheckContainer_Engine,
   Run_CheckContainer_ImageNote,
   Run_CheckContainer_Inspected,
+  Run_CheckContainer_Lookup,
+  Run_CheckContainer_LookupStatus,
   Run_CheckContainer_MonitorOnly,
   Run_CheckContainer_Name,
   Run_CheckContainer_NetworkMode,
   Run_CheckContainer_Options,
+  Run_CheckContainer_Origin,
   Run_CheckContainer_Outcome,
   Run_CheckContainer_PulledImage,
   Run_CheckContainer_Reference,
   Run_CheckContainer_RemoteDigest,
   Run_CheckContainer_Returns,
   Run_CheckContainer_Target,
-  Run_NotifyReport_Changed,
-  Run_NotifyReport_Dependencies,
-  Run_NotifyReport_Errors,
-  Run_NotifyReport_Failed,
-  Run_NotifyReport_Lines,
-  Run_NotifyReport_Noun,
-  Run_NotifyReport_Options,
-  Run_NotifyReport_Report,
-  Run_NotifyReport_Returns,
-  Run_NotifyReport_Title,
+  Run_ImageOrigin_Builds,
+  Run_ImageOrigin_Descriptor,
+  Run_ImageOrigin_Identity,
+  Run_ImageOrigin_Image,
+  Run_ImageOrigin_Pulls,
+  Run_ImageOrigin_RepoDigests,
+  Run_ImageOrigin_Returns,
   Run_RunUpdateCycle_Candidates,
   Run_RunUpdateCycle_ContainerIds,
   Run_RunUpdateCycle_Containers,
+  Run_RunUpdateCycle_CredentialCache,
   Run_RunUpdateCycle_Dependencies,
   Run_RunUpdateCycle_ErrorMessage,
+  Run_RunUpdateCycle_IsSelf,
   Run_RunUpdateCycle_Options,
   Run_RunUpdateCycle_Ordered,
   Run_RunUpdateCycle_Report,
@@ -48,15 +57,16 @@ import type {
   Run_RunUpdateCycle_Results,
   Run_RunUpdateCycle_Returns,
   Run_RunUpdateCycle_Selection,
+  Run_RunUpdateCycle_Sorted,
   Run_RunUpdateCycle_StartedAt,
 } from './types/run.d.ts';
 
 /**
  * Run - Update Cycle.
  *
- * Checks the selected containers (or only the given IDs) one at a time
- * in dependency order. Failures are recorded instead of stopping the
- * cycle, and the report is sent to the notification targets.
+ * Checks the selected containers (or only the given IDs) one at a time in
+ * dependency order, Outpost's own last since updating it restarts Outpost.
+ * Failures are recorded, and the report is returned for the caller to act on.
  *
  * @param {Run_RunUpdateCycle_Options}      options        - Options.
  * @param {Run_RunUpdateCycle_Dependencies} dependencies   - Dependencies.
@@ -68,40 +78,79 @@ import type {
  */
 export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, dependencies: Run_RunUpdateCycle_Dependencies, containerIds?: Run_RunUpdateCycle_ContainerIds): Run_RunUpdateCycle_Returns {
   const startedAt: Run_RunUpdateCycle_StartedAt = dependencies.now().toISOString();
-  const containers: Run_RunUpdateCycle_Containers = await dependencies['engine'].listContainers();
-  const selection: Run_RunUpdateCycle_Selection = selectContainers(containers, options);
+  let report: Run_RunUpdateCycle_Report = undefined;
 
-  // A targeted run (from the dashboard) only checks the requested containers.
-  const candidates: Run_RunUpdateCycle_Candidates = (containerIds === undefined) ? selection['candidates'] : selection['candidates'].filter((candidate) => containerIds.some((containerId) => candidate['Id'].startsWith(containerId)));
-  const ordered: Run_RunUpdateCycle_Ordered = sortByDependencies(candidates);
-  const results: Run_RunUpdateCycle_Results = (containerIds === undefined) ? [...selection['skipped']] : [];
+  try {
+    // Each registry's sign-in is read once per cycle, the first time a container needs it.
+    const credentialCache: Run_RunUpdateCycle_CredentialCache = new Map();
+    const containers: Run_RunUpdateCycle_Containers = await dependencies['engine'].listContainers();
+    const selection: Run_RunUpdateCycle_Selection = selectContainers(containers, options);
 
-  for (const container of ordered) {
-    let result: Run_RunUpdateCycle_Result = undefined;
+    // A targeted run (from the dashboard) only checks the requested containers.
+    const candidates: Run_RunUpdateCycle_Candidates = (containerIds === undefined) ? selection['candidates'] : selection['candidates'].filter((candidate) => containerIds.some((containerId) => candidate['Id'].startsWith(containerId)));
+    const sorted: Run_RunUpdateCycle_Sorted = sortByDependencies(candidates);
 
-    try {
-      result = await checkContainer(container, options, dependencies);
-    } catch (error) {
-      const errorMessage: Run_RunUpdateCycle_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+    /**
+     * Run - Run Update Cycle - Is Self.
+     *
+     * Reports whether a container is Outpost's own. That container is
+     * checked last, after every other one.
+     *
+     * @param {Shared_ContainerSummary} container - Container.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.0.0
+     */
+    const isSelf: Run_RunUpdateCycle_IsSelf = (container) => options['selfId'] !== undefined && container['Id'].startsWith(options['selfId']) === true;
+    const ordered: Run_RunUpdateCycle_Ordered = [
+      ...sorted.filter((container) => isSelf(container) === false),
+      ...sorted.filter((container) => isSelf(container) === true),
+    ];
+    const results: Run_RunUpdateCycle_Results = (containerIds === undefined) ? [...selection['skipped']] : [];
 
-      result = {
-        container: (container['Names'][0] ?? container['Id']).replace('/', ''),
-        image: container['Image'],
-        status: 'failed',
-        detail: errorMessage,
-      };
+    for (const container of ordered) {
+      let result: Run_RunUpdateCycle_Result = undefined;
+
+      try {
+        result = await checkContainer(container, options, dependencies, credentialCache, {
+          results,
+          startedAt,
+        });
+      } catch (error) {
+        const errorMessage: Run_RunUpdateCycle_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+        result = {
+          container: (container['Names'][0] ?? container['Id']).replace('/', ''),
+          image: container['Image'],
+          status: 'failed',
+          detail: errorMessage,
+        };
+      }
+
+      results.push(result);
     }
 
-    results.push(result);
+    report = {
+      startedAt,
+      finishedAt: dependencies.now().toISOString(),
+      results,
+    };
+  } catch (error) {
+    const errorMessage: Run_RunUpdateCycle_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+    report = {
+      startedAt,
+      finishedAt: dependencies.now().toISOString(),
+      error: errorMessage,
+      results: [{
+        container: 'Outpost',
+        image: 'update cycle',
+        status: 'failed',
+        detail: `Update cycle failed: ${errorMessage}`,
+      }],
+    };
   }
-
-  const report: Run_RunUpdateCycle_Report = {
-    startedAt,
-    finishedAt: dependencies.now().toISOString(),
-    results,
-  };
-
-  await notifyReport(report, options, dependencies);
 
   return report;
 }
@@ -109,19 +158,21 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
 /**
  * Run - Check Container.
  *
- * Decides whether one container has a newer image. The registry digest
- * is compared first so up-to-date containers are never pulled; if the
- * registry cannot be asked, the image is pulled and its ID compared.
+ * Decides whether one container has a newer image: its registry first, then
+ * a pull. Images built on this host are left alone, and Outpost's own
+ * container goes to the self-update step instead of being recreated here.
  *
- * @param {Run_CheckContainer_Container}    container    - Container.
- * @param {Run_CheckContainer_Options}      options      - Options.
- * @param {Run_CheckContainer_Dependencies} dependencies - Dependencies.
+ * @param {Run_CheckContainer_Container}       container       - Container.
+ * @param {Run_CheckContainer_Options}         options         - Options.
+ * @param {Run_CheckContainer_Dependencies}    dependencies    - Dependencies.
+ * @param {Run_CheckContainer_CredentialCache} credentialCache - Credential cache.
+ * @param {Run_CheckContainer_Cycle}           cycle           - Cycle.
  *
  * @returns {Run_CheckContainer_Returns}
  *
  * @since 0.0.1
  */
-async function checkContainer(container: Run_CheckContainer_Container, options: Run_CheckContainer_Options, dependencies: Run_CheckContainer_Dependencies): Run_CheckContainer_Returns {
+async function checkContainer(container: Run_CheckContainer_Container, options: Run_CheckContainer_Options, dependencies: Run_CheckContainer_Dependencies, credentialCache: Run_CheckContainer_CredentialCache, cycle: Run_CheckContainer_Cycle): Run_CheckContainer_Returns {
   const engine: Run_CheckContainer_Engine = dependencies['engine'];
   const inspected: Run_CheckContainer_Inspected = await engine.inspectContainer(container['Id']);
   const name: Run_CheckContainer_Name = inspected['Name'].replace('/', '');
@@ -147,22 +198,74 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     };
   }
 
-  const target: Run_CheckContainer_Target = parseImageReference(reference);
-  const credentials: Run_CheckContainer_Credentials = dependencies.findCredentials(options['dockerConfigPath'], target['registry']);
+  if (inspected['HostConfig']['AutoRemove'] === true) {
+    return {
+      container: name,
+      image: reference,
+      status: 'skipped',
+      detail: 'Container is configured for automatic removal',
+    };
+  }
+
   const currentImage: Run_CheckContainer_CurrentImage = await engine.inspectImage(inspected['Image']);
+  const origin: Run_CheckContainer_Origin = (currentImage !== undefined) ? imageOrigin(currentImage) : 'unknown';
+
+  // No registry has an image Docker built here, even one that shares its name.
+  if (origin === 'built') {
+    return {
+      container: name,
+      image: reference,
+      status: 'skipped',
+      detail: 'Image is locally built or has no published registry digest',
+    };
+  }
+
+  const target: Run_CheckContainer_Target = parseImageReference(reference);
+  let credentials: Run_CheckContainer_Credentials = credentialCache.get(target['registry']);
+
+  if (credentialCache.has(target['registry']) === false) {
+    credentials = dependencies.findCredentials(target['registry']);
+
+    credentialCache.set(target['registry'], credentials);
+  }
+
   let remoteDigest: Run_CheckContainer_RemoteDigest = undefined;
+  let lookupStatus: Run_CheckContainer_LookupStatus = undefined;
 
   try {
-    remoteDigest = await fetchRemoteDigest(reference, credentials, dependencies['fetchFunction']);
+    const lookup: Run_CheckContainer_Lookup = await fetchRemoteDigest(reference, credentials, dependencies['fetchFunction']);
+
+    remoteDigest = lookup['digest'];
+    lookupStatus = lookup['status'];
   } catch {
-    // Fall back to pulling and comparing image IDs.
+    // An unreachable registry falls back to pulling and comparing image IDs.
     remoteDigest = undefined;
   }
 
+  // The registry has nothing under this name, for an image Docker can't place.
+  if (
+    (
+      lookupStatus === 'not-found'
+      || lookupStatus === 'denied'
+    )
+    && origin === 'unknown'
+  ) {
+    return {
+      container: name,
+      image: reference,
+      status: 'skipped',
+      detail: (lookupStatus === 'denied') ? 'Image is locally built, or its registry needs credentials Outpost doesn\'t have' : 'Image is locally built or has no published registry digest',
+    };
+  }
+
+  // On Docker's containerd image store, an image's ID is its registry digest.
   if (
     remoteDigest !== undefined
     && currentImage !== undefined
-    && (currentImage['RepoDigests'] ?? []).some((repoDigest) => repoDigest.endsWith(`@${remoteDigest}`)) === true
+    && (
+      currentImage['Id'] === remoteDigest
+      || (currentImage['RepoDigests'] ?? []).some((repoDigest) => repoDigest.endsWith(`@${remoteDigest}`)) === true
+    )
   ) {
     return {
       container: name,
@@ -205,10 +308,37 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     };
   }
 
+  // Outpost can't stop itself and still watch its replacement, so a helper container swaps it.
+  if (options['selfId'] !== undefined && inspected['Id'].startsWith(options['selfId']) === true) {
+    if (dependencies['updateSelf'] === undefined) {
+      return {
+        container: name,
+        image: reference,
+        status: 'skipped',
+        detail: 'Outpost doesn\'t update itself in this setup',
+      };
+    }
+
+    return dependencies.updateSelf({
+      container: inspected,
+      newImageId: pulledImage['Id'],
+      reference,
+      results: [...cycle['results']],
+      startedAt: cycle['startedAt'],
+    });
+  }
+
   const outcome: Run_CheckContainer_Outcome = await recreateContainer(inspected, (currentImage !== undefined) ? (currentImage['Config'] ?? undefined) : undefined, reference, options, dependencies);
+  let cleanupNote: Run_CheckContainer_CleanupNote = '';
 
   if (outcome['status'] === 'updated' && options['cleanup'] === true) {
-    await engine.removeImage(inspected['Image']);
+    try {
+      await engine.removeImage(inspected['Image']);
+    } catch (error) {
+      const cleanupErrorMessage: Run_CheckContainer_CleanupErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+      cleanupNote = ` (warning: could not remove the previous image: ${cleanupErrorMessage})`;
+    }
   }
 
   // Without the old image's config, its defaults (such as env) cannot be told apart from user settings.
@@ -218,47 +348,48 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     container: name,
     image: reference,
     status: outcome['status'],
-    detail: `${outcome['detail']}${imageNote}`,
+    detail: `${outcome['detail']}${imageNote}${cleanupNote}`,
   };
 }
 
 /**
- * Run - Notify Report.
+ * Run - Image Origin.
  *
- * Sends one summary notification when a cycle updated, found, or failed
- * something. Quiet cycles do not notify.
+ * Says whether Docker pulled an image or built it here. Docker 29 records it
+ * as the image's identity; before that, only classic Docker's registry
+ * digests tell, and an image neither explains is unknown.
  *
- * @param {Run_NotifyReport_Report}       report       - Report.
- * @param {Run_NotifyReport_Options}      options      - Options.
- * @param {Run_NotifyReport_Dependencies} dependencies - Dependencies.
+ * @param {Run_ImageOrigin_Image} image - Image.
  *
- * @returns {Run_NotifyReport_Returns}
+ * @returns {Run_ImageOrigin_Returns}
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
-async function notifyReport(report: Run_NotifyReport_Report, options: Run_NotifyReport_Options, dependencies: Run_NotifyReport_Dependencies): Run_NotifyReport_Returns {
-  const changed: Run_NotifyReport_Changed = report['results'].filter((result) => result['status'] !== 'up-to-date' && result['status'] !== 'skipped');
+function imageOrigin(image: Run_ImageOrigin_Image): Run_ImageOrigin_Returns {
+  const identity: Run_ImageOrigin_Identity = image['Identity'] ?? undefined;
+  const pulls: Run_ImageOrigin_Pulls = (identity !== undefined) ? (identity['Pull'] ?? []) : [];
+  const builds: Run_ImageOrigin_Builds = (identity !== undefined) ? (identity['Build'] ?? []) : [];
+  const repoDigests: Run_ImageOrigin_RepoDigests = image['RepoDigests'] ?? [];
+  const descriptor: Run_ImageOrigin_Descriptor = image['Descriptor'] ?? undefined;
 
-  if (changed.length === 0) {
-    return;
+  // A local build that was pushed lists both, and its registry can be asked like any other.
+  if (pulls.length > 0) {
+    return 'pulled';
   }
 
-  const failed: Run_NotifyReport_Failed = changed.some((result) => result['status'] === 'failed' || result['status'] === 'rolled-back');
-  const lines: Run_NotifyReport_Lines = changed.map((result) => `${result['container']} (${result['image']}): ${result['status']} - ${result['detail']}`);
-  const noun: Run_NotifyReport_Noun = (changed.length === 1) ? 'container needs' : 'containers need';
-  const title: Run_NotifyReport_Title = `Outpost: ${String(changed.length)} ${noun} attention`;
-  const errors: Run_NotifyReport_Errors = await sendNotification(options['notificationTargets'], {
-    title,
-    message: lines.join('\n'),
-    tags: [(failed === true) ? 'warning' : 'whale'],
-    priority: (failed === true) ? 'high' : 'default',
-    payload: report,
-  }, dependencies['fetchFunction']);
-
-  // Delivery problems never affect the cycle, but they are logged so they can be fixed.
-  for (const error of errors) {
-    process.stderr.write(`${error}\n`);
+  if (builds.length > 0) {
+    return 'built';
   }
 
-  return;
+  // Classic Docker records a registry digest that differs from the image ID for every image it pulled.
+  if (repoDigests.some((repoDigest) => repoDigest.endsWith(`@${image['Id']}`) === false) === true) {
+    return 'pulled';
+  }
+
+  // It records none for a local build. The containerd image store, which adds a descriptor, leaves none on an untagged image too.
+  if (repoDigests.length === 0 && descriptor === undefined) {
+    return 'built';
+  }
+
+  return 'unknown';
 }

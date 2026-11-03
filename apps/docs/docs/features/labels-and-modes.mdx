@@ -36,7 +36,7 @@ Values are matched exactly, so `True`, `yes`, or `1` have no effect.
 
 ## Label Mode
 
-Set `OUTPOST_LABEL_MODE` to choose the starting point.
+Choose **Container selection** on the **Settings** page to set the starting point.
 
 ### Opt-Out (Default)
 
@@ -57,13 +57,6 @@ Only containers with `io.cbnventures.outpost.enable=true` are checked:
 
 ```yaml title="compose.yml"
 services:
-  outpost:
-    image: cbnventures/outpost:latest
-    environment:
-      OUTPOST_LABEL_MODE: "opt-in"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
   web:
     image: ghcr.io/example/web:latest
     labels:
@@ -77,7 +70,7 @@ Containers that are left out by the label rules don't appear in the <Terminology
 A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container is checked like any other, but when a newer image exists it is reported as `available` instead of being recreated. You can turn it on in two ways:
 
 - **For one container** — Add `io.cbnventures.outpost.monitor-only: "true"` to it.
-- **For everything** — Set `OUTPOST_MONITOR_ONLY: "true"` on Outpost.
+- **For everything** — Turn on **Monitor only** on Outpost's **Settings** page.
 
 ```yaml title="compose.yml"
 services:
@@ -87,21 +80,56 @@ services:
       io.cbnventures.outpost.monitor-only: "true"
 ```
 
+Every check that finds a newer image for a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container sends the **New images available** alert to the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> that chose it, as described in [Notifications](/docs/features/notifications/#choose-events).
+
 :::info
 When the registry can't report a digest, Outpost falls back to pulling the image to compare it. In that case a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container's new image is downloaded, but the container is still left as it is.
 :::
 
+## Outpost Itself
+
+Outpost follows the same labels for its own container, so it keeps itself current without a manual pull:
+
+- **Opt-out mode** — Outpost updates itself unless its container has `io.cbnventures.outpost.enable=false`.
+- **Opt-in mode** — Outpost updates itself only when its container has `io.cbnventures.outpost.enable=true`, like every other container.
+- **<Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">Monitor-only</Terminology>** — Outpost reports a newer image of itself as `available` instead when its container has `io.cbnventures.outpost.monitor-only=true` or **Monitor only** is on in **Settings**.
+
+To keep Outpost on the image it runs now, label it off:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    image: cbnventures/outpost:latest
+    labels:
+      # Keep Outpost on its current image.
+      io.cbnventures.outpost.enable: "false"
+```
+
+Outpost checks itself last in every <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and you can also check it on its own from the dashboard or the API. [How Outpost Updates Itself](/docs/features/updates-and-rollback/#how-outpost-updates-itself) explains the swap and what it needs.
+
+Outpost finds its own container from Linux process metadata, with Docker's container-ID hostname as a fallback. If it can't, it leaves alone every container running an image named `outpost`, such as `cbnventures/outpost:latest`, so it never stops itself in the middle of a check.
+
 ## Containers Outpost Always Skips
 
-Some containers are never recreated, whatever their labels say. They appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `skipped` with a reason:
+Some containers are never recreated, even when the label rules select them. Those that are selected appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `skipped` with a reason:
 
-| Container                                            | Reason shown                                   |
-|------------------------------------------------------|------------------------------------------------|
-| Outpost itself                                       | `Outpost does not update itself while running` |
-| Image pinned to a digest, such as `nginx@sha256:...` | `Image is pinned to a digest or ID`            |
-| `network_mode: container:...` or `service:...`       | `Shares another container's network namespace` |
+| Container                                                 | Reason shown                                                                     |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------|
+| Outpost container, when Outpost can't find its own        | `Outpost couldn't find its own container, so it leaves Outpost containers alone` |
+| Image pinned to a digest, such as `nginx@sha256:...`      | `Image is pinned to a digest or ID`                                              |
+| Locally built image the registry doesn't have             | `Image is locally built or has no published registry digest`                     |
+| Locally built image, or a private one without credentials | `Image is locally built, or its registry needs credentials Outpost doesn't have` |
+| `network_mode: container:...` or `service:...`            | `Shares another container's network namespace`                                   |
+| Container whose network namespace another uses            | `Has containers sharing its network namespace`                                   |
+| Container started with `--rm`                             | `Container is configured for automatic removal`                                  |
 
-Stopped containers are not checked either, because Outpost only looks at running containers. To update Outpost itself, pull its image and recreate it like any other service, for example with `docker compose pull && docker compose up --detach`.
+Outpost decides that an image is locally built like this:
+
+- **Docker 29, or the classic image store** — Docker records where each image came from. An image built on this host gets the first message without any registry being asked, even when a registry publishes the same name, and a pulled image is checked like any other.
+- **Docker 28 or older with the containerd image store** — Docker keeps no such record, so Outpost asks the registry and skips the image only when the registry doesn't have it or won't show it without a login. Docker Hub answers a missing name as if it needed a login, so local builds there get the second message, and so does a pulled private image when Outpost has no [sign-in for its registry](/docs/getting-started/private-registries/#add-a-sign-in).
+- **Registry can't be reached** — Outpost tries the pull instead, and a failed pull shows as `failed`.
+
+A container the label rules leave out never reaches these checks, so it gets no `skipped` line, and that includes Outpost itself. Stopped containers are not checked either, because Outpost only looks at running containers.
 
 ## Dependency Order
 

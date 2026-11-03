@@ -6,145 +6,298 @@ sidebar_position: 5
 keywords:
   - outpost
   - web dashboard
-  - admin
   - sign in
-  - docker secret
+  - setup code
   - update history
+  - reverse proxy
 tags:
   - features
   - dashboard
 ---
 
-import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+import ThemedImage from '@theme/ThemedImage';
+import { Frame, Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+
+import dashboardOneLight from './_assets_/dashboard-1-light.png';
+import dashboardOneDark from './_assets_/dashboard-1-dark.png';
+import dashboardTwoLight from './_assets_/dashboard-2-light.png';
+import dashboardTwoDark from './_assets_/dashboard-2-dark.png';
+import dashboardThreeLight from './_assets_/dashboard-3-light.png';
+import dashboardThreeDark from './_assets_/dashboard-3-dark.png';
+import dashboardFourLight from './_assets_/dashboard-4-light.png';
+import dashboardFourDark from './_assets_/dashboard-4-dark.png';
+import dashboardFiveLight from './_assets_/dashboard-5-light.png';
+import dashboardFiveDark from './_assets_/dashboard-5-dark.png';
+import dashboardSixLight from './_assets_/dashboard-6-light.png';
+import dashboardSixDark from './_assets_/dashboard-6-dark.png';
+import dashboardSevenLight from './_assets_/dashboard-7-light.png';
+import dashboardSevenDark from './_assets_/dashboard-7-dark.png';
+import dashboardEightLight from './_assets_/dashboard-8-light.png';
+import dashboardEightDark from './_assets_/dashboard-8-dark.png';
+import dashboardNineLight from './_assets_/dashboard-9-light.png';
+import dashboardNineDark from './_assets_/dashboard-9-dark.png';
+import dashboardTenLight from './_assets_/dashboard-10-light.png';
+import dashboardTenDark from './_assets_/dashboard-10-dark.png';
+import dashboardElevenLight from './_assets_/dashboard-11-light.png';
+import dashboardElevenDark from './_assets_/dashboard-11-dark.png';
 
 Check on Outpost from your browser, see which containers it manages and why, and start a check without touching the command line.
 
 ## Why Use the Dashboard?
 
 1. Shows the status, the next scheduled check, and the latest results on one page so you don't have to read container logs.
-2. Explains why each running container is or isn't managed so a missing update is easy to trace back to a label.
-3. Keeps the last 50 checks on disk so you can see what changed overnight, even after Outpost restarts.
-4. Starts a check for everything or for a single container with one click, without setting up an API token.
+2. Follows a running check live so you see the results the moment it finishes.
+3. Explains why each running container is or isn't managed so a missing update is easy to trace back to a label.
+4. Keeps the last 50 checks on disk so you can see what changed overnight, even after Outpost restarts.
+5. Creates its account on the first visit with a one-time code from the container log so no password sits in your Compose file.
 
-## What It Shows
+## Open the Dashboard
 
-The dashboard has four sections:
+Open `http://localhost:3000/admin/` on the Docker host. Opening `http://localhost:3000/` in a browser takes you there too.
 
-- **Overview** — The current status (idle or checking), how many containers are managed, when the last check finished, and when the next one is due. A **Check now** button starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and the results of the last check appear below.
-- **Containers** — Every running container with its image and last result. Each row says whether it's managed, and if not, why: `Opted out by label`, `Not opted in`, or `Outpost itself`.
-- **History** — The last 50 checks, newest first. Each entry shows counts per status and expands to the per-container results.
-- **Settings** — A read-only list of the active configuration. Secrets such as `OUTPOST_API_TOKEN` and `OUTPOST_NTFY_TOKEN` appear only as `Set` or `Not set`.
+| Page              | What it's for                                                                                                                                                                                                                                                                                                                         |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Overview**      | The scheduler, the last check, and a **Check now** button.                                                                                                                                                                                                                                                                            |
+| **Containers**    | Every running container, whether Outpost manages it, and a button to check one.                                                                                                                                                                                                                                                       |
+| **History**       | The last 50 checks, newest first.                                                                                                                                                                                                                                                                                                     |
+| **Settings**      | The schedule, update behavior, and replacement timing saved in Outpost, plus read-only container bootstrap paths.                                                                                                                                                                                                                     |
+| **Access tokens** | The <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology> that scripts use to call the API.                                                                                                                                                      |
+| **Notifications** | The <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> that get alerts, and the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">events</Terminology> each one hears about.            |
+| **Security**      | Your password, username, authenticator app, <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>, and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>. |
+
+**Access tokens**, **Notifications**, and **Security** sit under **Settings** in the sidebar. On a phone, the other four pages move to a bar at the bottom of the screen, and these three move to the account menu.
+
+<Frame caption="The sidebar on a desktop" style={{ maxWidth: 258, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardOneLight, dark: dashboardOneDark }} alt="Outpost sidebar listing Overview, Containers, History, Settings, Access tokens, Notifications, and Security" width={256} height={360} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+<Frame caption="The bottom bar and account menu on a phone" style={{ maxWidth: 392, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardTwoLight, dark: dashboardTwoDark }} alt="Outpost on a phone with the account menu open, listing Appearance, Access tokens, Notifications, Security, and Sign out above a bottom bar with Overview, Containers, History, and Settings" width={780} height={1688} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+## Set Up Your Account
+
+The first time you open the dashboard, it shows **Set up your account**. While no account exists, Outpost prints a <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> to the container log each time it starts:
+
+```text
+No account exists yet. Open the dashboard to create it with the setup code.
+  Setup code: K7Q2M-XR9TD-P4W8N
+  Expires: 2026-10-25T08:30:00.000Z
+```
+
+1. Read the code with `docker logs outpost`, or with `docker compose logs outpost` in a Compose project.
+2. Enter it under **One-time code**.
+3. Choose a **Username** and a **Password**, and repeat the password under **Confirm password**.
+4. Select **Create account**. The dashboard opens already signed in.
+
+<Frame caption="Setting up the account on the first visit" style={{ maxWidth: 450, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardThreeLight, dark: dashboardThreeDark }} alt="Set up your account screen with a one-time code, the username admin, and a password rated Strong" width={448} height={735} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Code lifetime** — A code works for 30 minutes after Outpost starts. Each restart prints a new code, and the old one stops working.
+- **Typing the code** — Letter case, spaces, and dashes don't matter.
+- **Username** — 3 to 64 letters, numbers, periods, underscores, or hyphens, starting with a letter or number.
+- **Password** — At least 12 characters. The bar under the field rates it from **Weak** to **Strong**, and any password of 12 or more characters is accepted.
+- **Wrong codes** — After 10 wrong codes from one address within 15 minutes, setup from that address is refused until the window passes.
+
+:::info
+The code only appears in the container log, never in the dashboard. No username or password goes in your Compose file or environment variables.
+:::
+
+## Sign In
+
+<Frame caption="The sign-in screen" style={{ maxWidth: 450, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardFourLight, dark: dashboardFourDark }} alt="Sign in screen with username and password fields, a Sign in button, and a Sign in with a passkey button" width={448} height={584} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+### With a Password
+
+1. Enter your **Username** and **Password**. The username ignores letter case.
+2. Select **Sign in**.
+
+An <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> doesn't work here, because tokens are only for the API.
+
+### With an Authenticator Code
+
+If you turned on an authenticator app on the **Security** page, the dashboard asks for a code after the password.
+
+1. Enter the 6-digit code from the app, or one of your <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>.
+2. Select **Verify**, or select **Start over** to go back to the password step.
+
+<Frame caption="The code step after the password" style={{ maxWidth: 450, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardFiveLight, dark: dashboardFiveDark }} alt="Enter your code screen with a 6-digit code entered, a Verify button, and a Start over link" width={448} height={503} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- You have 5 minutes after the password step, and 5 wrong codes send you back to it.
+- Each code works only once. A <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery code</Terminology> works with or without its dash, in any letter case.
+
+### With a Passkey
+
+1. Select **Sign in with a passkey**.
+2. Confirm with your device or password manager when the browser asks.
+
+- A <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> replaces the username, the password, and the code.
+- A <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> works only at the address it was added on, as described in [Account Security](/docs/features/account-security/#add-a-passkey).
+
+## Staying Signed In
+
+- A sign-in lasts 24 hours, and then the dashboard asks you to sign in again.
+- Sign-ins are saved in the database, so restarting or updating Outpost doesn't sign you out.
+- Changing the password signs out every other browser. **Sign out** in the account menu ends your own sign-in right away.
+
+## Failed Sign-Ins
+
+- Wrong passwords, wrong codes, and rejected <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> from one address share a limit of 10 in 15 minutes. After that, sign-in from that address is refused with `Too many sign-in attempts. Try again in 15 minutes.`
+- A wrong password on the **Security** page counts toward the same limit.
+- A successful sign-in clears the count, and so does restarting Outpost.
+- The setup screen has its own count of 10 wrong codes in 15 minutes.
+- When an address reaches the sign-in limit, Outpost sends the **Sign-in locked** alert to the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> that chose it, as described in [Notifications](/docs/features/notifications/#choose-events).
+
+## Overview
+
+The **Overview** page follows the scheduler live, so it changes as soon as a check starts or finishes.
+
+<Frame caption="The Overview page after a check from the dashboard">
+  <ThemedImage sources={{ light: dashboardSixLight, dark: dashboardSixDark }} alt="Outpost Overview page with the Scheduler panel showing 6 of 10 containers managed, and the last check, which updated immich-server and lists each container's result, ending with outpost up to date" width={1280} height={1219} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Scheduler** — Whether Outpost is idle or checking, the next check, the schedule in words with its time zone above its cron expression, the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>, whether <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> is on, and how many containers are managed.
+- **Last check** — When it finished, how long it took, and what started it. It also counts the containers that were updated, up to date, or failed, and lists each result.
+- **Check now** — Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> for every managed container. Outpost checks itself last, and when it has a newer image, the dashboard reconnects on its own while Outpost restarts.
+
+The card at the bottom of the sidebar shows the same status on every page. It also warns you when Docker can't be reached or the last check failed.
+
+## Containers
+
+The **Containers** page lists every running container with its image, its last result, and whether Outpost manages it.
+
+<Frame caption="The Containers page with managed and skipped containers">
+  <ThemedImage sources={{ light: dashboardSevenLight, dark: dashboardSevenDark }} alt="Outpost Containers page listing ten containers with their images, last results, whether Outpost manages each one or why not, and a check button for each managed container, including the outpost row marked Outpost itself" width={1280} height={1111} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Last result** — What the most recent check did with that container, and when. A container that no check has looked at yet shows **Not checked yet**.
+- **Managed** — **Yes**, with **Outpost itself** under Outpost's own row and **Monitor only** under <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers, or **No** with one of the reasons below. On a phone, it moves under the container's name, such as **Managed · Outpost itself**.
+- **Refresh** — Loads the list again.
+
+| Reason                      | Why Outpost leaves the container alone                                                                        |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------|
+| `Opted out by label`        | The container has `io.cbnventures.outpost.enable=false`.                                                      |
+| `Not opted in`              | Opt-in mode is on, and the container doesn't have `io.cbnventures.outpost.enable=true`.                       |
+| `Pinned image`              | The image is pinned to a digest or ID, so there's no tag to follow.                                           |
+| `Shared network namespace`  | The container uses another container's network.                                                               |
+| `Network namespace owner`   | Another container uses this container's network.                                                              |
+| `Automatic removal enabled` | The container was started with `--rm`.                                                                        |
+| `Outpost container`         | Outpost couldn't find its own container, so it leaves every container running an image named `outpost` alone. |
+
+When Outpost can't reach Docker, the page shows `Outpost can't reach Docker. Check that the Docker socket is mounted.` instead of the list.
 
 ### Checking a Single Container
 
-Managed containers have their own button in the **Containers** section:
+Managed containers have their own button:
 
 - **Check & update** — Checks that container and updates it when a newer image exists.
 - **Check** — Shown for <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> containers, which are only checked and never recreated.
 
-A single-container check is a short <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> of its own. Its <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> lists only that container, and it is saved to the history like any other.
+Outpost's own **Check & update** asks first, because an update restarts Outpost. The **Update Outpost itself?** dialog explains that the dashboard reconnects on its own and that the check shows in **History** once it's done:
+
+<Frame caption="Confirming a check of Outpost itself" style={{ maxWidth: 586, marginInline: 'auto' }}>
+  <ThemedImage sources={{ light: dashboardElevenLight, dark: dashboardElevenDark }} alt="Update Outpost itself? dialog saying that Outpost restarts on a newer image, the dashboard reconnects on its own, and the check shows in History once it's done, with Cancel and Check & update buttons" width={584} height={216} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Check & update** — Starts the check, as described in [Updates and Rollback](/docs/features/updates-and-rollback/#how-outpost-updates-itself).
+- **Cancel** — Closes the dialog without checking.
+
+A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> Outpost shows **Check** instead, which doesn't ask, because it never restarts Outpost.
+
+A single-container check is a short <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> of its own. Its <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> lists only that container, and it's saved to the history like any other.
 
 :::info
-Only one <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs at a time. If the schedule or the API already started one, the dashboard shows `A check is already running.` instead of starting another.
+Only one <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> runs at a time. While one is running, whether the schedule, the API, or the dashboard started it, the buttons can't be selected.
 :::
 
-### Theme
+## History
 
-A toggle in the header switches between the system, light, and dark themes. The choice is kept in your browser, so each browser remembers its own.
+- The **History** page lists the last 50 checks, newest first. Each one shows when it started, what started it (**Schedule**, **Startup**, **API**, or **Dashboard**), how long it took, and how many containers had each result.
+- Select a check to see each container's result. A check that failed as a whole shows its error at the top.
+- The history is saved to `history.json` in the data directory, so it survives a restart when `/data` is on a volume.
 
-## Enable the Dashboard
+<Frame caption="The History page with a failed check expanded">
+  <ThemedImage sources={{ light: dashboardEightLight, dark: dashboardEightDark }} alt="Outpost History page with a scheduled check expanded, showing immich-server failed because the registry returned HTTP 503, an update available for jellyfin, and the other containers up to date or skipped, with outpost last and up to date" width={1280} height={998} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
 
-The dashboard is always served at `/admin/`, and `/` redirects there. It stays locked until you give Outpost an administrator password.
+## Settings
 
-It is recommended to keep the password in a file and pass it as a Docker secret, so it doesn't show up in `docker inspect`:
+The **Settings** page edits the schedule, update behavior, and replacement timing stored in Outpost's database, one setting per row. Changing anything brings up a bar with the number of unsaved changes, **Discard**, and **Save**. Saving applies the new behavior immediately, including rebuilding the active schedule.
 
-```bash
-openssl rand -base64 24 > ./outpost-admin-password.txt
+- **Schedule** — Pick **Every hour**, **Every few hours**, **Every day**, **Every week** with its days, or **Custom (cron)**. The line under it shows the next check and its cron expression, in the time zone Outpost runs in.
+- **Private registries** — Sign-ins for private images, added, edited, and removed on their own, apart from the save bar, as described in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in).
+- **Container runtime** — The Docker host and data directory. Outpost needs them before it can open its database, so they're set in Compose and change only after a restart.
+
+<Frame caption="The Settings page">
+  <ThemedImage sources={{ light: dashboardNineLight, dark: dashboardNineDark }} alt="Outpost Settings page with the schedule set to every week on Monday, Wednesday, and Friday at 03:30 and the next check under it, the Updates and Timing rows, and a bar reading 1 unsaved change with Discard and Save" width={1280} height={900} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+Notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> stay on the **Notifications** page. See [Configuration](/docs/getting-started/configuration/) for the boundary between database settings and container bootstrap values.
+
+## Appearance
+
+Choose **System**, **Light**, or **Dark** under **Appearance** in the account menu. **System** follows your device's setting, and the choice is saved in this browser only.
+
+## Keep Your Data
+
+The account, its sign-ins, the <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, the notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, the private registry sign-ins, and the history live in the data directory, which is `/data` by default. Mount a volume at `/data` so they survive when the container is replaced.
+
+Without a volume, they're lost whenever the container is replaced, and the dashboard asks for setup again. See [Backup and Recovery](/docs/reference/backup-and-recovery/) for what the folder holds and how to back it up.
+
+## Saved Secrets Notice
+
+If Outpost starts without its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, it makes a new one, turns off the authenticator app, and removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the passwords of private registry sign-ins, because the old key sealed them. The dashboard then shows **Saved secrets were removed** at the top of every page, with the date Outpost made the new key and a link for each thing to enter again.
+
+<Frame caption="The notice after Outpost made a new key">
+  <ThemedImage sources={{ light: dashboardTenLight, dark: dashboardTenDark }} alt="Saved secrets were removed notice with links to set up the authenticator app, the Email and Homelab chat notifications, and the ghcr.io and registry.example.com registry sign-ins again, and a Dismiss button" width={992} height={299} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+- **Set up the authenticator app** — Opens the **Security** page. Turning the authenticator app on again there takes it off the notice.
+- **Set up the … notification again** — Appears with the name of each <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> that lost secrets, and opens the **Notifications** page. Entering its secrets again with **Edit** takes it off the notice and resumes its alerts.
+- **Set up the … registry sign-in again** — Appears with the host of each private registry sign-in that lost its password, and opens the **Settings** page. Entering the password again with **Edit** under **Private registries** takes it off the notice.
+- **Dismiss** — Hides the notice. Anything not entered again stays removed, those <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> stay paused, and private images from those registries can't be checked.
+
+See [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key) for what a lost key removes and what stays.
+
+## Behind a Reverse Proxy
+
+Outpost serves plain HTTP. To reach the dashboard over HTTPS, put a reverse proxy such as Caddy in front of it:
+
+```caddyfile title="Caddyfile"
+outpost.example.net {
+  reverse_proxy 127.0.0.1:3000
+}
 ```
 
-```yaml title="compose.yml"
-services:
-  outpost:
-    image: cbnventures/outpost:latest
-    environment:
-      OUTPOST_ADMIN_USERNAME: "admin"
-      OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
-    secrets:
-      - outpost_admin_password
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+Outpost has no proxy setting. It reads the `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host` headers only from connections that come from these loopback and private addresses:
 
-      # Keeps the dashboard history across restarts.
-      - outpost-data:/data
-    ports:
-      - "127.0.0.1:3000:3000"
-    restart: unless-stopped
+- `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16`
+- `::1` and `fc00::/7`
 
-secrets:
-  outpost_admin_password:
-    file: ./outpost-admin-password.txt
+A proxy on the same host or on the same Docker network falls in these ranges.
 
-volumes:
-  outpost-data:
-```
+- **Client address** — The sign-in limit and the API's rate limit count each client by the address in `X-Forwarded-For`. Outpost reads the list from the end and stops at the first public address.
+- **HTTPS** — `X-Forwarded-Proto: https` marks the sign-in cookie `Secure` and allows <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>.
+- **Hostname** — `X-Forwarded-Host`, or the `Host` header when it's missing, is the address that <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> are tied to.
+- **Own hostname** — Give Outpost its own hostname, such as `https://outpost.example.net`, because a sub-path such as `https://example.net/outpost/` isn't supported.
 
-- **Password file** — Leading and trailing whitespace, including the final newline, is ignored.
-- **Plain variable** — `OUTPOST_ADMIN_PASSWORD` works too, but it is only used when `OUTPOST_ADMIN_PASSWORD_FILE` is unset.
-- **Startup check** — If the file can't be read or is empty, Outpost stops at startup and names the file in the log.
-
-When no password is set, the startup log shows `Dashboard: http://localhost:3000/admin/ (locked: set OUTPOST_ADMIN_PASSWORD_FILE)`, and the sign-in page explains how to unlock it.
-
-### Keep the History
-
-The last 50 <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">reports</Terminology> are saved to `history.json` in the data directory, which is `/data` by default. Mount a volume at `/data` so the history survives when the container is recreated.
-
-Without a volume, the history lives in the container's own filesystem and is lost whenever the container is replaced. See [Configuration](/docs/getting-started/configuration/#dashboard) for `OUTPOST_DATA_DIRECTORY`.
-
-## Sign In
-
-Open `http://localhost:3000/admin/` and sign in with `OUTPOST_ADMIN_USERNAME` (`admin` by default) and the password.
-
-- **One administrator** — There is a single account. The username and password come only from the environment.
-- **Idle timeout** — A session ends after 30 minutes without requests. An open dashboard tab refreshes itself every 30 seconds, which keeps its session alive.
-- **Restarts** — Sessions are kept in memory, so restarting Outpost signs everyone out.
-- **Failed sign-ins** — After 10 failed sign-ins from one address within 15 minutes, further attempts from that address are refused with `429` until the window passes.
-
-:::info
-The dashboard login is separate from `OUTPOST_API_TOKEN`. The token still guards `/v1/update`, `/v1/status`, and `/metrics`, and a dashboard session doesn't unlock them. See [HTTP API and Metrics](/docs/features/http-api-and-metrics/).
+:::warning
+A device on your network with a private address can send these headers itself and choose the address its limits count against. It is recommended to keep the port bound to `127.0.0.1` so only the proxy on the host can reach it.
 :::
 
 ## Security Notes
 
 The dashboard can start updates on your Docker host, so it is worth protecting like SSH access:
 
-- **Network exposure** — It is recommended to keep the port bound to `127.0.0.1` and reach it through a VPN or SSH tunnel. If you expose it beyond localhost, put it behind HTTPS.
-- **Cookie** — The session cookie `outpost_session` is `HttpOnly`, `SameSite=Strict`, and limited to `/admin`. Changes such as starting a check also need a per-session CSRF token in the `X-CSRF-Token` header.
+- **Network exposure** — It is recommended to keep the port bound to `127.0.0.1` and reach the dashboard through a VPN, an SSH tunnel, or an HTTPS reverse proxy.
+- **Stored secrets** — The password is kept as a salted scrypt hash, and <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, sign-ins, and <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> as SHA-256 hashes. The authenticator app's secret, the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the passwords of private registry sign-ins are encrypted with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> are kept as public keys only.
+- **Files** — The database and the key file can be read only by the user in `PUID`, inside a folder only that user can open.
+- **Cookie** — The sign-in cookie `outpost_session` is `HttpOnly`, `SameSite=Strict`, and `Secure` over HTTPS. Every change also needs the sign-in's CSRF token in the `X-CSRF-Token` header.
 - **Page hardening** — Dashboard pages send a strict Content Security Policy and refuse to be framed.
 
-## Behind a Reverse Proxy
-
-Outpost itself serves plain HTTP. When a reverse proxy in front of it terminates HTTPS, set `OUTPOST_TRUST_PROXY` to `true` so Outpost reads the `X-Forwarded-For` and `X-Forwarded-Proto` headers from that one proxy.
-
-- The session cookie is then marked `Secure`, because Outpost knows the browser used HTTPS.
-- The sign-in limit then counts each client's real address instead of the proxy's.
-
-:::warning
-Only set `OUTPOST_TRUST_PROXY` when a proxy you control sits directly in front of Outpost. Without a proxy, any client could forge those headers to dodge the sign-in limit.
-:::
-
-## Dashboard API
-
-The dashboard page talks to a JSON API under `/admin/api`. It is built for the dashboard itself, and the [HTTP API](/docs/features/http-api-and-metrics/) is the stable choice for scripts.
-
-| Method   | Path                    | Description                                                                                                                                            |
-|----------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET`    | `/admin/api/session`    | Whether the dashboard is enabled and whether you're signed in.                                                                                         |
-| `POST`   | `/admin/api/session`    | Signs in with `{"username":"...","password":"..."}` and sets the session cookie.                                                                       |
-| `DELETE` | `/admin/api/session`    | Signs out. Needs the CSRF token.                                                                                                                       |
-| `GET`    | `/admin/api/overview`   | Status, next run, latest <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>, and mode. |
-| `GET`    | `/admin/api/containers` | Running containers, whether each is managed, and its last result.                                                                                      |
-| `GET`    | `/admin/api/history`    | Saved <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">reports</Terminology>, newest first.               |
-| `GET`    | `/admin/api/settings`   | The active configuration, with secrets shown as `Set` or `Not set`.                                                                                    |
-| `POST`   | `/admin/api/run`        | Starts a check. Send `{"containerId":"..."}` to check one container. Needs the CSRF token.                                                             |
-
-Every endpoint except `/admin/api/session` returns `401` without a valid session. `POST /admin/api/run` returns `202` when a check started and `409` when one is already running.
+The routes the dashboard calls are listed in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#dashboard-routes).

@@ -8,17 +8,37 @@ import type { Shared_ContainerSummary, Shared_Result } from './shared.d.ts';
 export type Select_Containers = Shared_ContainerSummary[];
 
 /**
- * Select - Select Containers - Applies Label Modes And Skips Self.
+ * Select - Select Containers - Applies Label Modes To Outpost Too.
  *
  * @since 0.0.1
  */
-export type Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection_Candidates = Shared_ContainerSummary[];
+export type Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Candidates = Shared_ContainerSummary[];
 
-export type Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection_Skipped = Shared_Result[];
+export type Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Skipped = Shared_Result[];
 
-export type Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection = {
-  candidates: Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection_Candidates;
-  skipped: Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection_Skipped;
+export type Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection = {
+  candidates: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Candidates;
+  skipped: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Skipped;
+};
+
+/**
+ * Select - Select Containers - Leaves Outpost Images Alone When Its Own Id Is Unknown.
+ *
+ * @since 1.0.0
+ */
+export type Select_SelectContainers_LeavesOutpostImagesAloneWhenItsOwnIdIsUnknown_Selection = {
+  candidates: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Candidates;
+  skipped: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Skipped;
+};
+
+/**
+ * Select - Select Containers - Skips Network Namespace Pairs And Auto Remove.
+ *
+ * @since 1.0.0
+ */
+export type Select_SelectContainers_SkipsNetworkNamespacePairsAndAutoRemove_Selection = {
+  candidates: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Candidates;
+  skipped: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection_Skipped;
 };
 
 /**

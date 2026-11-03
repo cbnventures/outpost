@@ -1,61 +1,91 @@
-import { timingSafeEqual } from 'node:crypto';
-
 import express from 'express';
+import rateLimit from 'express-rate-limit';
+
+import { Runner as Access } from './lib/access.js';
+import { Runner as Attempts } from './lib/attempts.js';
+import { isTrustedProxyAddress, sendError } from './lib/http.js';
+import { Runner as Notifier } from './lib/notifier.js';
+import { Runner as Auth } from './routes/auth.js';
+import { Runner as Dashboard } from './routes/dashboard.js';
+import { Runner as Notifications } from './routes/notifications.js';
+import { Runner as Registries } from './routes/registries.js';
+import { Runner as Security } from './routes/security.js';
+import { Runner as Tokens } from './routes/tokens.js';
+import { Runner as Watchtower } from './routes/watchtower.js';
+import { Runner as Web } from './routes/web.js';
 
 import type {
-  App_CreateApp_AdminRouter,
-  App_CreateApp_ApiToken,
+  App_CreateApp_Access,
+  App_CreateApp_ApiLimiter,
   App_CreateApp_App,
-  App_CreateApp_Authorize,
+  App_CreateApp_Attempts,
+  App_CreateApp_Dependencies,
+  App_CreateApp_Notifier,
   App_CreateApp_Returns,
-  App_CreateApp_Scheduler,
-  App_CreateApp_Started,
-  App_CreateApp_State,
-  App_CreateApp_TrustProxy,
-  App_FormatMetrics_Lines,
-  App_FormatMetrics_Returns,
-  App_FormatMetrics_RunningValue,
-  App_FormatMetrics_State,
-  App_IsAuthorized_ApiToken,
-  App_IsAuthorized_Expected,
-  App_IsAuthorized_Header,
-  App_IsAuthorized_Provided,
-  App_IsAuthorized_Returns,
+  App_HandleError_Error,
+  App_HandleError_ErrorMessage,
+  App_HandleError_Next,
+  App_HandleError_Request,
+  App_HandleError_Response,
+  App_HandleError_Returns,
+  App_HandleError_Status,
+  App_HandleError_Type,
+  App_HandleNotFound_Request,
+  App_HandleNotFound_Response,
+  App_HandleNotFound_Returns,
+  App_SetBaseHeaders_Next,
+  App_SetBaseHeaders_Request,
+  App_SetBaseHeaders_Response,
+  App_SetBaseHeaders_Returns,
 } from './types/app.d.ts';
 
 /**
  * App - Create App.
  *
- * Builds the HTTP server: the dashboard at /admin, a public health check,
- * and token-protected endpoints to trigger updates, read the last report,
- * and scrape metrics (disabled without OUTPOST_API_TOKEN).
+ * Builds the HTTP server: the dashboard at /admin, its /api/v1 API, a public health
+ * check, and the Watchtower-style update, status, and metrics endpoints.
  *
- * @param {App_CreateApp_Scheduler}   scheduler    - Scheduler.
- * @param {App_CreateApp_ApiToken}    apiToken     - Api token.
- * @param {App_CreateApp_AdminRouter} adminRouter  - Admin router.
- * @param {App_CreateApp_TrustProxy}  [trustProxy] - Trust proxy.
+ * @param {App_CreateApp_Dependencies} dependencies - Dependencies.
  *
  * @returns {App_CreateApp_Returns}
  *
  * @since 0.0.1
  */
-export function createApp(scheduler: App_CreateApp_Scheduler, apiToken: App_CreateApp_ApiToken, adminRouter: App_CreateApp_AdminRouter, trustProxy: App_CreateApp_TrustProxy = false): App_CreateApp_Returns {
+export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateApp_Returns {
   const app: App_CreateApp_App = express();
+  const access: App_CreateApp_Access = new Access(dependencies['state']);
+  const notifier: App_CreateApp_Notifier = dependencies['notifier'] ?? new Notifier(dependencies['state']);
+  const attempts: App_CreateApp_Attempts = new Attempts(dependencies['now'], (key) => notifier.notifySignInLimit(key));
+  const apiLimiter: App_CreateApp_ApiLimiter = rateLimit({
+    handler: (_request, response) => {
+      sendError(response, 429, 'rate_limited', 'Too many requests. Wait a minute and try again.');
+
+      return;
+    },
+    legacyHeaders: false,
+    limit: 120,
+    standardHeaders: true,
+    windowMs: 60 * 1000,
+  });
 
   app.disable('x-powered-by');
 
-  // Behind one reverse proxy, read the client address and HTTPS from X-Forwarded-* headers.
-  app.set('trust proxy', (trustProxy === true) ? 1 : false);
+  // Forwarded headers count only from loopback and private senders, such as a proxy on the LAN.
+  app.set('trust proxy', isTrustedProxyAddress);
 
-  app.get('/', (_request, response) => {
-    response.redirect(302, '/admin/');
+  app.use(setBaseHeaders);
 
-    return;
-  });
+  app.use(express.json({
+    limit: '64kb',
+  }));
 
-  if (adminRouter !== undefined) {
-    app.use('/admin', adminRouter);
-  }
+  app.use([
+    '/api/v1',
+    '/metrics',
+    '/v1',
+  ], apiLimiter);
+
+  new Web(dependencies['webRoot']).register(app);
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok' });
@@ -63,121 +93,137 @@ export function createApp(scheduler: App_CreateApp_Scheduler, apiToken: App_Crea
     return;
   });
 
-  /**
-   * App - Create App - Authorize.
-   *
-   * Middleware that rejects requests without the configured bearer
-   * token, or reports the endpoint as disabled when none is set.
-   *
-   * @param {Request}      request  - Request.
-   * @param {Response}     response - Response.
-   * @param {NextFunction} next     - Next.
-   *
-   * @returns {void}
-   *
-   * @since 0.0.1
-   */
-  const authorize: App_CreateApp_Authorize = (request, response, next) => {
-    if (apiToken === undefined) {
-      response.status(404).json({ error: 'Set OUTPOST_API_TOKEN to enable this endpoint.' });
+  new Auth(dependencies['state'], access, attempts).register(app);
 
-      return;
-    }
+  new Security(dependencies['state'], access, attempts).register(app);
 
-    if (isAuthorized(request.get('Authorization'), apiToken) === false) {
-      response.status(401).json({ error: 'Invalid or missing bearer token.' });
+  new Tokens(dependencies['state'], access).register(app);
 
-      return;
-    }
+  new Notifications(dependencies['state'], access, notifier).register(app);
 
-    next();
+  new Registries(dependencies['state'], access).register(app);
 
-    return;
-  };
+  new Dashboard({
+    access,
+    config: dependencies['config'],
+    ...((dependencies['eventHeartbeatMilliseconds'] === undefined) ? {} : { eventHeartbeatMilliseconds: dependencies['eventHeartbeatMilliseconds'] }),
+    history: dependencies['history'],
+    inspectContainer: dependencies['inspectContainer'],
+    listContainers: dependencies['listContainers'],
+    ...((dependencies['onRuntimeSettingsChanged'] === undefined) ? {} : { onRuntimeSettingsChanged: dependencies['onRuntimeSettingsChanged'] }),
+    scheduler: dependencies['scheduler'],
+    state: dependencies['state'],
+  }).register(app);
 
-  app.post('/v1/update', authorize, (_request, response) => {
-    const started: App_CreateApp_Started = scheduler.trigger();
+  new Watchtower(dependencies['scheduler'], access).register(app);
 
-    response.status((started === true) ? 202 : 409).json({ started });
+  app.use(handleNotFound);
 
-    return;
-  });
-
-  app.get('/v1/status', authorize, (_request, response) => {
-    const state: App_CreateApp_State = scheduler.getState();
-
-    response.json(state);
-
-    return;
-  });
-
-  app.get('/metrics', authorize, (_request, response) => {
-    response.type('text/plain; version=0.0.4').send(formatMetrics(scheduler.getState()));
-
-    return;
-  });
+  app.use(handleError);
 
   return app;
 }
 
 /**
- * App - Is Authorized.
+ * App - Handle Error.
  *
- * Compares a "Bearer <token>" header with the configured token in
- * constant time so the token cannot be guessed from response timing.
+ * Turns body-parser, static file, and unexpected failures into the shared error envelope.
+ * Unexpected causes are logged and never returned to the client.
  *
- * @param {App_IsAuthorized_Header}   header   - Header.
- * @param {App_IsAuthorized_ApiToken} apiToken - Api token.
+ * @param {App_HandleError_Error}    error    - Error.
+ * @param {App_HandleError_Request}  _request - Request.
+ * @param {App_HandleError_Response} response - Response.
+ * @param {App_HandleError_Next}     next     - Next.
  *
- * @returns {App_IsAuthorized_Returns}
+ * @returns {App_HandleError_Returns}
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
-export function isAuthorized(header: App_IsAuthorized_Header, apiToken: App_IsAuthorized_ApiToken): App_IsAuthorized_Returns {
-  if (header === undefined || header.startsWith('Bearer ') === false) {
-    return false;
+function handleError(error: App_HandleError_Error, _request: App_HandleError_Request, response: App_HandleError_Response, next: App_HandleError_Next): App_HandleError_Returns {
+  const type: App_HandleError_Type = (typeof error === 'object' && error !== null) ? Reflect.get(error, 'type') : undefined;
+  const status: App_HandleError_Status = (typeof error === 'object' && error !== null) ? Reflect.get(error, 'status') : undefined;
+
+  if (response.headersSent === true) {
+    next(error);
+
+    return;
   }
 
-  const provided: App_IsAuthorized_Provided = Buffer.from(header.slice(7));
-  const expected: App_IsAuthorized_Expected = Buffer.from(apiToken);
+  if (type === 'entity.parse.failed') {
+    sendError(response, 400, 'invalid_json', 'The request body is not valid JSON.');
 
-  return provided.length === expected.length && timingSafeEqual(provided, expected);
+    return;
+  }
+
+  if (type === 'entity.too.large') {
+    sendError(response, 413, 'payload_too_large', 'The request body is larger than 64 KB.');
+
+    return;
+  }
+
+  if (type === 'charset.unsupported' || type === 'encoding.unsupported') {
+    sendError(response, 415, 'unsupported_encoding', 'Send the request body as UTF-8 JSON.');
+
+    return;
+  }
+
+  // A missing dashboard asset, or a method a file can't take, has no route either.
+  if (status === 404 || status === 405) {
+    sendError(response, 404, 'not_found', 'No route matches this request.');
+
+    return;
+  }
+
+  const errorMessage: App_HandleError_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+  process.stderr.write(`Request failed: ${errorMessage}\n`);
+
+  sendError(response, 500, 'internal_error', 'Something went wrong. Try again.');
+
+  return;
 }
 
 /**
- * App - Format Metrics.
+ * App - Handle Not Found.
  *
- * Renders the scheduler state in the Prometheus text exposition format
- * so Outpost can be scraped like Watchtower.
+ * Answers every unmatched path with the shared error envelope.
+ * Unknown paths never fall through to a default HTML page.
  *
- * @param {App_FormatMetrics_State} state - State.
+ * @param {App_HandleNotFound_Request}  _request - Request.
+ * @param {App_HandleNotFound_Response} response - Response.
  *
- * @returns {App_FormatMetrics_Returns}
+ * @returns {App_HandleNotFound_Returns}
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
-export function formatMetrics(state: App_FormatMetrics_State): App_FormatMetrics_Returns {
-  const runningValue: App_FormatMetrics_RunningValue = (state['running'] === true) ? '1' : '0';
-  const lines: App_FormatMetrics_Lines = [
-    '# HELP outpost_cycles_total Update cycles finished since start.',
-    '# TYPE outpost_cycles_total counter',
-    `outpost_cycles_total ${String(state['totals']['cycles'])}`,
-    '# HELP outpost_containers_updated_total Containers updated since start.',
-    '# TYPE outpost_containers_updated_total counter',
-    `outpost_containers_updated_total ${String(state['totals']['updated'])}`,
-    '# HELP outpost_containers_failed_total Container updates that failed or rolled back since start.',
-    '# TYPE outpost_containers_failed_total counter',
-    `outpost_containers_failed_total ${String(state['totals']['failed'])}`,
-    '# HELP outpost_cycle_running Whether an update cycle is running.',
-    '# TYPE outpost_cycle_running gauge',
-    `outpost_cycle_running ${runningValue}`,
-  ];
+function handleNotFound(_request: App_HandleNotFound_Request, response: App_HandleNotFound_Response): App_HandleNotFound_Returns {
+  sendError(response, 404, 'not_found', 'No route matches this request.');
 
-  if (state['lastReport'] !== undefined) {
-    lines.push('# HELP outpost_last_cycle_timestamp_seconds When the last cycle finished.');
-    lines.push('# TYPE outpost_last_cycle_timestamp_seconds gauge');
-    lines.push(`outpost_last_cycle_timestamp_seconds ${String(Math.floor(Date.parse(state['lastReport']['finishedAt']) / 1000))}`);
-  }
+  return;
+}
 
-  return `${lines.join('\n')}\n`;
+/**
+ * App - Set Base Headers.
+ *
+ * Marks every response as uncacheable, unsniffable, and without a referrer.
+ * Dashboard assets later replace the cache header with their own long lifetime.
+ *
+ * @param {App_SetBaseHeaders_Request}  _request - Request.
+ * @param {App_SetBaseHeaders_Response} response - Response.
+ * @param {App_SetBaseHeaders_Next}     next     - Next.
+ *
+ * @returns {App_SetBaseHeaders_Returns}
+ *
+ * @since 1.0.0
+ */
+function setBaseHeaders(_request: App_SetBaseHeaders_Request, response: App_SetBaseHeaders_Response, next: App_SetBaseHeaders_Next): App_SetBaseHeaders_Returns {
+  response.set({
+    'Cache-Control': 'no-store',
+    'Referrer-Policy': 'no-referrer',
+    'X-Content-Type-Options': 'nosniff',
+  });
+
+  next();
+
+  return;
 }

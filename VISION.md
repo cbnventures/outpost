@@ -18,32 +18,32 @@ Outpost was built by CBN Ventures as a maintained, security-conscious replacemen
 
 ### Value Proposition
 
-Outpost watches registries on a schedule and recreates containers on new images with their original configuration, volumes, and networks intact. If the new container stops or reports unhealthy, Outpost puts the old container back. It runs as a non-root s6-overlay appliance and needs nothing but the Docker socket.
+Outpost watches registries on a schedule and recreates containers on new images with their original configuration, volumes, and networks intact. If the new container stops or reports unhealthy, Outpost puts the old container back. It runs as a non-root s6-overlay appliance and needs only the Docker socket and a volume for its data.
 
 ## Product Direction
 
-Outpost targets a single Docker host through the local socket. Swarm services, Kubernetes, and remote multi-host fleets are out of scope. Outpost never updates its own container while running; it is updated like any other image (for example with `docker compose pull`).
+Outpost targets a single Docker host through the local socket. Swarm services, Kubernetes, and remote multi-host fleets are out of scope. Outpost updates its own container too, last in each check: a short-lived helper container swaps it and puts the old one back if the new one fails.
 
 ## Product Design
 
-Configuration is environment variables only, so a Compose file fully describes an instance. Each cycle checks containers one at a time in dependency order, compares the registry digest before pulling, and records one result per container in a report that feeds notifications, the status endpoint, and Prometheus metrics.
+Update behavior is configured with environment variables, so a Compose file describes how an instance updates; the account, access tokens, and notification destinations are set up on the dashboard. Each cycle checks containers one at a time in dependency order, compares the registry digest before pulling, and records one result per container in a report that feeds notifications, the status endpoint, and Prometheus metrics.
 
 ## Positioning
 
 ### Differentiators
 
-| This project                                                           | Alternatives                                                       |
-|------------------------------------------------------------------------|--------------------------------------------------------------------|
-| Automatic rollback when the new container stops or turns unhealthy     | Watchtower leaves a failed update in place                         |
-| Reattaches anonymous volumes and drops stale image defaults            | Naive recreation loses anonymous volume data or freezes old env    |
-| Runs as a non-root user that only joins the Docker socket's group      | Updaters commonly run as root                                      |
-| Registry digest check before pulling                                   | Pull-and-compare downloads every image on every run                |
-| Updates Compose dependencies before their dependents                   | Updates run in arbitrary order                                     |
-| Actively maintained, typed, tested TypeScript                          | Unmaintained or loosely tested scripts                             |
+| This project                                                       | Alternatives                                                    |
+|--------------------------------------------------------------------|-----------------------------------------------------------------|
+| Automatic rollback when the new container stops or turns unhealthy | Watchtower leaves a failed update in place                      |
+| Reattaches anonymous volumes and drops stale image defaults        | Naive recreation loses anonymous volume data or freezes old env |
+| Runs as a non-root user that only joins the Docker socket's group  | Updaters commonly run as root                                   |
+| Registry digest check before pulling                               | Pull-and-compare downloads every image on every run             |
+| Updates Compose dependencies before their dependents               | Updates run in arbitrary order                                  |
+| Actively maintained, typed, tested TypeScript                      | Unmaintained or loosely tested scripts                          |
 
 ## Risks and Future
 
-- Docker credential helpers (`credsStore`) are not supported; private registries need credentials in a mounted `config.json`.
+- Docker credential helpers (`credsStore`) and `config.json` aren't read; private registry sign-ins are added on the dashboard's Settings page.
 - Containers sharing another container's network namespace (`network_mode: container:…`) are skipped for now.
 - Some registries rate-limit anonymous digest lookups; credentials raise those limits.
 
@@ -55,7 +55,7 @@ Keep every container current, and roll back when an update breaks.
 
 ### Elevator Pitch
 
-Outpost is a self-hosted container updater for Docker and a modern Watchtower replacement. On a schedule you choose, it checks each container's registry for a newer image, pulls it, and recreates the container with the same settings, volumes, and networks. If the new container fails to start or turns unhealthy, Outpost restores the old one automatically. Opt containers in or out with labels, run in monitor-only mode, get ntfy or webhook notifications, and trigger or scrape it through a small HTTP API.
+Outpost is a self-hosted container updater for Docker and a modern Watchtower replacement. On a schedule you choose, it checks each container's registry for a newer image, pulls it, and recreates the container with the same settings, volumes, and networks. If the new container fails to start or turns unhealthy, Outpost restores the old one automatically. Opt containers in or out with labels, run in monitor-only mode, get notifications in ntfy, Telegram, Discord, email, and more, and trigger or scrape it through a small HTTP API.
 
 ### Key Features
 
@@ -64,23 +64,23 @@ Outpost is a self-hosted container updater for Docker and a modern Watchtower re
 - **Digest-first checks** — Asks the registry before pulling, so up-to-date containers cost one HEAD request.
 - **Label control** — Opt-out (update everything) or opt-in mode, plus per-container monitor-only.
 - **Dependency order** — Compose `depends_on` services are updated before the services that need them.
-- **Notifications** — ntfy and JSON webhook summaries when something was updated, found, or failed.
+- **Notifications** — Alerts in ntfy, ntfy-reverse-proxy, Telegram, Discord, Slack, Gotify, Pushover, Matrix, email, Apprise, or a webhook when containers are updated, new images are found, or an update fails.
 - **Web dashboard** — See every container's status, run a check for everything or one container, and browse the last 50 checks.
 - **HTTP API and metrics** — Trigger updates, read the last report, and scrape Prometheus metrics with a bearer token.
 - **Non-root appliance** — s6-overlay image on Debian trixie slim; runs as PUID/PGID.
 
 ## Glossary
 
-| Term             | Definition                                                                                                       |
-|------------------|------------------------------------------------------------------------------------------------------------------|
-| Cycle            | One pass over all selected containers, started by the schedule or the API, producing one report.                 |
-| Report           | The per-container results of a cycle: updated, available, up-to-date, skipped, rolled-back, or failed.          |
-| Label mode       | `opt-out` updates every container unless labeled off; `opt-in` updates only containers labeled on.               |
-| Monitor-only     | Report available updates without recreating containers, globally or per container.                              |
-| Remote digest    | The manifest digest the registry reports for an image tag, compared with the digest of the running image.        |
-| Recreation       | Stopping a container, starting an identical one on the new image, and removing the old one once the new is up.   |
-| Rollback         | Removing a failed replacement and restarting the previous container under its original name.                     |
-| Settle period    | How long a container without a healthcheck must keep running before an update counts as successful.             |
+| Term          | Definition                                                                                                     |
+|---------------|----------------------------------------------------------------------------------------------------------------|
+| Cycle         | One pass over all selected containers, started by the schedule or the API, producing one report.               |
+| Report        | The per-container results of a cycle: updated, available, up-to-date, skipped, rolled-back, or failed.         |
+| Label mode    | `opt-out` updates every container unless labeled off; `opt-in` updates only containers labeled on.             |
+| Monitor-only  | Report available updates without recreating containers, globally or per container.                             |
+| Remote digest | The manifest digest the registry reports for an image tag, compared with the digest of the running image.      |
+| Recreation    | Stopping a container, starting an identical one on the new image, and removing the old one once the new is up. |
+| Rollback      | Removing a failed replacement and restarting the previous container under its original name.                   |
+| Settle period | How long a container without a healthcheck must keep running before an update counts as successful.            |
 
 ## Additional Vision Notes
 

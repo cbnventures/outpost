@@ -9,44 +9,26 @@ services:
       PUID: "${PUID:-1000}"
       S6_READ_ONLY_ROOT: "${S6_READ_ONLY_ROOT:-0}"
       TZ: "${TZ:-UTC}"
-
-      # Six-field cron (with seconds). Default: every day at 04:00.
-      OUTPOST_SCHEDULE: "${OUTPOST_SCHEDULE:-0 0 4 * * *}"
-      OUTPOST_RUN_ON_START: "${OUTPOST_RUN_ON_START:-false}"
-
-      # "opt-out" updates every container unless labeled
-      # io.cbnventures.outpost.enable=false; "opt-in" only updates
-      # containers labeled io.cbnventures.outpost.enable=true.
-      OUTPOST_LABEL_MODE: "${OUTPOST_LABEL_MODE:-opt-out}"
-      OUTPOST_MONITOR_ONLY: "${OUTPOST_MONITOR_ONLY:-false}"
-      OUTPOST_CLEANUP: "${OUTPOST_CLEANUP:-true}"
-
-      # Dashboard at http://localhost:3000/admin/ (locked until a password is set).
-      OUTPOST_ADMIN_USERNAME: "${OUTPOST_ADMIN_USERNAME:-admin}"
-      OUTPOST_ADMIN_PASSWORD_FILE: /run/secrets/outpost_admin_password
-      # Set to "true" only when a reverse proxy you control sits in front of Outpost.
-      OUTPOST_TRUST_PROXY: "${OUTPOST_TRUST_PROXY:-false}"
-
-      # Enables POST /v1/update, GET /v1/status, and GET /metrics.
-      OUTPOST_API_TOKEN: "${OUTPOST_API_TOKEN:-}"
-
-      # Optional notifications (an ntfy topic URL and/or a JSON webhook).
-      OUTPOST_NTFY_URL: "${OUTPOST_NTFY_URL:-}"
-      OUTPOST_NTFY_TOKEN: "${OUTPOST_NTFY_TOKEN:-}"
-      OUTPOST_WEBHOOK_URL: "${OUTPOST_WEBHOOK_URL:-}"
-    secrets:
-      - outpost_admin_password
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-      # Update history shown in the dashboard.
+      # Dashboard account, access tokens, notification destinations, registry
+      # sign-ins, and update history. Keep /data on a volume: Outpost needs it to
+      # update itself.
       - outpost-data:/data
 
-      # Private registries: mount the config.json written by "docker login".
-      # - ~/.docker/config.json:/config/config.json:ro
+    # Dashboard at http://localhost:3000/admin/. On the first visit, create the
+    # account with the setup code from "docker compose logs outpost". Access
+    # tokens for POST /v1/update, GET /v1/status, and GET /metrics are made
+    # on the dashboard's Access tokens page.
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped
+
+    # Outpost follows the same labels for its own container, so it updates
+    # itself too, last in each check. Uncomment to keep it on its current image.
+    # labels:
+    #   io.cbnventures.outpost.enable: "false"
 
     # The appliance supports a read-only root filesystem when project-specific
     # writable paths are mounted, s6 runtime paths use tmpfs, and
@@ -55,12 +37,6 @@ services:
     # tmpfs:
     #   - /run
     #   - /tmp
-
-secrets:
-  outpost_admin_password:
-    # A file containing the dashboard password, e.g. created with:
-    # openssl rand -base64 24 > ./outpost-admin-password.txt
-    file: "${OUTPOST_ADMIN_PASSWORD_SECRET_FILE:-./outpost-admin-password.txt}"
 
 volumes:
   outpost-data:

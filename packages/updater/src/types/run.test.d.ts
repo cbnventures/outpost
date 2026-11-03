@@ -2,7 +2,9 @@ import type { Mock } from 'vitest';
 
 import type {
   Shared_Dependencies,
+  Shared_Dependencies_UpdateSelf,
   Shared_Engine,
+  Shared_ImageInspect,
   Shared_Options,
   Shared_Report,
 } from './shared.d.ts';
@@ -22,6 +24,8 @@ export type Run_FetchFunction = Shared_Dependencies['fetchFunction'];
 
 export type Run_Sleep = Shared_Dependencies['sleep'];
 
+export type Run_UpdateSelf = Shared_Dependencies_UpdateSelf;
+
 export type Run_FakeEngine = { [Key in keyof Shared_Engine]: Mock<Shared_Engine[Key]> };
 
 export type Run_FakeDependencies_Engine = Run_FakeEngine;
@@ -32,7 +36,7 @@ export type Run_FakeDependencies_Sleep = Mock<Shared_Dependencies['sleep']>;
 
 export type Run_FakeDependencies_Now = Shared_Dependencies['now'];
 
-export type Run_FakeDependencies_FindCredentials = Shared_Dependencies['findCredentials'];
+export type Run_FakeDependencies_FindCredentials = Mock<Shared_Dependencies['findCredentials']>;
 
 export type Run_FakeDependencies = {
   engine: Run_FakeDependencies_Engine;
@@ -49,8 +53,38 @@ export type Run_FakeDependencies = {
  */
 export type Run_CreateDependencies_State_LocalDigest = string;
 
+export type Run_CreateDependencies_State_CurrentRepoDigests = string[] | undefined;
+
+export type Run_CreateDependencies_State_NewRestartCount = number | undefined;
+
+export type Run_CreateDependencies_State_NewRestarting = boolean | undefined;
+
+export type Run_CreateDependencies_State_NewStatus = string | undefined;
+
+export type Run_CreateDependencies_State_ListError = Error | undefined;
+
+export type Run_CreateDependencies_State_CleanupError = Error | undefined;
+
+export type Run_CreateDependencies_State_RemoteDigest = string | undefined;
+
+export type Run_CreateDependencies_State_RemoteStatus = number | undefined;
+
+export type Run_CreateDependencies_State_Identity = Shared_ImageInspect['Identity'];
+
+export type Run_CreateDependencies_State_Descriptor = boolean | undefined;
+
 export type Run_CreateDependencies_State = {
   localDigest: Run_CreateDependencies_State_LocalDigest;
+  currentRepoDigests?: Run_CreateDependencies_State_CurrentRepoDigests;
+  newRestartCount?: Run_CreateDependencies_State_NewRestartCount;
+  newRestarting?: Run_CreateDependencies_State_NewRestarting;
+  newStatus?: Run_CreateDependencies_State_NewStatus;
+  listError?: Run_CreateDependencies_State_ListError;
+  cleanupError?: Run_CreateDependencies_State_CleanupError;
+  remoteDigest?: Run_CreateDependencies_State_RemoteDigest;
+  remoteStatus?: Run_CreateDependencies_State_RemoteStatus;
+  identity?: Run_CreateDependencies_State_Identity;
+  descriptor?: Run_CreateDependencies_State_Descriptor;
 };
 
 export type Run_CreateDependencies_RunningAfterStart = boolean;
@@ -58,6 +92,71 @@ export type Run_CreateDependencies_RunningAfterStart = boolean;
 export type Run_CreateDependencies_Returns = Run_FakeDependencies;
 
 export type Run_CreateDependencies_Clock = number;
+
+export type Run_CreateDependencies_NewInspectCount = number;
+
+export type Run_CreateDependencies_IsCreated = boolean;
+
+/**
+ * Run - Create Self Dependencies.
+ *
+ * @since 1.0.0
+ */
+export type Run_CreateSelfDependencies_WithUpdateSelf = boolean;
+
+export type Run_CreateSelfDependencies_UpdateSelf = Mock<Shared_Dependencies_UpdateSelf>;
+
+export type Run_CreateSelfDependencies_Returns = Run_FakeDependencies & {
+  updateSelf?: Run_CreateSelfDependencies_UpdateSelf;
+};
+
+export type Run_CreateSelfDependencies_Clock = number;
+
+/**
+ * Run - Run Update Cycle - Checks Pulled Images On The Containerd Image Store.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_UntaggedDependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_RolledBackDependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_OlderDependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_Report = Shared_Report;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_UntaggedReport = Shared_Report;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_RolledBackReport = Shared_Report;
+
+export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_OlderReport = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Hands Outpost To Update Self After The Other Containers.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Dependencies = Run_CreateSelfDependencies_Returns;
+
+export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Keeps Checking Pulled Images That The Registry Turns Away.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Looks Up Each Registry Sign In Once Per Cycle.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies = Run_CreateSelfDependencies_Returns;
 
 /**
  * Run - Run Update Cycle - Rolls Back When The New Container Stops.
@@ -67,6 +166,68 @@ export type Run_CreateDependencies_Clock = number;
 export type Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Dependencies = Run_FakeDependencies;
 
 export type Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Rolls Back When The Replacement Restarts.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_RollsBackWhenTheReplacementRestarts_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_RollsBackWhenTheReplacementRestarts_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Reports A Cycle Failure And Notifies.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_ReportsACycleFailure_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ReportsACycleFailure_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Reports Updated When Cleanup Fails.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Skips Images Of Unknown Origin That The Registry Lacks.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_RefusedDependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_Report = Shared_Report;
+
+export type Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_RefusedReport = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Skips Images That Docker Built On This Host.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_SkipsImagesThatDockerBuiltOnThisHost_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_SkipsImagesThatDockerBuiltOnThisHost_ClassicDependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_SkipsImagesThatDockerBuiltOnThisHost_Report = Shared_Report;
+
+export type Run_RunUpdateCycle_SkipsImagesThatDockerBuiltOnThisHost_ClassicReport = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Skips Outpost When Nothing Can Update It.
+ *
+ * @since 1.0.0
+ */
+export type Run_RunUpdateCycle_SkipsOutpostWhenNothingCanUpdateIt_Dependencies = Run_CreateSelfDependencies_Returns;
+
+export type Run_RunUpdateCycle_SkipsOutpostWhenNothingCanUpdateIt_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Skips Pulling When The Digest Matches.

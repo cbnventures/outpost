@@ -15,3 +15,12 @@ export type History_Directory = string;
 export type History_History_KeepsTheNewestReportsAcrossRestarts_History = History;
 
 export type History_History_KeepsTheNewestReportsAcrossRestarts_Reloaded = History;
+
+/**
+ * History - History - Keeps What Started Each Check.
+ *
+ * @since 1.0.0
+ */
+export type History_History_KeepsWhatStartedEachCheck_History = History;
+
+export type History_History_KeepsWhatStartedEachCheck_Reloaded = History;

@@ -12,8 +12,10 @@
 **/.env
 **/.env.*
 !.env.sample
+!.env.*.sample
 !.env.example
 !**/.env.sample
+!**/.env.*.sample
 !**/.env.example
 .secrets
 **/.secrets
@@ -21,8 +23,14 @@
 **/*.log
 build
 **/build
+coverage
+**/coverage
 dist
 **/dist
+out
+**/out
+.output
+**/.output
 
 ########################################
 #### Version Control - Git / GitHub ####
@@ -38,6 +46,94 @@ node_modules
 npm-debug.log*
 **/npm-debug.log*
 
+#########################
+#### Language - Rust ####
+#########################
+target
+**/target
+
+###########################
+#### Framework - Astro ####
+###########################
+.astro
+**/.astro
+
+################################
+#### Framework - Docusaurus ####
+################################
+.docusaurus
+**/.docusaurus
+
+#############################
+#### Framework - Next.js ####
+#############################
+.next
+**/.next
+next-env.d.ts
+**/next-env.d.ts
+
+############################
+#### Framework - Svelte ####
+############################
+.svelte-kit
+**/.svelte-kit
+
+############################
+#### Platform - Android ####
+############################
+.gradle
+**/.gradle
+.kotlin
+**/.kotlin
+.externalNativeBuild
+**/.externalNativeBuild
+.cxx
+**/.cxx
+captures
+**/captures
+local.properties
+**/local.properties
+*.jks
+**/*.jks
+*.keystore
+**/*.keystore
+keystore.properties
+**/keystore.properties
+
+##########################
+#### Platform - Apple ####
+##########################
+.build
+**/.build
+.swiftpm
+**/.swiftpm
+DerivedData
+**/DerivedData
+Pods
+**/Pods
+
+########################
+#### Tooling - Vite ####
+########################
+.vite
+**/.vite
+
+##############################
+#### Web Hosting - Vercel ####
+##############################
+.vercel
+**/.vercel
+
+##########################################
+#### Web Hosting - Cloudflare Workers ####
+##########################################
+.dev.vars*
+**/.dev.vars*
+.wrangler
+**/.wrangler
+worker-configuration.d.ts
+**/worker-configuration.d.ts
+
 ########################
 #### Tooling - Nova ####
 ########################
@@ -46,4 +142,3 @@ npm-debug.log*
 ##########################
 #### Project Excludes ####
 ##########################
-outpost-admin-password.txt

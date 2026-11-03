@@ -8,7 +8,9 @@ import { selectContainers, sortByDependencies } from './select.js';
 
 import type {
   Select_Containers,
-  Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection,
+  Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection,
+  Select_SelectContainers_LeavesOutpostImagesAloneWhenItsOwnIdIsUnknown_Selection,
+  Select_SelectContainers_SkipsNetworkNamespacePairsAndAutoRemove_Selection,
   Select_SortByDependencies_UpdatesDependenciesFirst_Names,
 } from './types/select.test.d.ts';
 
@@ -74,14 +76,14 @@ const containers: Select_Containers = [
 /**
  * Select - Containers.
  *
- * Checks both label modes against the same container list, plus the
- * skip for Outpost's own container.
+ * Checks both label modes against the same container list, Outpost's
+ * own container included, and the guard for an unknown own ID.
  *
  * @since 0.0.1
  */
 describe('selectContainers', () => {
-  it('applies label modes and skips self', () => {
-    const selection: Select_SelectContainers_AppliesLabelModesAndSkipsSelf_Selection = selectContainers(containers, {
+  it('applies label modes to Outpost too', () => {
+    const selection: Select_SelectContainers_AppliesLabelModesToOutpostToo_Selection = selectContainers(containers, {
       labelMode: 'opt-out',
       selfId: 'eee5',
     });
@@ -90,14 +92,91 @@ describe('selectContainers', () => {
       'aaa1',
       'bbb2',
       'ddd4',
+      'eee5',
     ]);
 
-    expect(selection['skipped'].map((skipped) => skipped['container'])).toStrictEqual(['outpost']);
+    expect(selection['skipped']).toStrictEqual([]);
 
     expect(selectContainers(containers, {
       labelMode: 'opt-in',
-      selfId: undefined,
+      selfId: 'eee5',
     })['candidates'].map((candidate) => candidate['Id'])).toStrictEqual(['bbb2']);
+
+    return;
+  });
+
+  it('leaves Outpost images alone when its own ID is unknown', () => {
+    const selection: Select_SelectContainers_LeavesOutpostImagesAloneWhenItsOwnIdIsUnknown_Selection = selectContainers(containers, {
+      labelMode: 'opt-out',
+      selfId: undefined,
+    });
+
+    expect(selection['candidates'].map((candidate) => candidate['Id'])).toStrictEqual([
+      'aaa1',
+      'bbb2',
+      'ddd4',
+    ]);
+
+    expect(selection['skipped']).toStrictEqual([{
+      container: 'outpost',
+      image: 'cbnventures/outpost:latest',
+      status: 'skipped',
+      detail: 'Outpost couldn\'t find its own container, so it leaves Outpost containers alone',
+    }]);
+
+    return;
+  });
+
+  it('skips network namespace pairs and automatic removal', () => {
+    const selection: Select_SelectContainers_SkipsNetworkNamespacePairsAndAutoRemove_Selection = selectContainers([
+      {
+        Id: 'owner-id-123456',
+        Names: ['/vpn'],
+        Image: 'vpn:1',
+        ImageID: 'sha256:owner',
+        Labels: {},
+        HostConfig: {
+          NetworkMode: 'bridge',
+          AutoRemove: false,
+        },
+        State: 'running',
+      },
+      {
+        Id: 'dependent-id-123456',
+        Names: ['/app'],
+        Image: 'app:1',
+        ImageID: 'sha256:dependent',
+        Labels: {},
+        HostConfig: {
+          NetworkMode: 'container:owner-id-123456',
+          AutoRemove: false,
+        },
+        State: 'running',
+      },
+      {
+        Id: 'temporary-id-123456',
+        Names: ['/backup'],
+        Image: 'backup:1',
+        ImageID: 'sha256:temporary',
+        Labels: {},
+        HostConfig: {
+          NetworkMode: 'bridge',
+          AutoRemove: true,
+        },
+        State: 'running',
+      },
+    ], {
+      labelMode: 'opt-out',
+      selfId: undefined,
+    });
+
+    expect(selection['candidates']).toStrictEqual([]);
+
+    expect(selection['skipped'].map((result) => result['detail'])).toStrictEqual([
+      'Has containers sharing its network namespace',
+      'Shares another container\'s network namespace',
+      'Container is configured for automatic removal',
+    ]);
 
     return;
   });

@@ -12,8 +12,6 @@ import {
 /**
  * ESLint Configuration.
  *
- * Composes Nova's browser, TypeScript, MDX, and Docusaurus contracts.
- *
  * @since 0.0.0
  */
 export default [
@@ -25,6 +23,10 @@ export default [
   ...fwDocusaurus,
   ...runtimeBrowser,
   {
+    name: 'custom-ignores',
+    ignores: [],
+  },
+  {
     name: 'custom-tsconfig',
     files: [
       '**/*.cts',
@@ -34,7 +36,11 @@ export default [
     ],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json'],
+        project: [
+          './tsconfig.app.json',
+          './tsconfig.config.json',
+          './tsconfig.tests.json',
+        ],
       },
     },
   },
@@ -52,6 +58,58 @@ export default [
       '**/*.tsx',
     ],
     rules: {
+      '@cbnventures/nova/require-jsdoc-body': [
+        'error',
+        {
+          ignoreFiles: [
+            './docusaurus.config.ts',
+            './eslint.config.mts',
+            './sidebars.ts',
+            './vitest.config.mts',
+          ],
+          maxLines: 3,
+          maxWidth: 90,
+          minLines: 2,
+          skipDirectories: [
+            'styles',
+            'tests',
+            'types',
+          ],
+        },
+      ],
+      '@cbnventures/nova/require-jsdoc-hierarchy': [
+        'error',
+        {
+          anchorDirectories: [
+            'src',
+            'utils',
+          ],
+          ignoreFiles: [
+            './docusaurus.config.ts',
+            './eslint.config.mts',
+            './sidebars.ts',
+            './vitest.config.mts',
+            './vitest.setup.ts',
+          ],
+          knownNames: {},
+          stripDirectories: ['types'],
+        },
+      ],
+      '@cbnventures/nova/require-jsdoc-presence': [
+        'error',
+        {
+          ignoreFiles: [
+            './docusaurus.config.ts',
+            './eslint.config.mts',
+            './sidebars.ts',
+            './vitest.config.mts',
+          ],
+          skipDirectories: [
+            'tests',
+            'types',
+          ],
+        },
+      ],
       '@cbnventures/nova/require-kebab-case-filename': [
         'error',
         {

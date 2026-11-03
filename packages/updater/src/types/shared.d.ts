@@ -5,7 +5,6 @@ import type {
   DockerEngine,
   DockerImageInspect,
 } from 'outpost-package-docker-engine';
-import type { FetchFunction, NotificationTargets } from 'outpost-package-notifiers';
 import type { RegistryCredentials } from 'outpost-package-registry';
 
 /**
@@ -88,10 +87,13 @@ export type Shared_Report_FinishedAt = string;
 
 export type Shared_Report_Results = Shared_Result[];
 
+export type Shared_Report_Error = string | undefined;
+
 export type Shared_Report = {
   startedAt: Shared_Report_StartedAt;
   finishedAt: Shared_Report_FinishedAt;
   results: Shared_Report_Results;
+  error?: Shared_Report_Error;
 };
 
 /**
@@ -113,10 +115,6 @@ export type Shared_Options_SettleSeconds = number;
 
 export type Shared_Options_SelfId = string | undefined;
 
-export type Shared_Options_DockerConfigPath = string;
-
-export type Shared_Options_NotificationTargets = NotificationTargets;
-
 export type Shared_Options = {
   labelMode: Shared_Options_LabelMode;
   monitorOnly: Shared_Options_MonitorOnly;
@@ -125,8 +123,29 @@ export type Shared_Options = {
   healthTimeoutSeconds: Shared_Options_HealthTimeoutSeconds;
   settleSeconds: Shared_Options_SettleSeconds;
   selfId: Shared_Options_SelfId;
-  dockerConfigPath: Shared_Options_DockerConfigPath;
-  notificationTargets: Shared_Options_NotificationTargets;
+};
+
+/**
+ * Shared - Self Update Request.
+ *
+ * @since 1.0.0
+ */
+export type Shared_SelfUpdateRequest_Container = Shared_ContainerInspect;
+
+export type Shared_SelfUpdateRequest_NewImageId = string;
+
+export type Shared_SelfUpdateRequest_Reference = string;
+
+export type Shared_SelfUpdateRequest_Results = Shared_Result[];
+
+export type Shared_SelfUpdateRequest_StartedAt = string;
+
+export type Shared_SelfUpdateRequest = {
+  container: Shared_SelfUpdateRequest_Container;
+  newImageId: Shared_SelfUpdateRequest_NewImageId;
+  reference: Shared_SelfUpdateRequest_Reference;
+  results: Shared_SelfUpdateRequest_Results;
+  startedAt: Shared_SelfUpdateRequest_StartedAt;
 };
 
 /**
@@ -136,13 +155,15 @@ export type Shared_Options = {
  */
 export type Shared_Dependencies_Engine = Shared_Engine;
 
-export type Shared_Dependencies_FetchFunction = FetchFunction;
+export type Shared_Dependencies_FetchFunction = (input: string, init: RequestInit) => Promise<Response>;
 
 export type Shared_Dependencies_Sleep = (milliseconds: number) => Promise<void>;
 
 export type Shared_Dependencies_Now = () => Date;
 
-export type Shared_Dependencies_FindCredentials = (configPath: string, registry: string) => RegistryCredentials | undefined;
+export type Shared_Dependencies_FindCredentials = (registry: string) => RegistryCredentials | undefined;
+
+export type Shared_Dependencies_UpdateSelf = (request: Shared_SelfUpdateRequest) => Promise<Shared_Result>;
 
 export type Shared_Dependencies = {
   engine: Shared_Dependencies_Engine;
@@ -150,6 +171,7 @@ export type Shared_Dependencies = {
   sleep: Shared_Dependencies_Sleep;
   now: Shared_Dependencies_Now;
   findCredentials: Shared_Dependencies_FindCredentials;
+  updateSelf?: Shared_Dependencies_UpdateSelf;
 };
 
 /**

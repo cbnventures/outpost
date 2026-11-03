@@ -14,6 +14,10 @@ export const containerSummarySchema = z.looseObject({
   Image: z.string(),
   ImageID: z.string(),
   Labels: z.record(z.string(), z.string()).nullable().optional(),
+  HostConfig: z.looseObject({
+    NetworkMode: z.string().optional(),
+    AutoRemove: z.boolean().optional(),
+  }).optional(),
   State: z.string(),
 });
 
@@ -65,6 +69,7 @@ export const containerInspectSchema = z.looseObject({
   Config: containerConfigSchema,
   HostConfig: z.looseObject({
     NetworkMode: z.string().optional(),
+    AutoRemove: z.boolean().optional(),
   }),
   NetworkSettings: z.looseObject({
     Networks: z.record(z.string(), z.looseObject({
@@ -83,18 +88,21 @@ export const containerInspectSchema = z.looseObject({
   })).optional(),
   State: z.looseObject({
     Running: z.boolean(),
+    Restarting: z.boolean().optional(),
     Status: z.string(),
+    ExitCode: z.number().int().optional(),
     Health: z.looseObject({
       Status: z.string(),
     }).nullable().optional(),
   }),
+  RestartCount: z.number().int().nonnegative().optional(),
 });
 
 /**
  * Schema - Image Inspect Schema.
  *
- * Validates the inspect response of an image, used to compare digests
- * and to diff container config against the image defaults.
+ * Validates the inspect response of an image, used to compare digests, to
+ * tell pulled images from local builds, and to diff container config.
  *
  * @since 0.0.1
  */
@@ -103,6 +111,11 @@ export const imageInspectSchema = z.looseObject({
   RepoTags: z.array(z.string()).nullable().optional(),
   RepoDigests: z.array(z.string()).nullable().optional(),
   Config: containerConfigSchema.nullable().optional(),
+  Descriptor: z.looseObject({}).nullable().optional(),
+  Identity: z.looseObject({
+    Build: z.array(z.looseObject({})).nullable().optional(),
+    Pull: z.array(z.looseObject({})).nullable().optional(),
+  }).nullable().optional(),
 });
 
 /**

@@ -5,12 +5,17 @@
   "workspaces": [
     "packages/docker-engine",
     "packages/registry",
-    "packages/notifiers",
     "packages/updater",
     "apps/server"
   ],
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true,
+    "core-js": true,
+    "es5-ext": false
+  },
   "engines": {
-    "node": "^22 || ^24"
+    "node": "^22 || ^24 || ^26"
   },
   "packageManager": "npm@11.18.0"
 }

@@ -44,6 +44,10 @@ export type Recreate_RecreateContainer_Renamed = boolean;
 
 export type Recreate_RecreateContainer_NewId = string | undefined;
 
+export type Recreate_RecreateContainer_Created = Shared_ContainerInspect;
+
+export type Recreate_RecreateContainer_InitialRestartCount = number;
+
 export type Recreate_RecreateContainer_ErrorMessage = string;
 
 export type Recreate_RecreateContainer_RollbackMessage = string;
@@ -56,6 +60,8 @@ export type Recreate_RecreateContainer_RollbackErrorMessage = string;
  * @since 0.0.1
  */
 export type Recreate_WaitUntilHealthy_Id = string;
+
+export type Recreate_WaitUntilHealthy_InitialRestartCount = number;
 
 export type Recreate_WaitUntilHealthy_Options = Pick<Shared_Options, 'healthTimeoutSeconds' | 'settleSeconds'>;
 
@@ -70,5 +76,7 @@ export type Recreate_WaitUntilHealthy_SettleDeadline = number;
 export type Recreate_WaitUntilHealthy_Poll = () => Promise<void>;
 
 export type Recreate_WaitUntilHealthy_Inspected = Shared_ContainerInspect;
+
+export type Recreate_WaitUntilHealthy_RestartCount = number;
 
 export type Recreate_WaitUntilHealthy_HealthStatus = string | undefined;

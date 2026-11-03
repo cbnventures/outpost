@@ -2,7 +2,7 @@ import { registerMarkdownTableSuite } from '@cbnventures/nova/rules/vitest';
 import * as vitest from 'vitest';
 
 /**
- * Markdown Table.
+ * Tests - Markdown Table.
  *
  * This site self-checks its documentation tables THROUGH the published kit. The
  * suite logic lives in @cbnventures/nova/rules/vitest; this wrapper supplies

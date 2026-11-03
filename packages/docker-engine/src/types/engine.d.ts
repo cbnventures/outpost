@@ -104,6 +104,19 @@ export type Engine_Runner_ListContainers_Returns = Promise<Shared_ContainerSumma
 export type Engine_Runner_ListContainers_Response = Shared_EngineResponse;
 
 /**
+ * Engine - List Containers By Label.
+ *
+ * @since 1.0.0
+ */
+export type Engine_Runner_ListContainersByLabel_Label = string;
+
+export type Engine_Runner_ListContainersByLabel_Returns = Promise<Shared_ContainerSummary[]>;
+
+export type Engine_Runner_ListContainersByLabel_Filters = string;
+
+export type Engine_Runner_ListContainersByLabel_Response = Shared_EngineResponse;
+
+/**
  * Engine - Parse Docker Host.
  *
  * @since 0.0.1

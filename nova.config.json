@@ -6,7 +6,7 @@
     },
     "description": {
       "short": "Self-hosted container auto-updater for Docker, a modern Watchtower replacement",
-      "long": "Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, ntfy and webhook notifications, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image."
+      "long": "Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, notifications to ntfy, Telegram, Discord, email, and more, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image."
     },
     "keywords": [
       "docker",
@@ -217,8 +217,9 @@
           }
         },
         {
-          "to": "cloudflare-pages-docusaurus",
-          "path": "./apps/docs"
+          "to": "cloudflare-pages",
+          "path": "./apps/docs",
+          "artifact": "documentation"
         }
       ]
     }
@@ -269,11 +270,6 @@
       "policy": "trackable",
       "name": "outpost-package-docker-engine"
     },
-    "./packages/notifiers": {
-      "role": "package",
-      "policy": "trackable",
-      "name": "outpost-package-notifiers"
-    },
     "./packages/registry": {
       "role": "package",
       "policy": "trackable",
@@ -290,6 +286,19 @@
       "name": "outpost-tool-docker"
     }
   },
+  "artifacts": {
+    "documentation": {
+      "build": [
+        "./apps/docs"
+      ],
+      "sources": [
+        {
+          "from": "./apps/docs/build",
+          "to": "./"
+        }
+      ]
+    }
+  },
   "ignoreFiles": {
     "./.gitignore": {
       "bundles": [
@@ -297,17 +306,14 @@
       ],
       "patterns": [
         "/assets/",
-        "graphify-out/",
-        "outpost-admin-password.txt"
+        "graphify-out/"
       ]
     },
     "./.dockerignore": {
       "bundles": [
         "nova"
       ],
-      "patterns": [
-        "outpost-admin-password.txt"
-      ]
+      "patterns": []
     }
   },
   "agents": [
@@ -546,46 +552,6 @@
           "enabled": true
         }
       },
-      "./packages/notifiers": {
-        "cleanup": {
-          "enabled": true,
-          "settings": {
-            "removeUnknownKeys": true,
-            "reorderKeys": true
-          }
-        },
-        "normalize-artifacts": {
-          "enabled": true
-        },
-        "normalize-bundler": {
-          "enabled": true
-        },
-        "normalize-dependencies": {
-          "enabled": true,
-          "settings": {
-            "pinDependencyVersions": true,
-            "pinDevDependencyVersions": true
-          }
-        },
-        "normalize-modules": {
-          "enabled": true
-        },
-        "normalize-tooling": {
-          "enabled": true
-        },
-        "sync-environment": {
-          "enabled": true,
-          "settings": {
-            "trackNodeLtsVersions": true
-          }
-        },
-        "sync-identity": {
-          "enabled": true
-        },
-        "sync-ownership": {
-          "enabled": true
-        }
-      },
       "./packages/registry": {
         "cleanup": {
           "enabled": true,
@@ -627,6 +593,46 @@
         }
       },
       "./packages/updater": {
+        "cleanup": {
+          "enabled": true,
+          "settings": {
+            "removeUnknownKeys": true,
+            "reorderKeys": true
+          }
+        },
+        "normalize-artifacts": {
+          "enabled": true
+        },
+        "normalize-bundler": {
+          "enabled": true
+        },
+        "normalize-dependencies": {
+          "enabled": true,
+          "settings": {
+            "pinDependencyVersions": true,
+            "pinDevDependencyVersions": true
+          }
+        },
+        "normalize-modules": {
+          "enabled": true
+        },
+        "normalize-tooling": {
+          "enabled": true
+        },
+        "sync-environment": {
+          "enabled": true,
+          "settings": {
+            "trackNodeLtsVersions": true
+          }
+        },
+        "sync-identity": {
+          "enabled": true
+        },
+        "sync-ownership": {
+          "enabled": true
+        }
+      },
+      "./packages/docker": {
         "cleanup": {
           "enabled": true,
           "settings": {
