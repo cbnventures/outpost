@@ -42,7 +42,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - outpost-data:/data
     ports:
-      - "127.0.0.1:3000:3000"
+      - "0.0.0.0:22601:22601"
     restart: unless-stopped
 
 volumes:
@@ -117,11 +117,18 @@ Outpost also joins the group that owns the Docker socket, so `PGID` doesn't need
 
 ## Port
 
-The dashboard and HTTP API listen on port `3000` inside the container. To use a different port on the host, change only the host side of the mapping, such as `"127.0.0.1:8080:3000"`.
+Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API listen on `22601` by default. The examples publish it on `0.0.0.0` so another computer on the network can reach the Docker host. To use a different port only on the host, change the host side of the mapping, such as `"0.0.0.0:8080:22601"`.
 
-:::info
-The `PORT` variable is read by the server, but the image sets it to `3000` when the service starts. Changing `PORT` on the container has no effect.
-:::
+Set `PORT` to change the port inside the container too. The image healthcheck follows the same value, so the environment and both sides of the mapping must agree:
+
+```yaml title="compose.yml"
+services:
+  outpost:
+    environment:
+      PORT: "8080"
+    ports:
+      - "0.0.0.0:8080:8080"
+```
 
 ## Read-Only Root Filesystem
 

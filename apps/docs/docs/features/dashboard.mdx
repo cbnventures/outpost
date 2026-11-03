@@ -53,7 +53,7 @@ Check on Outpost from your browser, see which containers it manages and why, and
 
 ## Open the Dashboard
 
-Open `http://localhost:3000/admin/` on the Docker host. Opening `http://localhost:3000/` in a browser takes you there too.
+Open `http://localhost:22601/admin/` on the Docker host, or `http://<server-ip>:22601/admin/` from another computer on its network. Opening the same address without `/admin/` takes you there too.
 
 | Page              | What it's for                                                                                                                                                                                                                                                                                                                         |
 |-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -270,7 +270,7 @@ Outpost serves plain HTTP. To reach the dashboard over HTTPS, put a reverse prox
 
 ```caddyfile title="Caddyfile"
 outpost.example.net {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:22601
 }
 ```
 
@@ -287,14 +287,14 @@ A proxy on the same host or on the same Docker network falls in these ranges.
 - **Own hostname** — Give Outpost its own hostname, such as `https://outpost.example.net`, because a sub-path such as `https://example.net/outpost/` isn't supported.
 
 :::warning
-A device on your network with a private address can send these headers itself and choose the address its limits count against. It is recommended to keep the port bound to `127.0.0.1` so only the proxy on the host can reach it.
+A device on your network with a private address can send these headers itself and choose the address its limits count against. When the reverse proxy runs on the Docker host, bind Outpost to `127.0.0.1` instead of the Quick Start's `0.0.0.0` so only that proxy can reach it.
 :::
 
 ## Security Notes
 
 The dashboard can start updates on your Docker host, so it is worth protecting like SSH access:
 
-- **Network exposure** — It is recommended to keep the port bound to `127.0.0.1` and reach the dashboard through a VPN, an SSH tunnel, or an HTTPS reverse proxy.
+- **Network exposure** — Publishing on `0.0.0.0` makes Outpost reachable from the host's networks. Keep port `22601` behind the host firewall and never expose it directly to the public internet. Bind it to `127.0.0.1` instead when access goes through a same-host VPN, SSH tunnel, or HTTPS reverse proxy.
 - **Stored secrets** — The password is kept as a salted scrypt hash, and <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, sign-ins, and <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> as SHA-256 hashes. The authenticator app's secret, the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the passwords of private registry sign-ins are encrypted with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> are kept as public keys only.
 - **Files** — The database and the key file can be read only by the user in `PUID`, inside a folder only that user can open.
 - **Cookie** — The sign-in cookie `outpost_session` is `HttpOnly`, `SameSite=Strict`, and `Secure` over HTTPS. Every change also needs the sign-in's CSRF token in the `X-CSRF-Token` header.

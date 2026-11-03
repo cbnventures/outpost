@@ -32,9 +32,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5176,
     proxy: (mode === 'mock') ? {} : {
-      '/api': 'http://127.0.0.1:3000',
-      '/metrics': 'http://127.0.0.1:3000',
-      '/v1': 'http://127.0.0.1:3000',
+      '/api': 'http://127.0.0.1:22601',
+      '/metrics': 'http://127.0.0.1:22601',
+      '/v1': 'http://127.0.0.1:22601',
     },
   },
 }));

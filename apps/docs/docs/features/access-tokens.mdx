@@ -100,7 +100,7 @@ The **Calling the API** section shows the address clients call, the `Authorizati
 To test a token, ask Outpost which token is calling, with the token in the `OUTPOST_TOKEN` shell variable:
 
 ```bash
-curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:3000/api/v1/auth/me
+curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:22601/api/v1/auth/me
 ```
 
 The reply holds the token's name and <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology>. See [HTTP API and Metrics](/docs/features/http-api-and-metrics/) for every route.

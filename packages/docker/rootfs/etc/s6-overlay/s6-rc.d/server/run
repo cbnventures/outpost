@@ -7,7 +7,6 @@ if [ -f /app/.pnp.loader.mjs ]; then
   export NODE_OPTIONS="--experimental-loader=/app/.pnp.loader.mjs${NODE_OPTIONS:+ ${NODE_OPTIONS}}"
 fi
 cd '/app/apps/server'
-export PORT='3000'
 
 # Outpost runs as PUID/PGID; add the Docker socket's group so it can reach the daemon.
 docker_socket="${DOCKER_HOST:-unix:///var/run/docker.sock}"

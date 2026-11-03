@@ -220,7 +220,7 @@ let job: Index_Job = new Cron(config['schedule'], () => {
  * Index - App.
  *
  * HTTP server for the dashboard, its API, first-run setup, health checks,
- * and the Watchtower-style endpoints. Listens on PORT (3000 by default).
+ * and the Watchtower-style endpoints. Listens on PORT (22601 by default).
  *
  * @since 0.0.1
  */

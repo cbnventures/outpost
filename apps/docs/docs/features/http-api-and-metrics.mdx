@@ -29,9 +29,9 @@ Start a check on demand, read what the last run did, and feed Outpost into Prome
 
 ## Before You Start
 
-- **A published port** — The API listens on port `3000`, next to the dashboard. The [Quick Start](/docs/getting-started/quick-start/) publishes it as `127.0.0.1:3000:3000`, which keeps it off your network.
+- **A published port** — The API listens on port `22601`, next to the dashboard. The [Quick Start](/docs/getting-started/quick-start/) publishes it as `0.0.0.0:22601:22601`, which makes it reachable through the Docker host's network addresses.
 - **An <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>** — Create one on the dashboard's **Access tokens** page with the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology> the client needs, as shown in [Access Tokens](/docs/features/access-tokens/).
-- **The base URL** — The address the dashboard is open at, such as `http://127.0.0.1:3000`. Every path starts at the root, so a sub-path isn't supported.
+- **The base URL** — The address the dashboard is open at, such as `http://192.168.1.50:22601`. Every path starts at the root, so a sub-path isn't supported.
 
 ## Authentication
 
@@ -41,7 +41,7 @@ Send the token in the `Authorization` header of every request:
 # Read the token without showing it or saving it to the shell history.
 read -r -s OUTPOST_TOKEN
 
-curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:3000/api/v1/overview
+curl --header "Authorization: Bearer $OUTPOST_TOKEN" http://127.0.0.1:22601/api/v1/overview
 ```
 
 - The word `Bearer` is matched without regard to letter case. A token is `outpost_` followed by 43 URL-safe base64 characters.
@@ -85,7 +85,7 @@ Lists come back as `{"items":[...]}`. Opening `/` in a browser redirects to the 
 ```bash
 curl --request POST \
   --header "Authorization: Bearer $OUTPOST_TOKEN" \
-  http://127.0.0.1:3000/api/v1/checks
+  http://127.0.0.1:22601/api/v1/checks
 ```
 
 To check one container, send its 12-character ID from `GET /api/v1/containers`:
@@ -95,7 +95,7 @@ curl --request POST \
   --header "Authorization: Bearer $OUTPOST_TOKEN" \
   --header "Content-Type: application/json" \
   --data '{"containerId":"3f2a9c1b7d4e"}' \
-  http://127.0.0.1:3000/api/v1/checks
+  http://127.0.0.1:22601/api/v1/checks
 ```
 
 | Status | Meaning                                                                                                                                                                                       |
@@ -152,7 +152,7 @@ curl --request POST \
 ```bash
 curl --no-buffer \
   --header "Authorization: Bearer $OUTPOST_TOKEN" \
-  http://127.0.0.1:3000/api/v1/events
+  http://127.0.0.1:22601/api/v1/events
 ```
 
 ```text title="Event stream"
@@ -238,7 +238,7 @@ Outpost checks a request in this order, so the first problem it finds decides th
 ```bash
 curl --request POST \
   --header "Authorization: Bearer $OUTPOST_TOKEN" \
-  http://127.0.0.1:3000/v1/update
+  http://127.0.0.1:22601/v1/update
 ```
 
 | Status | Body                | Meaning                                                                                                                                                          |
@@ -265,7 +265,7 @@ scrape_configs:
       credentials: outpost_...
     static_configs:
       - targets:
-          - outpost:3000
+          - outpost:22601
 ```
 
 | Metric                                 | Type    | Description                                                                                                                                                               |

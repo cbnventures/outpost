@@ -89,7 +89,7 @@ Outpost ignores Watchtower labels entirely. You can keep them while you migrate,
 
 ## API and Metrics
 
-- **Port** — The API listens on port `3000` rather than Watchtower's `8080`, so update port mappings, scripts, and scrape targets.
+- **Port** — The API listens on port `22601` rather than Watchtower's `8080`, so update port mappings, scripts, and scrape targets.
 - **Tokens** — Watchtower's one shared token becomes an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> for each client, with only the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scopes</Terminology> it needs. Clients still send it as `Authorization: Bearer`, so only the token's value changes.
 - **Update** — Watchtower's `/v1/update` becomes `POST /v1/update`, which returns `202` or `409` instead of waiting for the run to finish. A `GET`, which is what plain `curl` sends, gets `404` with the code `not_found`.
 - **Single images** — `POST /v1/update` ignores query parameters, so Watchtower's `?image=` has no equivalent there. To check one container, send its ID to `POST /api/v1/checks`, as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#start-a-check).

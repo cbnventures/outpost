@@ -33,9 +33,7 @@ Each release publishes the same multi-platform image to both registries:
 - `cbnventures/outpost` on [Docker Hub](https://hub.docker.com/r/cbnventures/outpost)
 - `ghcr.io/cbnventures/outpost` on the GitHub Container Registry
 
-:::info
-No release has been published yet, so neither registry has the image. Until the first release, build it from source with the repository's own `compose.yml`, as shown below.
-:::
+Use either registry for a released image. To try an unpublished working copy, build it from source with the repository's own `compose.yml`, as shown below.
 
 ### Build From Source
 
@@ -75,7 +73,7 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
           # update itself.
           - outpost-data:/data
         ports:
-          - "127.0.0.1:3000:3000"
+          - "0.0.0.0:22601:22601"
         restart: unless-stopped
 
     volumes:
@@ -98,7 +96,7 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
       --env TZ=America/New_York \
       --volume /var/run/docker.sock:/var/run/docker.sock \
       --volume outpost-data:/data \
-      --publish 127.0.0.1:3000:3000 \
+      --publish 0.0.0.0:22601:22601 \
       cbnventures/outpost:latest
     ```
 
@@ -125,7 +123,7 @@ A healthy start prints the dashboard address, the schedule with its next run tim
 
 ```text
 Outpost
-  Dashboard: http://localhost:3000/admin/
+  Dashboard: http://localhost:22601/admin/
   Schedule: 0 0 4 * * * (next run 2026-10-25T08:00:00.000Z)
   Mode: opt-out
 No account exists yet. Open the dashboard to create it with the setup code.
@@ -137,7 +135,7 @@ If Outpost can't reach the Docker socket, the server stops before printing this 
 
 ## Open the Dashboard
 
-Open [http://localhost:3000/admin/](http://localhost:3000/admin/) on the Docker host. The first time, it asks you to set up your account:
+Open [http://localhost:22601/admin/](http://localhost:22601/admin/) on the Docker host, or `http://<server-ip>:22601/admin/` from another computer on its network. The first time, it asks you to set up your account:
 
 1. Enter the <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> from the log under **One-time code**. A code works for 30 minutes, and restarting the container prints a new one.
 2. Choose a username and a password of at least 12 characters, and repeat the password under **Confirm password**.
@@ -159,7 +157,7 @@ read -r -s OUTPOST_TOKEN
 
 curl --request POST \
   --header "Authorization: Bearer $OUTPOST_TOKEN" \
-  http://127.0.0.1:3000/api/v1/checks
+  http://127.0.0.1:22601/api/v1/checks
 ```
 
 Each container gets one line in the logs when the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes:

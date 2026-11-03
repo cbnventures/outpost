@@ -142,7 +142,7 @@ The `server` service then starts through `packages/docker/rootfs/etc/s6-overlay/
 2. Reads the group ID that owns the socket.
 3. Runs `node build/index.js` with `s6-applyuidgid` as `PUID` and `PGID`, adding the socket's group as a supplementary group.
 
-The updater process therefore runs as `PUID` and `PGID`, never as root, and `PGID` doesn't need to match the host's `docker` group. The image healthcheck calls `GET /health` on port `3000`.
+The updater process therefore runs as `PUID` and `PGID`, never as root, and `PGID` doesn't need to match the host's `docker` group. The image healthcheck calls `GET /health` on the configured `PORT`, which defaults to `22601`.
 
 :::warning
 Access to the Docker socket is equivalent to root on the host, because the Docker API can start privileged containers and mount any host path. Running the updater as `PUID` limits the process itself, not what it can ask Docker to do.

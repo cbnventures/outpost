@@ -1,5 +1,10 @@
 # outpost-app-server
 
+## 1.0.1 - 2026-11-03
+
+### UPDATED
+- Updated Outpost to use port 22601 by default while preserving custom PORT values across startup and health checks.
+
 ## 1.0.0 - 2026-11-03
 
 ### ADDED

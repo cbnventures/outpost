@@ -86,7 +86,7 @@ RUN find /usr/local/libexec/nova-docker -type f -exec sed -i 's/\r$//' {} \; \
   && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod 0755 {} \;
 COPY --from=build /runtime/ /app/
 RUN mkdir -p '/data'
-EXPOSE 3000
+EXPOSE 22601
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["/usr/local/libexec/nova-docker/healthcheck"]
 STOPSIGNAL SIGTERM

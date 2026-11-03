@@ -32,7 +32,7 @@ describe('loadConfig', () => {
     const config: Config_LoadConfig_AppliesDefaults_Config = loadConfig({});
 
     expect(config).toMatchObject({
-      port: 3000,
+      port: 22601,
       dockerHost: 'unix:///var/run/docker.sock',
       schedule: '0 0 4 * * *',
       runOnStart: false,

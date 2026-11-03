@@ -65,7 +65,7 @@ export const defaultRuntimeSettings: Config_DefaultRuntimeSettings = {
  */
 export function loadConfig(environment: Config_LoadConfig_Environment): Config_LoadConfig_Returns {
   return {
-    port: readNumber('PORT', environment['PORT'], 3000),
+    port: readNumber('PORT', environment['PORT'], 22601),
     dockerHost: readString(environment['DOCKER_HOST'], 'unix:///var/run/docker.sock'),
     schedule: defaultRuntimeSettings['schedule'],
     runOnStart: defaultRuntimeSettings['runOnStart'],
