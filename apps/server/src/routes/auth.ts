@@ -1,5 +1,5 @@
 import {
-  getClientAddress,
+  getClientLimitKey,
   getWebauthnConfiguration,
   isPasskeyAvailable,
   sendError,
@@ -210,7 +210,7 @@ export class Runner {
    * @since 1.0.0
    */
   private async routeClaim(request: Routes_Auth_Runner_RouteClaim_Request, response: Routes_Auth_Runner_RouteClaim_Response): Routes_Auth_Runner_RouteClaim_Returns {
-    const attemptKey: Routes_Auth_Runner_RouteClaim_AttemptKey = `setup:${getClientAddress(request)}`;
+    const attemptKey: Routes_Auth_Runner_RouteClaim_AttemptKey = `setup:${getClientLimitKey(request)}`;
 
     if (this.isRateLimited(response, attemptKey, 'Too many setup attempts. Try again in 15 minutes.') === true) {
       return;
@@ -345,7 +345,7 @@ export class Runner {
    * @since 1.0.0
    */
   private async routeLogin(request: Routes_Auth_Runner_RouteLogin_Request, response: Routes_Auth_Runner_RouteLogin_Response): Routes_Auth_Runner_RouteLogin_Returns {
-    const attemptKey: Routes_Auth_Runner_RouteLogin_AttemptKey = `sign-in:${getClientAddress(request)}`;
+    const attemptKey: Routes_Auth_Runner_RouteLogin_AttemptKey = `sign-in:${getClientLimitKey(request)}`;
 
     if (this.isRateLimited(response, attemptKey, 'Too many sign-in attempts. Try again in 15 minutes.') === true) {
       return;
@@ -474,7 +474,7 @@ export class Runner {
    * @since 1.0.0
    */
   private async routePasskeyVerify(request: Routes_Auth_Runner_RoutePasskeyVerify_Request, response: Routes_Auth_Runner_RoutePasskeyVerify_Response): Routes_Auth_Runner_RoutePasskeyVerify_Returns {
-    const attemptKey: Routes_Auth_Runner_RoutePasskeyVerify_AttemptKey = `sign-in:${getClientAddress(request)}`;
+    const attemptKey: Routes_Auth_Runner_RoutePasskeyVerify_AttemptKey = `sign-in:${getClientLimitKey(request)}`;
 
     if (this.isRateLimited(response, attemptKey, 'Too many sign-in attempts. Try again in 15 minutes.') === true) {
       return;
@@ -554,7 +554,7 @@ export class Runner {
    * @since 1.0.0
    */
   private routeSecondFactor(request: Routes_Auth_Runner_RouteSecondFactor_Request, response: Routes_Auth_Runner_RouteSecondFactor_Response): Routes_Auth_Runner_RouteSecondFactor_Returns {
-    const attemptKey: Routes_Auth_Runner_RouteSecondFactor_AttemptKey = `sign-in:${getClientAddress(request)}`;
+    const attemptKey: Routes_Auth_Runner_RouteSecondFactor_AttemptKey = `sign-in:${getClientLimitKey(request)}`;
 
     if (this.isRateLimited(response, attemptKey, 'Too many sign-in attempts. Try again in 15 minutes.') === true) {
       return;

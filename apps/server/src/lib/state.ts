@@ -45,6 +45,7 @@ import {
   storedNotificationValues,
   storedPersonalAccessToken,
   storedRegistryCredential,
+  storedRejectedImage,
   storedRemovedSecret,
 } from './schema.js';
 import { verifyTotpCode } from './totp.js';
@@ -121,6 +122,7 @@ import type {
   Lib_State_Runner_CreateRegistry_Registry,
   Lib_State_Runner_CreateRegistry_Returns,
   Lib_State_Runner_CreateRegistry_SealedPassword,
+  Lib_State_Runner_CreateSchema_AppliedVersionFive,
   Lib_State_Runner_CreateSchema_AppliedVersionFour,
   Lib_State_Runner_CreateSchema_AppliedVersionOne,
   Lib_State_Runner_CreateSchema_AppliedVersionThree,
@@ -178,6 +180,11 @@ import type {
   Lib_State_Runner_FindRegistryCredentials_Registry,
   Lib_State_Runner_FindRegistryCredentials_Returns,
   Lib_State_Runner_FindRegistryCredentials_StoredRegistry,
+  Lib_State_Runner_FindRejectedImage_Container,
+  Lib_State_Runner_FindRejectedImage_Returns,
+  Lib_State_Runner_FindRejectedImage_Row,
+  Lib_State_Runner_ForgetRejectedImage_Container,
+  Lib_State_Runner_ForgetRejectedImage_Returns,
   Lib_State_Runner_GetAdministrator_Administrator,
   Lib_State_Runner_GetAdministrator_Returns,
   Lib_State_Runner_GetAdministratorById_Administrator,
@@ -282,6 +289,9 @@ import type {
   Lib_State_Runner_RecordSignInChallengeFailure_ChallengeHash,
   Lib_State_Runner_RecordSignInChallengeFailure_Result,
   Lib_State_Runner_RecordSignInChallengeFailure_Returns,
+  Lib_State_Runner_RememberRejectedImage_Container,
+  Lib_State_Runner_RememberRejectedImage_ImageId,
+  Lib_State_Runner_RememberRejectedImage_Returns,
   Lib_State_Runner_RemoveLockedSecrets_Administrators,
   Lib_State_Runner_RemoveLockedSecrets_MissingSecrets,
   Lib_State_Runner_RemoveLockedSecrets_NotificationRows,
@@ -1339,6 +1349,46 @@ export class Runner {
   }
 
   /**
+   * Lib - State - Find Rejected Image.
+   *
+   * Reads the image a container was last rolled back from, if any.
+   * Update checks skip that image so a bad release is not retried every cycle.
+   *
+   * @param {Lib_State_Runner_FindRejectedImage_Container} container - Container.
+   *
+   * @returns {Lib_State_Runner_FindRejectedImage_Returns}
+   *
+   * @since 1.0.3
+   */
+  public findRejectedImage(container: Lib_State_Runner_FindRejectedImage_Container): Lib_State_Runner_FindRejectedImage_Returns {
+    const row: Lib_State_Runner_FindRejectedImage_Row = this.#database.prepare('SELECT image_id AS imageId, rejected_at AS rejectedAt FROM rejected_images WHERE container = ?').get(container);
+
+    if (row === undefined) {
+      return undefined;
+    }
+
+    return storedRejectedImage.parse(row);
+  }
+
+  /**
+   * Lib - State - Forget Rejected Image.
+   *
+   * Clears a container's rolled-back image once it updates successfully.
+   * Its next new image is tried as usual.
+   *
+   * @param {Lib_State_Runner_ForgetRejectedImage_Container} container - Container.
+   *
+   * @returns {Lib_State_Runner_ForgetRejectedImage_Returns}
+   *
+   * @since 1.0.3
+   */
+  public forgetRejectedImage(container: Lib_State_Runner_ForgetRejectedImage_Container): Lib_State_Runner_ForgetRejectedImage_Returns {
+    this.#database.prepare('DELETE FROM rejected_images WHERE container = ?').run(container);
+
+    return;
+  }
+
+  /**
    * Lib - State - Get Administrator.
    *
    * Returns safe account metadata, or undefined before setup.
@@ -1970,6 +2020,25 @@ export class Runner {
   }
 
   /**
+   * Lib - State - Remember Rejected Image.
+   *
+   * Records the image a container was just rolled back from.
+   * A later rollback to a different image replaces it.
+   *
+   * @param {Lib_State_Runner_RememberRejectedImage_Container} container - Container.
+   * @param {Lib_State_Runner_RememberRejectedImage_ImageId}   imageId   - Image id.
+   *
+   * @returns {Lib_State_Runner_RememberRejectedImage_Returns}
+   *
+   * @since 1.0.3
+   */
+  public rememberRejectedImage(container: Lib_State_Runner_RememberRejectedImage_Container, imageId: Lib_State_Runner_RememberRejectedImage_ImageId): Lib_State_Runner_RememberRejectedImage_Returns {
+    this.#database.prepare('INSERT INTO rejected_images (container, image_id, rejected_at) VALUES (?, ?, ?) ON CONFLICT(container) DO UPDATE SET image_id = excluded.image_id, rejected_at = excluded.rejected_at').run(container, imageId, new Date(this.#now()).toISOString());
+
+    return;
+  }
+
+  /**
    * Lib - State - Remove Notification Target.
    *
    * Deletes one destination so its alerts stop right away.
@@ -2530,6 +2599,19 @@ export class Runner {
           'ALTER TABLE removed_secrets_next RENAME TO removed_secrets;',
           'CREATE UNIQUE INDEX removed_secrets_kind_owner ON removed_secrets (kind, COALESCE(administrator_id, \'\'), COALESCE(notification_id, \'\'), COALESCE(registry_id, \'\'));',
           'INSERT INTO schema_migrations (version, applied_at) VALUES (4, datetime(\'now\'));',
+        ].join('\n'));
+
+        return;
+      });
+    }
+
+    const appliedVersionFive: Lib_State_Runner_CreateSchema_AppliedVersionFive = this.#database.prepare('SELECT version FROM schema_migrations WHERE version = 5').get();
+
+    if (appliedVersionFive === undefined) {
+      this.transaction(() => {
+        this.#database.exec([
+          'CREATE TABLE rejected_images (container TEXT PRIMARY KEY, image_id TEXT NOT NULL, rejected_at TEXT NOT NULL) STRICT;',
+          'INSERT INTO schema_migrations (version, applied_at) VALUES (5, datetime(\'now\'));',
         ].join('\n'));
 
         return;

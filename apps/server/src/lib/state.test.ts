@@ -106,6 +106,8 @@ import type {
   Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_DockerHub,
   Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_Ghcr,
   Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_State,
+  Lib_State_RejectedImages_RemembersRolledBackImages_Reopened,
+  Lib_State_RejectedImages_RemembersRolledBackImages_State,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Reopened,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Settings,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_State,
@@ -1288,6 +1290,63 @@ describe('token state', () => {
     expect(state.getTokenScopes('tok-0000000000000000')).toBeUndefined();
 
     state.close();
+
+    return;
+  });
+
+  return;
+});
+
+/**
+ * Lib - State - Rejected Images.
+ *
+ * Confirms a rolled-back image survives a restart, a later rollback replaces
+ * it, and a successful update clears it.
+ *
+ * @since 1.0.3
+ */
+describe('rejected images', () => {
+  beforeEach(() => {
+    dataDirectory = mkdtempSync(join(tmpdir(), 'outpost-state-'));
+
+    return;
+  });
+
+  afterEach(() => {
+    rmSync(getDataDirectory(), {
+      force: true,
+      recursive: true,
+    });
+
+    dataDirectory = undefined;
+
+    return;
+  });
+
+  it('remembers rolled-back images across restarts until they are forgotten', () => {
+    const state: Lib_State_RejectedImages_RemembersRolledBackImages_State = new State(getDataDirectory(), () => Date.parse('2026-11-05T04:00:00.000Z'));
+
+    expect(state.findRejectedImage('web')).toBeUndefined();
+
+    state.rememberRejectedImage('web', 'sha256:first');
+    state.rememberRejectedImage('web', 'sha256:second');
+
+    state.close();
+
+    const reopened: Lib_State_RejectedImages_RemembersRolledBackImages_Reopened = new State(getDataDirectory());
+
+    expect(reopened.findRejectedImage('web')).toEqual({
+      imageId: 'sha256:second',
+      rejectedAt: '2026-11-05T04:00:00.000Z',
+    });
+
+    expect(reopened.findRejectedImage('db')).toBeUndefined();
+
+    reopened.forgetRejectedImage('web');
+
+    expect(reopened.findRejectedImage('web')).toBeUndefined();
+
+    reopened.close();
 
     return;
   });

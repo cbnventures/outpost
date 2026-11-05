@@ -136,7 +136,7 @@ services:
 
 ## IPv6
 
-The examples turn on IPv6 for Outpost's Compose network, so the sign-in limit and the API's rate limit count each IPv6 client by its own address. Docker Engine 27 or later picks the IPv6 subnet on its own, and on a host without IPv6, you can delete the `networks` block. For `docker run`, create the network first with `docker network create --ipv6 outpost`, then add `--network outpost`.
+The examples turn on IPv6 for Outpost's Compose network, so the sign-in limit and the API's rate limit count each IPv6 client by its own `/56` network instead of by Docker's gateway address. Docker Engine 27 or later picks the IPv6 subnet on its own, and on a host without IPv6, you can delete the `networks` block. For `docker run`, create the network first with `docker network create --ipv6 outpost`, then add `--network outpost`.
 
 IPv6 addresses are often reachable from the internet, so it is recommended to check that your router or host firewall blocks inbound connections to port `22601`.
 

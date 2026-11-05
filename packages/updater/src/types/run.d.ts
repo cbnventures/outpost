@@ -12,6 +12,7 @@ import type {
   Shared_Engine,
   Shared_ImageInspect,
   Shared_Options,
+  Shared_RejectedImage,
   Shared_Report,
   Shared_Result,
   Shared_ResultStatus,
@@ -34,9 +35,12 @@ export type Run_CheckContainer_Cycle_Results = Shared_Result[];
 
 export type Run_CheckContainer_Cycle_StartedAt = string;
 
+export type Run_CheckContainer_Cycle_Targeted = boolean;
+
 export type Run_CheckContainer_Cycle = {
   results: Run_CheckContainer_Cycle_Results;
   startedAt: Run_CheckContainer_Cycle_StartedAt;
+  targeted: Run_CheckContainer_Cycle_Targeted;
 };
 
 export type Run_CheckContainer_Returns = Promise<Shared_Result>;
@@ -68,6 +72,8 @@ export type Run_CheckContainer_Lookup = RemoteDigest;
 export type Run_CheckContainer_MonitorOnly = boolean;
 
 export type Run_CheckContainer_PulledImage = Shared_ImageInspect | undefined;
+
+export type Run_CheckContainer_RejectedImage = Shared_RejectedImage | undefined;
 
 export type Run_CheckContainer_Outcome_Status = Shared_ResultStatus;
 

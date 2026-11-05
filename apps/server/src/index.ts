@@ -167,6 +167,9 @@ const scheduler: Index_Scheduler = new Scheduler(async (containerIds, source) =>
     sleep: selfUpdateContext['sleep'],
     now: () => new Date(),
     findCredentials: (registry) => state.findRegistryCredentials(registry),
+    findRejectedImage: (container) => state.findRejectedImage(container),
+    rememberRejectedImage: (container, imageId) => state.rememberRejectedImage(container, imageId),
+    forgetRejectedImage: (container) => state.forgetRejectedImage(container),
     updateSelf: async (request) => handOver(request, source, selfUpdateContext),
   }, containerIds);
 

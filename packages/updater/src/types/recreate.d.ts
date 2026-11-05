@@ -40,6 +40,10 @@ export type Recreate_RecreateContainer_Plan = Shared_CreatePlan;
 
 export type Recreate_RecreateContainer_PreviousName = string;
 
+export type Recreate_RecreateContainer_PreviousHealth = NonNullable<Shared_ContainerInspect['State']['Health']> | undefined;
+
+export type Recreate_RecreateContainer_PreviouslyUnhealthy = boolean;
+
 export type Recreate_RecreateContainer_Renamed = boolean;
 
 export type Recreate_RecreateContainer_NewId = string | undefined;
@@ -47,6 +51,10 @@ export type Recreate_RecreateContainer_NewId = string | undefined;
 export type Recreate_RecreateContainer_Created = Shared_ContainerInspect;
 
 export type Recreate_RecreateContainer_InitialRestartCount = number;
+
+export type Recreate_RecreateContainer_HealthStatus = string | undefined;
+
+export type Recreate_RecreateContainer_HealthNote = string;
 
 export type Recreate_RecreateContainer_ErrorMessage = string;
 
@@ -63,17 +71,19 @@ export type Recreate_WaitUntilHealthy_Id = string;
 
 export type Recreate_WaitUntilHealthy_InitialRestartCount = number;
 
+export type Recreate_WaitUntilHealthy_PreviouslyUnhealthy = boolean;
+
 export type Recreate_WaitUntilHealthy_Options = Pick<Shared_Options, 'healthTimeoutSeconds' | 'settleSeconds'>;
 
 export type Recreate_WaitUntilHealthy_Dependencies = Pick<Shared_Dependencies, 'engine' | 'sleep' | 'now'>;
 
-export type Recreate_WaitUntilHealthy_Returns = Promise<void>;
+export type Recreate_WaitUntilHealthy_Returns = Promise<Recreate_WaitUntilHealthy_HealthStatus>;
 
 export type Recreate_WaitUntilHealthy_Deadline = number;
 
 export type Recreate_WaitUntilHealthy_SettleDeadline = number;
 
-export type Recreate_WaitUntilHealthy_Poll = () => Promise<void>;
+export type Recreate_WaitUntilHealthy_Poll = () => Promise<Recreate_WaitUntilHealthy_HealthStatus>;
 
 export type Recreate_WaitUntilHealthy_Inspected = Shared_ContainerInspect;
 

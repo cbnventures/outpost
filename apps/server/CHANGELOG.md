@@ -1,5 +1,16 @@
 # outpost-app-server
 
+## 1.0.3 - 2026-11-05
+
+### UPDATED
+- Updated the new notification dialog to start on "— Select one —", so a service is chosen on purpose and its fields appear once it is.
+- Updated text boxes to resize only vertically and never shrink below three lines.
+
+### FIXED
+- Fixed update checks rolling the same container back on every run. A container that was already unhealthy now keeps its new image as long as it stays running, and an image that was rolled back is skipped until a newer one appears or that container is checked on its own.
+- Fixed the API rate limit and the sign-in limit so an IPv6 client can no longer reset them by switching addresses; IPv6 clients now count by their /56 network.
+- Fixed password managers offering to fill or save the Outpost sign-in in notification and registry secret fields.
+
 ## 1.0.2 - 2026-11-03
 
 ### UPDATED

@@ -6,11 +6,15 @@ import type {
   Recreate_RecreateContainer_Dependencies,
   Recreate_RecreateContainer_Engine,
   Recreate_RecreateContainer_ErrorMessage,
+  Recreate_RecreateContainer_HealthNote,
+  Recreate_RecreateContainer_HealthStatus,
   Recreate_RecreateContainer_ImageConfig,
   Recreate_RecreateContainer_InitialRestartCount,
   Recreate_RecreateContainer_NewId,
   Recreate_RecreateContainer_Options,
   Recreate_RecreateContainer_Plan,
+  Recreate_RecreateContainer_PreviousHealth,
+  Recreate_RecreateContainer_PreviouslyUnhealthy,
   Recreate_RecreateContainer_PreviousName,
   Recreate_RecreateContainer_Reference,
   Recreate_RecreateContainer_Renamed,
@@ -25,6 +29,7 @@ import type {
   Recreate_WaitUntilHealthy_Inspected,
   Recreate_WaitUntilHealthy_Options,
   Recreate_WaitUntilHealthy_Poll,
+  Recreate_WaitUntilHealthy_PreviouslyUnhealthy,
   Recreate_WaitUntilHealthy_RestartCount,
   Recreate_WaitUntilHealthy_Returns,
   Recreate_WaitUntilHealthy_SettleDeadline,
@@ -51,6 +56,10 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
   const engine: Recreate_RecreateContainer_Engine = dependencies['engine'];
   const plan: Recreate_RecreateContainer_Plan = buildCreatePlan(container, imageConfig, reference);
   const previousName: Recreate_RecreateContainer_PreviousName = `${plan['name']}-outpost-previous`;
+  const previousHealth: Recreate_RecreateContainer_PreviousHealth = container['State']['Health'] ?? undefined;
+
+  // Rolling back to a container that was already unhealthy gains nothing, so its replacement only has to keep running.
+  const previouslyUnhealthy: Recreate_RecreateContainer_PreviouslyUnhealthy = previousHealth !== undefined && previousHealth['Status'] === 'unhealthy';
   let renamed: Recreate_RecreateContainer_Renamed = false;
   let newId: Recreate_RecreateContainer_NewId = undefined;
 
@@ -72,13 +81,16 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
 
     await engine.startContainer(newId);
 
-    await waitUntilHealthy(newId, initialRestartCount, options, dependencies);
+    const healthStatus: Recreate_RecreateContainer_HealthStatus = await waitUntilHealthy(newId, initialRestartCount, previouslyUnhealthy, options, dependencies);
 
     await engine.removeContainer(container['Id']);
 
+    // Kept although not healthy, because the container it replaced was already unhealthy.
+    const healthNote: Recreate_RecreateContainer_HealthNote = (healthStatus !== undefined && healthStatus !== 'healthy') ? ` (kept while ${healthStatus}, since the previous container was already unhealthy)` : '';
+
     return {
       status: 'updated',
-      detail: `Recreated with ${reference}`,
+      detail: `Recreated with ${reference}${healthNote}`,
     };
   } catch (error) {
     const errorMessage: Recreate_RecreateContainer_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
@@ -117,11 +129,12 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
  * Recreate - Wait Until Healthy.
  *
  * Polls a freshly started container. Containers with a healthcheck must
- * report healthy before the timeout; others must still be running after
- * the settle period. Throws when either condition fails.
+ * report healthy before the timeout; others, and any that replaced an
+ * unhealthy container, must still be running after the settle period.
  *
  * @param {Recreate_WaitUntilHealthy_Id}                  id                  - Id.
  * @param {Recreate_WaitUntilHealthy_InitialRestartCount} initialRestartCount - Initial restart count.
+ * @param {Recreate_WaitUntilHealthy_PreviouslyUnhealthy} previouslyUnhealthy - Previously unhealthy.
  * @param {Recreate_WaitUntilHealthy_Options}             options             - Options.
  * @param {Recreate_WaitUntilHealthy_Dependencies}        dependencies        - Dependencies.
  *
@@ -129,7 +142,7 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
  *
  * @since 0.0.1
  */
-async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestartCount: Recreate_WaitUntilHealthy_InitialRestartCount, options: Recreate_WaitUntilHealthy_Options, dependencies: Recreate_WaitUntilHealthy_Dependencies): Recreate_WaitUntilHealthy_Returns {
+async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestartCount: Recreate_WaitUntilHealthy_InitialRestartCount, previouslyUnhealthy: Recreate_WaitUntilHealthy_PreviouslyUnhealthy, options: Recreate_WaitUntilHealthy_Options, dependencies: Recreate_WaitUntilHealthy_Dependencies): Recreate_WaitUntilHealthy_Returns {
   const deadline: Recreate_WaitUntilHealthy_Deadline = dependencies.now().getTime() + (options['healthTimeoutSeconds'] * 1000);
   const settleDeadline: Recreate_WaitUntilHealthy_SettleDeadline = dependencies.now().getTime() + (options['settleSeconds'] * 1000);
 
@@ -139,7 +152,7 @@ async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestart
    * Checks the container once and schedules the next check a second
    * later until it is settled, healthy, stopped, or out of time.
    *
-   * @returns {Promise<void>}
+   * @returns {Promise<Recreate_WaitUntilHealthy_HealthStatus>}
    *
    * @since 0.0.1
    */
@@ -161,18 +174,21 @@ async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestart
 
     const healthStatus: Recreate_WaitUntilHealthy_HealthStatus = (inspected['State']['Health'] !== undefined && inspected['State']['Health'] !== null) ? inspected['State']['Health']['Status'] : undefined;
 
-    if (healthStatus === 'unhealthy') {
+    if (healthStatus === 'unhealthy' && previouslyUnhealthy === false) {
       throw new Error('New container is unhealthy');
     }
 
     if (
       healthStatus === 'healthy'
       || (
-        healthStatus === undefined
+        (
+          healthStatus === undefined
+          || previouslyUnhealthy === true
+        )
         && dependencies.now().getTime() >= settleDeadline
       )
     ) {
-      return;
+      return healthStatus;
     }
 
     if (dependencies.now().getTime() >= deadline) {
@@ -184,7 +200,5 @@ async function waitUntilHealthy(id: Recreate_WaitUntilHealthy_Id, initialRestart
     return poll();
   };
 
-  await poll();
-
-  return;
+  return poll();
 }

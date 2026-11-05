@@ -14,6 +14,7 @@ import { FieldLabel } from '@/web/field-label.tsx';
 import {
   Button,
   Icon,
+  passwordManagerIgnore,
 } from '@/web/primitives.tsx';
 import { showToast } from '@/web/toast.ts';
 import { useDialogFocus } from '@/web/use-dialog-focus.ts';
@@ -171,6 +172,7 @@ export const RegistryDialog = ({
             <FieldLabel>
               <span>Username</span>
               <input
+                {...passwordManagerIgnore}
                 aria-invalid={usernameIssue !== ''}
                 autoCapitalize="none"
                 autoComplete="off"
@@ -183,8 +185,9 @@ export const RegistryDialog = ({
             <FieldLabel>
               <span>Password</span>
               <input
+                {...passwordManagerIgnore}
                 aria-invalid={passwordIssue !== ''}
-                autoComplete="new-password"
+                autoComplete="off"
                 onChange={(event): void => setPassword(event.currentTarget.value)}
                 type="password"
                 value={password}

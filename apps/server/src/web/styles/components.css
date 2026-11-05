@@ -25,6 +25,11 @@ textarea {
   font: inherit;
 }
 
+/* Grid and flex rules would otherwise beat the hidden attribute. */
+[hidden] {
+  display: none !important;
+}
+
 button,
 select,
 input[type="checkbox"],
@@ -266,6 +271,7 @@ textarea {
 }
 
 .field input[aria-invalid="true"],
+.field select[aria-invalid="true"],
 .field textarea[aria-invalid="true"] {
   border-color: var(--color-danger);
 }
@@ -304,7 +310,11 @@ textarea {
 
 .field textarea,
 textarea.setting-input {
+  /* Three lines, the shortest box's starting height, so dragging can't shrink one smaller. */
+  min-height: calc(3lh + var(--space-2) * 2 + 2px);
   padding: var(--space-2) var(--space-3);
+
+  resize: vertical;
 }
 
 /* The meter sits in the field like a hint, so it drops the label styling of the field's spans. */
@@ -364,6 +374,15 @@ select {
   background-repeat: no-repeat;
   background-position: right var(--space-3) center;
   background-size: 1rem;
+}
+
+/* "— Select one —" is a prompt rather than a choice, so it reads like a placeholder. */
+select:has(> option.select-placeholder:checked) {
+  color: var(--color-muted);
+
+  & > option {
+    color: var(--color-text);
+  }
 }
 
 /* Room for the chevron, so a long choice stops before it. */

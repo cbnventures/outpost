@@ -33,6 +33,7 @@ import type {
   Run_CheckContainer_Outcome,
   Run_CheckContainer_PulledImage,
   Run_CheckContainer_Reference,
+  Run_CheckContainer_RejectedImage,
   Run_CheckContainer_RemoteDigest,
   Run_CheckContainer_Returns,
   Run_CheckContainer_Target,
@@ -116,6 +117,7 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
         result = await checkContainer(container, options, dependencies, credentialCache, {
           results,
           startedAt,
+          targeted: containerIds !== undefined,
         });
       } catch (error) {
         const errorMessage: Run_RunUpdateCycle_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
@@ -159,8 +161,8 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
  * Run - Check Container.
  *
  * Decides whether one container has a newer image: its registry first, then
- * a pull. Images built on this host are left alone, and Outpost's own
- * container goes to the self-update step instead of being recreated here.
+ * a pull. Built images, Outpost's own container, and an image this container
+ * was rolled back from are left to other steps or skipped.
  *
  * @param {Run_CheckContainer_Container}       container       - Container.
  * @param {Run_CheckContainer_Options}         options         - Options.
@@ -328,8 +330,32 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     });
   }
 
+  const rejectedImage: Run_CheckContainer_RejectedImage = dependencies.findRejectedImage(name);
+
+  // Retrying the image that was just rolled back would roll it back again on every cycle.
+  if (
+    rejectedImage !== undefined
+    && rejectedImage['imageId'] === pulledImage['Id']
+    && cycle['targeted'] === false
+  ) {
+    return {
+      container: name,
+      image: reference,
+      status: 'skipped',
+      detail: `The new image (${pulledImage['Id'].replace('sha256:', '').slice(0, 12)}) was rolled back last time, so Outpost waits for a newer one; check this container on its own to try it again`,
+    };
+  }
+
   const outcome: Run_CheckContainer_Outcome = await recreateContainer(inspected, (currentImage !== undefined) ? (currentImage['Config'] ?? undefined) : undefined, reference, options, dependencies);
   let cleanupNote: Run_CheckContainer_CleanupNote = '';
+
+  if (outcome['status'] === 'rolled-back') {
+    dependencies.rememberRejectedImage(name, pulledImage['Id']);
+  }
+
+  if (outcome['status'] === 'updated') {
+    dependencies.forgetRejectedImage(name);
+  }
 
   if (outcome['status'] === 'updated' && options['cleanup'] === true) {
     try {

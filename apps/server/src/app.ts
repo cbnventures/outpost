@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 
 import { Runner as Access } from './lib/access.js';
 import { Runner as Attempts } from './lib/attempts.js';
-import { isTrustedProxyAddress, sendError } from './lib/http.js';
+import { getClientLimitKey, isTrustedProxyAddress, sendError } from './lib/http.js';
 import { Runner as Notifier } from './lib/notifier.js';
 import { Runner as Auth } from './routes/auth.js';
 import { Runner as Dashboard } from './routes/dashboard.js';
@@ -62,6 +62,7 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
 
       return;
     },
+    keyGenerator: (request) => getClientLimitKey(request),
     legacyHeaders: false,
     limit: 120,
     standardHeaders: true,

@@ -13,6 +13,7 @@ import type {
   storedAdministratorTotp,
   storedNotificationTarget,
   storedRegistryCredential,
+  storedRejectedImage,
   storedRemovedSecret,
 } from '../../lib/schema.js';
 import type {
@@ -482,6 +483,37 @@ export type Lib_State_Runner_FindRegistryCredentials_Returns = RegistryCredentia
 export type Lib_State_Runner_FindRegistryCredentials_Host = string;
 
 export type Lib_State_Runner_FindRegistryCredentials_StoredRegistry = z.infer<typeof storedRegistryCredential> | undefined;
+
+/**
+ * Lib - State - Runner - Find Rejected Image.
+ *
+ * @since 1.0.3
+ */
+export type Lib_State_Runner_FindRejectedImage_Container = string;
+
+export type Lib_State_Runner_FindRejectedImage_Returns = z.infer<typeof storedRejectedImage> | undefined;
+
+export type Lib_State_Runner_FindRejectedImage_Row = Record<string, SQLOutputValue> | undefined;
+
+/**
+ * Lib - State - Runner - Forget Rejected Image.
+ *
+ * @since 1.0.3
+ */
+export type Lib_State_Runner_ForgetRejectedImage_Container = string;
+
+export type Lib_State_Runner_ForgetRejectedImage_Returns = void;
+
+/**
+ * Lib - State - Runner - Remember Rejected Image.
+ *
+ * @since 1.0.3
+ */
+export type Lib_State_Runner_RememberRejectedImage_Container = string;
+
+export type Lib_State_Runner_RememberRejectedImage_ImageId = string;
+
+export type Lib_State_Runner_RememberRejectedImage_Returns = void;
 
 /**
  * Lib - State - Runner - Get Administrator.
@@ -1308,6 +1340,8 @@ export type Lib_State_Runner_StoredNotificationTarget = Omit<ReturnType<typeof s
 export type Lib_State_Runner_CreateSchema_AppliedVersionThree = Record<string, SQLOutputValue> | undefined;
 
 export type Lib_State_Runner_CreateSchema_AppliedVersionFour = Record<string, SQLOutputValue> | undefined;
+
+export type Lib_State_Runner_CreateSchema_AppliedVersionFive = Record<string, SQLOutputValue> | undefined;
 
 export type Lib_State_Runner_GetRemovedSecrets_RemovedSecret = ReturnType<typeof storedRemovedSecret.parse>;
 

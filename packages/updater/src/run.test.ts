@@ -31,17 +31,27 @@ import type {
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_UntaggedReport,
   Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Dependencies,
   Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report,
+  Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Dependencies,
+  Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Report,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Dependencies,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Report,
   Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies,
+  Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Dependencies,
+  Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Report,
   Run_RunUpdateCycle_ReportsACycleFailure_Dependencies,
   Run_RunUpdateCycle_ReportsACycleFailure_Report,
   Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Dependencies,
   Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Report,
+  Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies,
+  Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report,
+  Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies,
+  Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report,
   Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Dependencies,
   Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Report,
   Run_RunUpdateCycle_RollsBackWhenTheReplacementRestarts_Dependencies,
   Run_RunUpdateCycle_RollsBackWhenTheReplacementRestarts_Report,
+  Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Dependencies,
+  Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Report,
   Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_Dependencies,
   Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_RefusedDependencies,
   Run_RunUpdateCycle_SkipsImagesOfUnknownOriginThatTheRegistryLacks_RefusedReport,
@@ -137,6 +147,7 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
               Running: (isCreated === false) && runningAfterStart === true,
               Restarting: (isCreated === false) && state['newRestarting'] === true,
               Status: (isCreated === true) ? 'created' : (state['newStatus'] ?? ((runningAfterStart === true) ? 'running' : 'exited')),
+              ...((isCreated === false && state['newHealth'] !== undefined) ? { Health: { Status: state['newHealth'] } } : {}),
             },
           };
         }
@@ -157,6 +168,7 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
             Running: true,
             Restarting: false,
             Status: 'running',
+            ...((state['oldHealth'] !== undefined) ? { Health: { Status: state['oldHealth'] } } : {}),
           },
         };
       }),
@@ -199,6 +211,9 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
     }),
     now: () => new Date(Date.parse('2026-10-24T00:00:00.000Z') + clock),
     findCredentials: vi.fn(() => undefined),
+    findRejectedImage: vi.fn(() => undefined),
+    rememberRejectedImage: vi.fn(() => undefined),
+    forgetRejectedImage: vi.fn(() => undefined),
   };
 }
 
@@ -290,6 +305,9 @@ function createSelfDependencies(withUpdateSelf: Run_CreateSelfDependencies_WithU
     }),
     now: () => new Date(Date.parse('2026-10-24T00:00:00.000Z') + clock),
     findCredentials: vi.fn(() => undefined),
+    findRejectedImage: vi.fn(() => undefined),
+    rememberRejectedImage: vi.fn(() => undefined),
+    forgetRejectedImage: vi.fn(() => undefined),
     ...((withUpdateSelf === true) ? {
       updateSelf: vi.fn<Run_UpdateSelf>(async (request) => ({
         container: 'outpost',
@@ -364,6 +382,92 @@ describe('runUpdateCycle', () => {
     }]);
 
     expect(dependencies['engine']['removeImage']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('keeps an unhealthy replacement when the old container was unhealthy', async () => {
+    const dependencies: Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Dependencies = createDependencies({
+      localDigest: 'sha256:local',
+      oldHealth: 'unhealthy',
+      newHealth: 'unhealthy',
+    }, true);
+    const report: Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'updated',
+      detail: expect.stringContaining('kept while unhealthy'),
+    }]);
+
+    expect(dependencies['engine']['removeContainer']).toHaveBeenCalledWith('old-id');
+
+    expect(dependencies['forgetRejectedImage']).toHaveBeenCalledWith('web');
+
+    return;
+  });
+
+  it('rolls back an unhealthy replacement of a healthy container', async () => {
+    const dependencies: Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies = createDependencies({
+      localDigest: 'sha256:local',
+      oldHealth: 'healthy',
+      newHealth: 'unhealthy',
+    }, true);
+    const report: Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'rolled-back',
+      detail: expect.stringContaining('New container is unhealthy'),
+    }]);
+
+    return;
+  });
+
+  it('remembers an image that rolls back', async () => {
+    const dependencies: Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Dependencies = createDependencies({ localDigest: 'sha256:local' }, false);
+    const report: Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results'].map((result) => result['status'])).toStrictEqual(['rolled-back']);
+
+    expect(dependencies['rememberRejectedImage']).toHaveBeenCalledWith('web', 'sha256:new');
+
+    expect(dependencies['forgetRejectedImage']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('skips an image that was rolled back', async () => {
+    const dependencies: Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
+
+    dependencies['findRejectedImage'].mockReturnValue({
+      imageId: 'sha256:new',
+      rejectedAt: '2026-10-23T04:00:00.000Z',
+    });
+
+    const report: Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'skipped',
+      detail: expect.stringContaining('The new image (new) was rolled back last time'),
+    }]);
+
+    expect(dependencies['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('retries a rolled-back image when a check names the container', async () => {
+    const dependencies: Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
+
+    dependencies['findRejectedImage'].mockReturnValue({
+      imageId: 'sha256:new',
+      rejectedAt: '2026-10-23T04:00:00.000Z',
+    });
+
+    const report: Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report = await runUpdateCycle(options, dependencies, ['old-id']);
+
+    expect(report['results'].map((result) => result['status'])).toStrictEqual(['updated']);
+
+    expect(dependencies['forgetRejectedImage']).toHaveBeenCalledWith('web');
 
     return;
   });

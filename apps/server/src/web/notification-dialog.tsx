@@ -18,6 +18,7 @@ import {
 import {
   Button,
   Icon,
+  passwordManagerIgnore,
 } from '@/web/primitives.tsx';
 import { showToast } from '@/web/toast.ts';
 import { useEscapeKey } from '@/web/use-escape-key.ts';
@@ -102,7 +103,7 @@ export const NotificationDialog = ({
   const [
     service,
     setService,
-  ] = useState<Web_Notifications_Service>('ntfy');
+  ] = useState<Web_Notifications_Service | ''>('');
   const [
     name,
     setName,
@@ -110,7 +111,7 @@ export const NotificationDialog = ({
   const [
     values,
     setValues,
-  ] = useState<Record<string, string>>(defaultValues('ntfy'));
+  ] = useState<Record<string, string>>({});
   const [
     selectedEvents,
     setSelectedEvents,
@@ -138,9 +139,9 @@ export const NotificationDialog = ({
     }
 
     if (target === null) {
-      setService('ntfy');
+      setService('');
       setName('');
-      setValues(defaultValues('ntfy'));
+      setValues({});
       setSelectedEvents(events.filter((event: Web_Notifications_Event): boolean => event['defaultEnabled']).map((event: Web_Notifications_Event): string => event['key']));
     } else {
       setService(target['service']);
@@ -164,7 +165,8 @@ export const NotificationDialog = ({
     return null;
   }
 
-  const definition: Web_Notifications_ServiceDefinition = findNotificationService(service);
+  // A new notification starts on "— Select one —", so its service fields wait for a choice.
+  const fields: Web_Notifications_Field[] = (service === '') ? [] : findNotificationService(service)['fields'];
 
   /**
    * Notification Dialog - Toggles event.
@@ -193,13 +195,19 @@ export const NotificationDialog = ({
    */
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+
+    // The submit button stays disabled until a service is picked.
+    if (service === '') {
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
     const orderedEvents: string[] = events
       .map((option: Web_Notifications_Event): string => option['key'])
       .filter((key: string): boolean => selectedEvents.includes(key));
-    const settings: Record<string, string> = Object.fromEntries(definition['fields'].map((field: Web_Notifications_Field): [string, string] => [
+    const settings: Record<string, string> = Object.fromEntries(fields.map((field: Web_Notifications_Field): [string, string] => [
       field['key'],
       (values[field['key']] ?? '').trim(),
     ]));
@@ -231,13 +239,14 @@ export const NotificationDialog = ({
     }
   };
 
+  const serviceIssue: string = issueFor(error, 'service');
   const nameIssue: string = issueFor(error, 'name');
   const eventsIssue: string = issueFor(error, 'events');
   const summary: string = summaryFor(error, [
     'events',
     'name',
     'service',
-    ...definition['fields'].map((field: Web_Notifications_Field): string => `settings.${field['key']}`),
+    ...fields.map((field: Web_Notifications_Field): string => `settings.${field['key']}`),
   ], 'The notification could not be saved.');
 
   return (
@@ -257,6 +266,7 @@ export const NotificationDialog = ({
           <FieldLabel>
             <span>Service</span>
             <select
+              aria-invalid={serviceIssue !== ''}
               className="select-control"
               disabled={target !== null}
               onChange={(event): void => {
@@ -267,8 +277,10 @@ export const NotificationDialog = ({
               }}
               value={service}
             >
+              <option className="select-placeholder" disabled value="">— Select one —</option>
               {notificationServices.map((option: Web_Notifications_ServiceDefinition): ReactElement => <option key={option['key']} value={option['key']}>{option['label']}</option>)}
             </select>
+            {(serviceIssue === '') ? null : <small className="field-error">{serviceIssue}</small>}
           </FieldLabel>
 
           <FieldLabel>
@@ -282,7 +294,7 @@ export const NotificationDialog = ({
             {(nameIssue === '') ? <small>{'A name you\'ll recognize, like the device or chat it goes to.'}</small> : <small className="field-error">{nameIssue}</small>}
           </FieldLabel>
 
-          {definition['fields'].map((field: Web_Notifications_Field): ReactElement => {
+          {fields.map((field: Web_Notifications_Field): ReactElement => {
             const issue: string = issueFor(error, `settings.${field['key']}`);
             const cleared: boolean = clearSecrets.includes(field['key']);
             const hint: string = fieldHint(field, target, interpreter, cleared);
@@ -323,9 +335,10 @@ export const NotificationDialog = ({
                     </select>
                   ) : (
                     <input
+                      {...passwordManagerIgnore}
                       aria-invalid={issue !== ''}
                       autoCapitalize="none"
-                      autoComplete={(field['secret'] === true) ? 'new-password' : 'off'}
+                      autoComplete="off"
                       className={(field['kind'] === 'url' || field['kind'] === 'password') ? 'monospace' : undefined}
                       disabled={cleared}
                       inputMode={(field['kind'] === 'number') ? 'numeric' : undefined}
@@ -399,7 +412,7 @@ export const NotificationDialog = ({
 
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button disabled={busy || selectedEvents.length === 0 || name.trim() === ''} type="submit" variant="primary">
+            <Button disabled={busy || service === '' || selectedEvents.length === 0 || name.trim() === ''} type="submit" variant="primary">
               {(target === null) ? 'Add notification' : 'Save'}
             </Button>
           </div>

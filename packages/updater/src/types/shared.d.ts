@@ -149,6 +149,20 @@ export type Shared_SelfUpdateRequest = {
 };
 
 /**
+ * Shared - Rejected Image.
+ *
+ * @since 1.0.3
+ */
+export type Shared_RejectedImage_ImageId = string;
+
+export type Shared_RejectedImage_RejectedAt = string;
+
+export type Shared_RejectedImage = {
+  imageId: Shared_RejectedImage_ImageId;
+  rejectedAt: Shared_RejectedImage_RejectedAt;
+};
+
+/**
  * Shared - Dependencies.
  *
  * @since 0.0.1
@@ -165,12 +179,21 @@ export type Shared_Dependencies_FindCredentials = (registry: string) => Registry
 
 export type Shared_Dependencies_UpdateSelf = (request: Shared_SelfUpdateRequest) => Promise<Shared_Result>;
 
+export type Shared_Dependencies_FindRejectedImage = (container: string) => Shared_RejectedImage | undefined;
+
+export type Shared_Dependencies_RememberRejectedImage = (container: string, imageId: string) => void;
+
+export type Shared_Dependencies_ForgetRejectedImage = (container: string) => void;
+
 export type Shared_Dependencies = {
   engine: Shared_Dependencies_Engine;
   fetchFunction: Shared_Dependencies_FetchFunction;
   sleep: Shared_Dependencies_Sleep;
   now: Shared_Dependencies_Now;
   findCredentials: Shared_Dependencies_FindCredentials;
+  findRejectedImage: Shared_Dependencies_FindRejectedImage;
+  rememberRejectedImage: Shared_Dependencies_RememberRejectedImage;
+  forgetRejectedImage: Shared_Dependencies_ForgetRejectedImage;
   updateSelf?: Shared_Dependencies_UpdateSelf;
 };
 

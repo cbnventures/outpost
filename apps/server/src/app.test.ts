@@ -1605,6 +1605,43 @@ describe('setup and sign-in', () => {
       status: 200,
     }));
 
+    // IPv6 visitors share one limit per /56 network, whichever address in it they use.
+    const baseUrl: App_CreateClient_BaseUrl = harness['baseUrl'];
+    const ipv6Failures: App_SetupAndSignIn_AsksForASecondFactorAndLimitsFailures_FailedAttempts = await Promise.all(Array.from({ length: 10 }, async (_value, index) => createClient(baseUrl, {
+      'X-Forwarded-For': `2001:db8:1234:56${index.toString(16).padStart(2, '0')}::1`,
+    }).request('POST', '/api/v1/auth/login', {
+      password: 'wrong password guess',
+      username: 'admin',
+    })));
+
+    expect(ipv6Failures.map((failedAttempt) => failedAttempt['body'])).toEqual(Array.from({ length: 10 }, () => ({
+      error: {
+        code: 'credentials_invalid',
+        message: 'The username or password is incorrect.',
+      },
+    })));
+
+    expect(await createClient(baseUrl, {
+      'X-Forwarded-For': '2001:db8:1234:56ff::1',
+    }).request('POST', '/api/v1/auth/login', {
+      password: 'fixture admin password',
+      username: 'admin',
+    })).toEqual(expect.objectContaining({
+      status: 429,
+    }));
+
+    expect(await createClient(baseUrl, {
+      'X-Forwarded-For': '2001:db8:1234:5700::1',
+    }).request('POST', '/api/v1/auth/login', {
+      password: 'fixture admin password',
+      username: 'admin',
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        status: 'second_factor_required',
+      }),
+      status: 200,
+    }));
+
     return;
   });
 

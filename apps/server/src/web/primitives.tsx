@@ -44,6 +44,21 @@ const iconPaths: Record<Web_Components_Icon_Name, ReactElement> = {
 };
 
 /**
+ * Primitives - Password manager ignore.
+ *
+ * Marks a field that holds another service's sign-in or secret, so 1Password, Bitwarden,
+ * LastPass, and Dashlane leave it alone. Pair it with autoComplete="off" for the browser.
+ *
+ * @since 1.0.0
+ */
+export const passwordManagerIgnore = {
+  'data-1p-ignore': 'true',
+  'data-bwignore': 'true',
+  'data-form-type': 'other',
+  'data-lpignore': 'true',
+} as const;
+
+/**
  * Primitives - Icon.
  *
  * Stores this module-level value in one named location.

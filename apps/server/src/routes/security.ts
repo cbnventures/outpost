@@ -1,7 +1,7 @@
 import { toDataURL } from 'qrcode';
 
 import {
-  getClientAddress,
+  getClientLimitKey,
   getRequestHostname,
   getWebauthnConfiguration,
   isPasskeyAvailable,
@@ -237,7 +237,7 @@ export class Runner {
    * @since 1.0.0
    */
   private async confirmPassword(request: Routes_Security_Runner_ConfirmPassword_Request, response: Routes_Security_Runner_ConfirmPassword_Response, password: Routes_Security_Runner_ConfirmPassword_Password, field: Routes_Security_Runner_ConfirmPassword_Field): Routes_Security_Runner_ConfirmPassword_Returns {
-    const attemptKey: Routes_Security_Runner_ConfirmPassword_AttemptKey = `sign-in:${getClientAddress(request)}`;
+    const attemptKey: Routes_Security_Runner_ConfirmPassword_AttemptKey = `sign-in:${getClientLimitKey(request)}`;
     const session: Routes_Security_Runner_ConfirmPassword_Session = response.locals['session'];
 
     if (this.#attempts.isAllowed(attemptKey) === false) {

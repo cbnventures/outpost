@@ -38,12 +38,21 @@ export type Run_FakeDependencies_Now = Shared_Dependencies['now'];
 
 export type Run_FakeDependencies_FindCredentials = Mock<Shared_Dependencies['findCredentials']>;
 
+export type Run_FakeDependencies_FindRejectedImage = Mock<Shared_Dependencies['findRejectedImage']>;
+
+export type Run_FakeDependencies_RememberRejectedImage = Mock<Shared_Dependencies['rememberRejectedImage']>;
+
+export type Run_FakeDependencies_ForgetRejectedImage = Mock<Shared_Dependencies['forgetRejectedImage']>;
+
 export type Run_FakeDependencies = {
   engine: Run_FakeDependencies_Engine;
   fetchFunction: Run_FakeDependencies_FetchFunction;
   sleep: Run_FakeDependencies_Sleep;
   now: Run_FakeDependencies_Now;
   findCredentials: Run_FakeDependencies_FindCredentials;
+  findRejectedImage: Run_FakeDependencies_FindRejectedImage;
+  rememberRejectedImage: Run_FakeDependencies_RememberRejectedImage;
+  forgetRejectedImage: Run_FakeDependencies_ForgetRejectedImage;
 };
 
 /**
@@ -73,6 +82,10 @@ export type Run_CreateDependencies_State_Identity = Shared_ImageInspect['Identit
 
 export type Run_CreateDependencies_State_Descriptor = boolean | undefined;
 
+export type Run_CreateDependencies_State_OldHealth = string | undefined;
+
+export type Run_CreateDependencies_State_NewHealth = string | undefined;
+
 export type Run_CreateDependencies_State = {
   localDigest: Run_CreateDependencies_State_LocalDigest;
   currentRepoDigests?: Run_CreateDependencies_State_CurrentRepoDigests;
@@ -85,6 +98,8 @@ export type Run_CreateDependencies_State = {
   remoteStatus?: Run_CreateDependencies_State_RemoteStatus;
   identity?: Run_CreateDependencies_State_Identity;
   descriptor?: Run_CreateDependencies_State_Descriptor;
+  oldHealth?: Run_CreateDependencies_State_OldHealth;
+  newHealth?: Run_CreateDependencies_State_NewHealth;
 };
 
 export type Run_CreateDependencies_RunningAfterStart = boolean;
@@ -143,6 +158,15 @@ export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_D
 export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report = Shared_Report;
 
 /**
+ * Run - Run Update Cycle - Keeps An Unhealthy Replacement When The Old Container Was Unhealthy.
+ *
+ * @since 1.0.3
+ */
+export type Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Report = Shared_Report;
+
+/**
  * Run - Run Update Cycle - Keeps Checking Pulled Images That The Registry Turns Away.
  *
  * @since 1.0.0
@@ -157,6 +181,33 @@ export type Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway
  * @since 1.0.0
  */
 export type Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies = Run_CreateSelfDependencies_Returns;
+
+/**
+ * Run - Run Update Cycle - Remembers An Image That Rolls Back.
+ *
+ * @since 1.0.3
+ */
+export type Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Retries A Rolled Back Image When A Check Names The Container.
+ *
+ * @since 1.0.3
+ */
+export type Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Rolls Back An Unhealthy Replacement Of A Healthy Container.
+ *
+ * @since 1.0.3
+ */
+export type Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Rolls Back When The New Container Stops.
@@ -193,6 +244,15 @@ export type Run_RunUpdateCycle_ReportsACycleFailure_Report = Shared_Report;
 export type Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Dependencies = Run_FakeDependencies;
 
 export type Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Skips An Image That Was Rolled Back.
+ *
+ * @since 1.0.3
+ */
+export type Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Skips Images Of Unknown Origin That The Registry Lacks.

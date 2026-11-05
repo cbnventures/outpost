@@ -662,6 +662,19 @@ export const storedRegistryCredential = z.strictObject({
 });
 
 /**
+ * Lib - Schema - Stored Rejected Image.
+ *
+ * Validates one image a container was rolled back from, read from SQLite.
+ * Update checks skip that image until a newer one appears.
+ *
+ * @since 1.0.3
+ */
+export const storedRejectedImage = z.strictObject({
+  imageId: z.string().min(1),
+  rejectedAt: offsetDateTime,
+});
+
+/**
  * Lib - Schema - Stored Removed Secret.
  *
  * Validates one record of a secret removed with a lost encryption key.

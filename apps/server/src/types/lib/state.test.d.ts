@@ -362,6 +362,15 @@ export type Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_D
 export type Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_Ghcr = Lib_State_Runner_CreateRegistry_Returns;
 
 /**
+ * Lib - State - Rejected Images - Remembers Rolled Back Images.
+ *
+ * @since 1.0.3
+ */
+export type Lib_State_RejectedImages_RemembersRolledBackImages_State = State;
+
+export type Lib_State_RejectedImages_RemembersRolledBackImages_Reopened = State;
+
+/**
  * Lib - State - Runtime Settings - Seeds And Persists Runtime Settings.
  *
  * @since 1.0.0

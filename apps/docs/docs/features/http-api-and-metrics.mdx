@@ -224,7 +224,7 @@ Outpost checks a request in this order, so the first problem it finds decides th
 
 ## Rate Limits
 
-- Every request to a path under `/api/v1`, `/v1`, or `/metrics` counts toward 120 requests per minute for each client address. The dashboard's own requests count too.
+- Every request to a path under `/api/v1`, `/v1`, or `/metrics` counts toward 120 requests per minute for each client address, or each `/56` network for IPv6. The dashboard's own requests count too.
 - Responses carry the `RateLimit-Policy`, `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. A `429` also carries `Retry-After` in seconds.
 - Sign-in has its own limit on failed attempts, described in [Web Dashboard](/docs/features/dashboard/#failed-sign-ins).
 - Behind a reverse proxy, the client address comes from `X-Forwarded-For`, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).

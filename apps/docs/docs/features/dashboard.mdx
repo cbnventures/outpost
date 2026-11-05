@@ -281,7 +281,7 @@ Outpost has no proxy setting. It reads the `X-Forwarded-For`, `X-Forwarded-Proto
 
 A proxy on the same host or on the same Docker network falls in these ranges.
 
-- **Client address** — The sign-in limit and the API's rate limit count each client by the address in `X-Forwarded-For`. Outpost reads the list from the end and stops at the first public address.
+- **Client address** — The sign-in limit and the API's rate limit count each client by the address in `X-Forwarded-For`, and each IPv6 client by its `/56` network. Outpost reads the list from the end and stops at the first public address.
 - **HTTPS** — `X-Forwarded-Proto: https` marks the sign-in cookie `Secure` and allows <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>.
 - **Hostname** — `X-Forwarded-Host`, or the `Host` header when it's missing, is the address that <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> are tied to.
 - **Own hostname** — Give Outpost its own hostname, such as `https://outpost.example.net`, because a sub-path such as `https://example.net/outpost/` isn't supported.

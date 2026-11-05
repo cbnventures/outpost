@@ -11,6 +11,7 @@ export {
 export type {
   Shared_Dependencies as UpdaterDependencies,
   Shared_LabelMode as LabelMode,
+  Shared_RejectedImage as RejectedImage,
   Shared_Options as UpdaterOptions,
   Shared_Report as UpdateReport,
   Shared_Result as UpdateResult,
