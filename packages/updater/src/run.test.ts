@@ -33,6 +33,8 @@ import type {
   Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report,
   Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Dependencies,
   Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Report,
+  Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Dependencies,
+  Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Report,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Dependencies,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Report,
   Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies,
@@ -46,6 +48,8 @@ import type {
   Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report,
   Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies,
   Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report,
+  Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Dependencies,
+  Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Report,
   Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Dependencies,
   Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Report,
   Run_RunUpdateCycle_RollsBackWhenTheReplacementRestarts_Dependencies,
@@ -135,7 +139,10 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
             Id: id,
             Name: '/web',
             Image: 'sha256:new',
-            Config: { Image: 'nginx:1' },
+            Config: {
+              Image: 'nginx:1',
+              ...((state['newHealthcheck'] !== undefined) ? { Healthcheck: state['newHealthcheck'] } : {}),
+            },
             HostConfig: {
               NetworkMode: 'bridge',
               AutoRemove: false,
@@ -382,6 +389,55 @@ describe('runUpdateCycle', () => {
     }]);
 
     expect(dependencies['engine']['removeImage']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('keeps a replacement whose healthcheck answers after the timeout', async () => {
+    // Like an image that checks its health every 15 minutes, which a 30-second timeout can never wait for.
+    const dependencies: Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Dependencies = createDependencies({
+      localDigest: 'sha256:local',
+      oldHealth: 'starting',
+      newHealth: 'starting',
+      newHealthcheck: {
+        Test: [
+          'CMD-SHELL',
+          'curl http://127.0.0.1/health',
+        ],
+        Interval: 900_000_000_000,
+        StartPeriod: 5_000_000_000,
+      },
+    }, true);
+    const report: Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'updated',
+      detail: expect.stringContaining('first answers about 905s after start, past the 30s health timeout'),
+    }]);
+
+    expect(dependencies['engine']['removeContainer']).toHaveBeenCalledWith('old-id');
+
+    return;
+  });
+
+  it('rolls back a replacement still starting when its healthcheck should have answered', async () => {
+    const dependencies: Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Dependencies = createDependencies({
+      localDigest: 'sha256:local',
+      newHealth: 'starting',
+      newHealthcheck: {
+        Test: [
+          'CMD-SHELL',
+          'curl http://127.0.0.1/health',
+        ],
+        Interval: 10_000_000_000,
+      },
+    }, true);
+    const report: Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'rolled-back',
+      detail: expect.stringContaining('did not become healthy within 30s'),
+    }]);
 
     return;
   });

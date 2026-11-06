@@ -81,8 +81,10 @@ After starting the new container, Outpost checks on it every second:
 
 - **With a healthcheck** — It must report `healthy` within the **Health timeout** from **Settings** (default `120` seconds).
 - **Without a healthcheck** — It must still be running after the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology>, set by **Settle time** in **Settings** (default `10` seconds).
+- **Replacing an unhealthy container** — If the old container already reported `unhealthy`, the new one only has to keep running through the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology>, whatever its health. The detail ends with `(kept while unhealthy, since the previous container was already unhealthy)`.
+- **With a slow healthcheck** — A healthcheck counts its first result one interval after its start period. When that comes later than the health timeout, a new container still `starting` only has to keep running through the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology>. The detail ends with a note such as `(kept while starting, since its healthcheck first answers about 905s after start, past the 120s health timeout)`.
 
-The update fails as soon as the container stops, reports a state other than `running`, enters `restarting`, increases its restart count, or reports `unhealthy`. It is recommended to keep the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology> shorter than the health timeout, since the health timeout also ends the wait.
+The update fails as soon as the container stops, reports a state other than `running`, enters `restarting`, increases its restart count, or reports `unhealthy` after replacing a container that wasn't. It is recommended to keep the <Terminology title="how long a container must keep running" to="/docs/reference/terminology#settle-period">settle period</Terminology> shorter than the health timeout, since the health timeout also ends the wait.
 
 ## Rollback
 
@@ -93,6 +95,8 @@ When anything goes wrong after the old container was stopped, Outpost performs a
 3. Starts the old container again.
 
 The result is `rolled-back`, with the reason in its detail, such as `New container is unhealthy; rolled back to the previous container`. If the <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology> itself fails, the result is `failed` and the detail explains both errors.
+
+Later checks skip the image that was rolled back, with `The new image (3f2a9c1b7d4e) was rolled back last time, so Outpost waits for a newer one; check this container on its own to try it again`. A newer image is tried as usual, and [checking the container on its own](/docs/features/dashboard/#checking-a-single-container) tries the same image again.
 
 ## Cleanup
 
@@ -132,14 +136,14 @@ See [Troubleshooting](/docs/reference/troubleshooting/#outpost-didnt-update-itse
 
 Every container in a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> gets one of these statuses in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>:
 
-| Status        | Meaning                                                                                                                                                                                                                                 |
-|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `updated`     | Recreated on the new image and passed the health or settle check.                                                                                                                                                                       |
-| `available`   | A newer image exists, but the container is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.                                                  |
-| `up-to-date`  | The running image is already the newest one for its tag.                                                                                                                                                                                |
-| `skipped`     | A pinned or local-only image, a shared network namespace, its owner, a container configured for automatic removal, or Outpost itself when it [can't update itself](#how-outpost-updates-itself).                                        |
-| `rolled-back` | The new container failed and the previous one was restored.                                                                                                                                                                             |
-| `failed`      | The check, the pull, the <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology>, or the helper that updates Outpost failed. The detail holds the error. |
+| Status        | Meaning                                                                                                                                                                                                                                      |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `updated`     | Recreated on the new image and passed the health or settle check.                                                                                                                                                                            |
+| `available`   | A newer image exists, but the container is <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.                                                       |
+| `up-to-date`  | The running image is already the newest one for its tag.                                                                                                                                                                                     |
+| `skipped`     | A pinned or local-only image, a shared network namespace, its owner, a container configured for automatic removal, or Outpost itself when it [can't update itself](#how-outpost-updates-itself), or an image that was rolled back last time. |
+| `rolled-back` | The new container failed and the previous one was restored.                                                                                                                                                                                  |
+| `failed`      | The check, the pull, the <Terminology title="restoring the previous container after a failure" to="/docs/reference/terminology#rollback">rollback</Terminology>, or the helper that updates Outpost failed. The detail holds the error.      |
 
 One container's failure never stops the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>; Outpost records it and moves on to the next container. A whole-cycle failure, such as an unreachable Docker socket, is also saved as a failed <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> and sent as the **Update failed** alert, as described in [Notifications](/docs/features/notifications/#choose-events).
 

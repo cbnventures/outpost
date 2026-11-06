@@ -125,13 +125,14 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 ## Updates Keep Rolling Back
 
-**Symptom**: A container shows `rolled-back` every <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>.
+**Symptom**: A container shows `rolled-back`, and later <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycles</Terminology> show `skipped` with `The new image (3f2a9c1b7d4e) was rolled back last time, so Outpost waits for a newer one; check this container on its own to try it again`.
 
 **Cause**: The new image fails to start, reports unhealthy, or takes longer than the timeout to become healthy.
 
 **Solution**:
 
-- Read the detail, such as `New container is not running (exited)` or `New container did not become healthy within 120s`.
+- Read the detail of the `rolled-back` line in **History**, such as `New container is not running (exited)` or `New container did not become healthy within 120s`.
+- Once the cause is fixed, check the container on its own from the **Containers** page to try the same image again.
 - Start the new image by hand with `docker run` to see its logs.
 - For slow starters, raise **Health timeout** on the **Settings** page.
 - Mark the container <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> until a fixed image is released.

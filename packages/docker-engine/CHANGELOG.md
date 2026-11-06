@@ -1,5 +1,9 @@
 # outpost-package-docker-engine
 
+## 1.0.4 - 2026-11-06
+
+No changes.
+
 ## 1.0.3 - 2026-11-05
 
 No changes.

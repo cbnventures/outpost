@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest';
 
 import type {
+  Shared_ContainerInspect,
   Shared_Dependencies,
   Shared_Dependencies_UpdateSelf,
   Shared_Engine,
@@ -86,6 +87,8 @@ export type Run_CreateDependencies_State_OldHealth = string | undefined;
 
 export type Run_CreateDependencies_State_NewHealth = string | undefined;
 
+export type Run_CreateDependencies_State_NewHealthcheck = Shared_ContainerInspect['Config']['Healthcheck'];
+
 export type Run_CreateDependencies_State = {
   localDigest: Run_CreateDependencies_State_LocalDigest;
   currentRepoDigests?: Run_CreateDependencies_State_CurrentRepoDigests;
@@ -100,6 +103,7 @@ export type Run_CreateDependencies_State = {
   descriptor?: Run_CreateDependencies_State_Descriptor;
   oldHealth?: Run_CreateDependencies_State_OldHealth;
   newHealth?: Run_CreateDependencies_State_NewHealth;
+  newHealthcheck?: Run_CreateDependencies_State_NewHealthcheck;
 };
 
 export type Run_CreateDependencies_RunningAfterStart = boolean;
@@ -183,6 +187,15 @@ export type Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway
 export type Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies = Run_CreateSelfDependencies_Returns;
 
 /**
+ * Run - Run Update Cycle - Keeps A Replacement Whose Healthcheck Answers After The Timeout.
+ *
+ * @since 1.0.4
+ */
+export type Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Report = Shared_Report;
+
+/**
  * Run - Run Update Cycle - Remembers An Image That Rolls Back.
  *
  * @since 1.0.3
@@ -208,6 +221,15 @@ export type Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContaine
 export type Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies = Run_FakeDependencies;
 
 export type Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Rolls Back A Replacement Still Starting When Its Healthcheck Should Have Answered.
+ *
+ * @since 1.0.4
+ */
+export type Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Rolls Back When The New Container Stops.

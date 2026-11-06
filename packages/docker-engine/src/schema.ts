@@ -50,7 +50,14 @@ export const containerConfigSchema = z.looseObject({
   User: z.string().optional(),
   ExposedPorts: z.record(z.string(), z.unknown()).nullable().optional(),
   Volumes: z.record(z.string(), z.unknown()).nullable().optional(),
-  Healthcheck: z.unknown().optional(),
+  Healthcheck: z.looseObject({
+    Test: z.array(z.string()).nullable().optional(),
+    Interval: z.number().int().nonnegative().optional(),
+    Timeout: z.number().int().nonnegative().optional(),
+    StartPeriod: z.number().int().nonnegative().optional(),
+    StartInterval: z.number().int().nonnegative().optional(),
+    Retries: z.number().int().nonnegative().optional(),
+  }).nullable().optional(),
   StopSignal: z.string().optional(),
 });
 

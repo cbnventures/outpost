@@ -1,5 +1,10 @@
 # outpost-app-server
 
+## 1.0.4 - 2026-11-06
+
+### FIXED
+- Fixed updates rolling back containers whose healthcheck first runs after the health timeout, such as one that checks every 15 minutes. Such a container is now kept once it stays running through the settle period, and the result says the healthcheck had not answered yet.
+
 ## 1.0.3 - 2026-11-05
 
 ### UPDATED
