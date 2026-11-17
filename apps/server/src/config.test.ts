@@ -36,7 +36,9 @@ describe('loadConfig', () => {
       dockerHost: 'unix:///var/run/docker.sock',
       schedule: '0 0 4 * * *',
       runOnStart: false,
-      dataDirectory: '/data',
+      dataDirectory: '/config',
+      databaseDirectory: '/config/database',
+      installationKeyFile: '/config/keys/installation.key',
       updater: {
         labelMode: 'opt-out',
         monitorOnly: false,
@@ -51,12 +53,16 @@ describe('loadConfig', () => {
     const config: Config_LoadConfig_ReadsBootstrapOverrides_Config = loadConfig({
       DOCKER_HOST: 'tcp://docker:2375',
       HOSTNAME: 'abcdef123456',
+      NOVA_DATABASE_DIRECTORY: '/var/lib/outpost/sqlite',
+      NOVA_INSTALLATION_KEY_FILE: '/var/lib/outpost/secrets/installation.key',
       OUTPOST_DATA_DIRECTORY: '/var/lib/outpost',
     });
 
     expect(config).toMatchObject({
       dataDirectory: '/var/lib/outpost',
+      databaseDirectory: '/var/lib/outpost/sqlite',
       dockerHost: 'tcp://docker:2375',
+      installationKeyFile: '/var/lib/outpost/secrets/installation.key',
       port: 22601,
       updater: {
         selfId: 'abcdef123456',

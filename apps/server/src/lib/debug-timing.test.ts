@@ -91,15 +91,15 @@ describe('debug timing', () => {
   it('writes DEBUG lines only while debug logging is on', () => {
     const write: Lib_DebugTiming_Write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
 
-    logDebug('hidden while off');
+    logDebug('test', 'hidden while off');
 
     setDebugLogging(true);
 
-    logDebug('shown while on');
+    logDebug('test', 'shown while on');
 
     const lines: Lib_DebugTiming_Lines = write.mock.calls.map((call) => String(call[0]));
 
-    expect(lines).toEqual(['DEBUG shown while on\n']);
+    expect(lines).toEqual([expect.stringContaining(' DEBUG test: shown while on\n')]);
 
     return;
   });
@@ -123,7 +123,7 @@ describe('debug timing', () => {
 
     const lines: Lib_DebugTiming_Lines = write.mock.calls.map((call) => String(call[0]));
 
-    expect(lines).toEqual(['DEBUG Registry request HEAD https://registry.example.test/v2/library/nginx/manifests/latest answered 200 after 120 ms\n']);
+    expect(lines).toEqual([expect.stringContaining(' DEBUG registry: Registry request HEAD https://registry.example.test/v2/library/nginx/manifests/latest answered 200 after 120 ms\n')]);
 
     return;
   });
@@ -142,7 +142,7 @@ describe('debug timing', () => {
 
     const lines: Lib_DebugTiming_Lines = write.mock.calls.map((call) => String(call[0]));
 
-    expect(lines).toEqual(['DEBUG Registry request GET https://registry.example.test/v2/ failed after 50 ms: connect ECONNREFUSED\n']);
+    expect(lines).toEqual([expect.stringContaining(' DEBUG registry: Registry request GET https://registry.example.test/v2/ failed after 50 ms: connect ECONNREFUSED\n')]);
 
     return;
   });
@@ -172,8 +172,8 @@ describe('debug timing', () => {
     const lines: Lib_DebugTiming_Lines = write.mock.calls.map((call) => String(call[0]));
 
     expect(lines).toEqual([
-      'DEBUG Slow Docker call: listContainers took 1500 ms\n',
-      'DEBUG Docker call inspectContainer failed after 20 ms: No such container: fixture-container\n',
+      expect.stringContaining(' DEBUG docker: Slow Docker call: listContainers took 1500 ms\n'),
+      expect.stringContaining(' DEBUG docker: Docker call inspectContainer failed after 20 ms: No such container: fixture-container\n'),
     ]);
 
     return;

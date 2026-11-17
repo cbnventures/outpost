@@ -1,23 +1,36 @@
 {
+  "healthPath": "/health",
+  "legacyStatePaths": [
+    "account.json",
+    "database/outpost.sqlite3",
+    "database/outpost.sqlite3-shm",
+    "database/outpost.sqlite3-wal",
+    "history.json",
+    "image-config-cache.json",
+    "keys/installation.key",
+    "outpost.sqlite3",
+    "outpost.sqlite3-shm",
+    "outpost.sqlite3-wal",
+    "self-update.json"
+  ],
+  "networkMode": "host",
   "schemaVersion": 1,
   "services": [
     {
-      "command": "node build/index.js",
-      "critical": false,
+      "command": "bash docker/start-server.sh",
+      "critical": true,
       "dependencies": [],
       "environment": {},
       "kind": "longrun",
       "name": "server",
       "requiredForHealth": true,
-      "runAsRoot": false,
+      "runAsRoot": true,
       "workspace": "apps/server",
-      "writablePaths": [
-        "/data"
-      ],
-      "healthCommand": "node -e \"fetch('http://127.0.0.1:22601/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))\"",
+      "writablePaths": [],
       "port": 22601
     }
   ],
+  "stateEnvironment": "OUTPOST_DATA_DIRECTORY",
   "workspaces": [
     {
       "packageName": "outpost-app-server",

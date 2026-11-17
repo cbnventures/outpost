@@ -71,7 +71,7 @@ Docker Hub's other names, `index.docker.io`, `registry-1.docker.io`, and `https:
 
 ## How the Password Is Kept
 
-- **Sealed in `/data`** — The password is encrypted with the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> and stored in the database in the data directory, like the other saved secrets. Neither the dashboard nor the API shows it again.
+- **Sealed in `/config`** — The password is encrypted with the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> and stored in the database in the data directory, like the other saved secrets. Neither the dashboard nor the API shows it again.
 - **Dashboard only** — Only a signed-in browser session can list or change sign-ins. <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">Access tokens</Terminology> can't reach them.
 - **Lost encryption key** — If Outpost starts without its <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>, it removes each saved registry password but keeps the host and username. Until you enter the password again from the **Saved secrets were removed** notice, Outpost checks that registry without a login.
 

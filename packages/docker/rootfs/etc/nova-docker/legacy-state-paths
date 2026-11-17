@@ -1,0 +1,11 @@
+account.json
+database/outpost.sqlite3
+database/outpost.sqlite3-shm
+database/outpost.sqlite3-wal
+history.json
+image-config-cache.json
+keys/installation.key
+outpost.sqlite3
+outpost.sqlite3-shm
+outpost.sqlite3-wal
+self-update.json

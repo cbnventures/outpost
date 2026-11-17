@@ -288,7 +288,7 @@ describe('backup state', () => {
   it('rolls back every section when one imported row fails', () => {
     directory = mkdtempSync(join(tmpdir(), 'outpost-backup-rollback-'));
     const state: Lib_BackupStateTest_State = new State(directory);
-    const database: Lib_BackupStateTest_Database = new DatabaseSync(join(directory, 'outpost.sqlite3'));
+    const database: Lib_BackupStateTest_Database = new DatabaseSync(join(directory, 'database', 'outpost.sqlite3'));
 
     state.setRuntimeSettings(currentSettings);
 

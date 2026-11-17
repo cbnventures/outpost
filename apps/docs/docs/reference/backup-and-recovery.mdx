@@ -95,18 +95,17 @@ Use the portable <Terminology title="A JSON backup you can carry to another Outp
 
 ## What Outpost Saves
 
-Everything lives in the data directory, which is `/data` by default:
+Everything lives in the data directory, which is `/config` by default:
 
-| Path                                                     | What it holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/data/outpost.sqlite3`                                  | The dashboard account, its sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the authenticator app, the <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the private registry sign-ins. |
-| `/data/outpost.sqlite3-wal`, `/data/outpost.sqlite3-shm` | Recent database changes that belong with `outpost.sqlite3`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `/data/keys/installation.key`                            | The <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> that seals the authenticator app's secret, the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the passwords of private registry sign-ins.                                                                                                                                                |
-| `/data/history.json`                                     | The last 50 checks and updates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `/data/image-config-cache.json`                          | Image defaults for images still used by managed containers, so recreation can preserve user overrides if Docker removes an old image record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `/data/self-update.json`                                 | An update of Outpost itself that's still in progress, and a new Outpost image that failed to start, which later checks skip. It's gone when there's nothing left to keep.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Path                                                                           | What it holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/config/database/outpost.sqlite3`                                             | The dashboard account, its sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the authenticator app, the <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the private registry sign-ins. |
+| `/config/database/outpost.sqlite3-wal`, `/config/database/outpost.sqlite3-shm` | Recent database changes that belong with `outpost.sqlite3`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `/config/keys/installation.key`                                                | The <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> that seals the authenticator app's secret, the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the passwords of private registry sign-ins.                                                                                                                                                |
+| `/config/history.json`                                                         | The last 50 checks and updates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `/config/image-config-cache.json`                                              | Image defaults for images still used by managed containers, so recreation can preserve user overrides if Docker removes an old image record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `/config/self-update.json`                                                     | An update of Outpost itself that's still in progress, and a new Outpost image that failed to start, which later checks skip. It's gone when there's nothing left to keep.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
-- If you set `OUTPOST_DATA_DIRECTORY`, these files are in that folder instead.
 - When a new Outpost image fails to start, the previous Outpost starts again on the same data directory. Each release keeps the database readable by the release before it, so the account, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the history carry over.
 - It is recommended to keep the data directory on a local disk, because the database isn't reliable on network shares such as NFS or SMB.
 
@@ -127,10 +126,10 @@ Everything lives in the data directory, which is `/data` by default:
 
    ```bash
    docker run --rm \
-     --volume outpost-data:/data:ro \
+     --volume outpost-data:/config:ro \
      --volume "$PWD":/backup \
      debian:trixie-slim \
-     tar -czf /backup/outpost-data.tgz -C /data .
+     tar -czf /backup/outpost-data.tgz -C /config .
    ```
 
 3. Start Outpost again.
@@ -151,10 +150,10 @@ The second command deletes everything in the current data volume before the back
 ```bash
 docker stop outpost
 docker run --rm \
-  --volume outpost-data:/data \
+  --volume outpost-data:/config \
   --volume "$PWD":/backup:ro \
   debian:trixie-slim \
-  sh -c 'rm -rf /data/* && tar -xzpf /backup/outpost-data.tgz -C /data'
+  sh -c 'rm -rf /config/* && tar -xzpf /backup/outpost-data.tgz -C /config'
 docker start outpost
 ```
 
@@ -171,7 +170,7 @@ There's no password reset, because Outpost keeps only a hash of the password.
 
 - With a <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery code</Terminology>, sign in with it in place of the authenticator code. Then open **Sign-in and security** from the account menu, turn off the authenticator app, and set it up again on your new device.
 - With a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>, sign in with it and do the same.
-- Without either, delete the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> with `docker exec outpost rm /data/keys/installation.key` and run `docker restart outpost`. Outpost then turns off the authenticator app, so you can sign in with the password and set the app up again, but it also removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the passwords of private registry sign-ins, as described in [Lost Encryption Key](#lost-encryption-key).
+- Without either, delete the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> with `docker exec outpost rm /config/keys/installation.key` and run `docker restart outpost`. Outpost then turns off the authenticator app, so you can sign in with the password and set the app up again, but it also removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the passwords of private registry sign-ins, as described in [Lost Encryption Key](#lost-encryption-key).
 
 ## Lost Encryption Key
 
@@ -180,7 +179,7 @@ If `keys/installation.key` is missing, Outpost makes a new <Terminology title="T
 The account, the password, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, the sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> with their other fields, the registry sign-ins' hosts and usernames, and the history stay. Outpost logs one warning on that start, naming what was removed:
 
 ```text
-No encryption key was found at "/data/keys/installation.key", so Outpost made a new one. These saved secrets were locked with the old key and were removed: the authenticator app for <username>, the <name> notification, the <host> registry sign-in. Enter them again in the dashboard.
+2026-10-24T22:05:00Z WARN state: No encryption key was found at "/config/keys/installation.key", so Outpost made a new one. These saved secrets were locked with the old key and were removed: the authenticator app for <username>, the <name> notification, the <host> registry sign-in. Enter them again in the dashboard.
 ```
 
 - **Signing in** — Password sign-in asks only for the password until you set the authenticator app up again, and <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> keep working.
@@ -195,28 +194,25 @@ After Outpost makes the new key, the database belongs to that key, so putting th
 
 Startup stops with one of these messages, and the server repeats it each time it restarts:
 
-- `The encryption key at "/data/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/data/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` — The key file belongs to another database, such as when the database and the key came from different backups.
-- `The encryption key file at "..." is not 64 hexadecimal characters.` — The key file is damaged.
+- `The encryption key at "/config/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/config/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` — The key file belongs to another database, such as when the database and the key came from different backups.
+- `The encryption key file at "..." is not 32 raw bytes or 64 hexadecimal characters.` — The key file is damaged.
 
 Restore `keys/installation.key` from the same backup as the database. Without it, delete the key file and restart, so Outpost makes a new key as described in [Lost Encryption Key](#lost-encryption-key):
 
 ```bash
-docker exec outpost rm /data/keys/installation.key
-docker restart outpost
+docker stop outpost
+docker run --rm \
+  --volume outpost-data:/config \
+  debian:trixie-slim \
+  rm /config/keys/installation.key
+docker start outpost
 ```
 
-`docker exec` works even while startup keeps failing, because the container stays up and retries the server. If you changed `OUTPOST_DATA_DIRECTORY`, delete the key file from that folder instead.
+The helper container edits the named volume while Outpost is stopped. For a bind mount, remove the file from the mounted host folder instead.
 
 ## Change PUID or PGID With Existing Data
 
-The container's setup step changes the owner of `/data` itself, but not of the files inside it. Before starting with new IDs, change the files' owner to match, here for `PUID` and `PGID` set to `1001`:
-
-```bash
-docker run --rm \
-  --volume outpost-data:/data \
-  debian:trixie-slim \
-  chown -R 1001:1001 /data
-```
+Set the new values, each from `1` through `60000`, and restart the container. Nova recursively changes the complete state directory to the new `PUID:PGID` on every start, including the database and key folders.
 
 ## Start Over
 
@@ -230,7 +226,7 @@ Starting over deletes the dashboard account and its browser sessions, every <Ter
 2. Remove the database and its key, then restart Outpost.
 
    ```bash
-   docker exec outpost sh -c 'rm -rf /data/outpost.sqlite3 /data/outpost.sqlite3-wal /data/outpost.sqlite3-shm /data/keys'
+   docker exec outpost sh -c 'rm -rf /config/database /config/keys'
    docker restart outpost
    ```
 
@@ -238,5 +234,3 @@ Starting over deletes the dashboard account and its browser sessions, every <Ter
 4. Create new <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology> and update every client that used the old ones.
 5. Add the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> again on the **Notifications** page.
 6. Add the private registry sign-ins again and set the **Settings** page back the way you had it.
-
-If you changed `OUTPOST_DATA_DIRECTORY`, remove the files from that folder instead.

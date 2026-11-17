@@ -64,7 +64,7 @@ The server applies all selected sections in one database transaction, so an impo
 
 ## Startup Stops With an Encryption Key Error
 
-**Symptom**: The logs repeat `The encryption key at "/data/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/data/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` or `The encryption key file at "..." is not 64 hexadecimal characters.`, and the container reports unhealthy.
+**Symptom**: The logs show `The encryption key at "/config/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/config/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` or `The encryption key file at "..." is not 32 raw bytes or 64 hexadecimal characters.`, and the critical server stops the container.
 
 **Cause**: The <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> in `keys/installation.key`, next to the database, belongs to another database or is damaged. A missing key file doesn't stop startup, because Outpost makes a new key, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key).
 
@@ -77,12 +77,12 @@ The server applies all selected sections in one database transaction, so an impo
 
 **Symptom**: The logs repeat `unable to open database file`, or an `EACCES` or `EPERM` error for the data directory.
 
-**Cause**: The data directory or the files in it belong to a different user than `PUID`. This happens after changing `PUID` or `PGID`, or with a custom `OUTPOST_DATA_DIRECTORY` that another user owns.
+**Cause**: The `/config` mount is read-only or its filesystem refuses the recursive ownership change Nova performs for `PUID:PGID` on every start.
 
 **Solution**:
 
-- Change the owner of the files to `PUID` and `PGID`, as shown in [Backup and Recovery](/docs/reference/backup-and-recovery/#change-puid-or-pgid-with-existing-data).
-- For a custom `OUTPOST_DATA_DIRECTORY`, give that folder to `PUID` too, since only `/data` is prepared at startup.
+- Keep the `/config` volume writable, and use a local filesystem that supports Unix ownership.
+- Set `PUID` and `PGID` to numeric IDs from `1` through `60000`; Nova changes the existing files to those IDs automatically.
 
 ## Docker Hub Rate Limits
 
@@ -161,7 +161,7 @@ The server applies all selected sections in one database transaction, so an impo
 
 **Cause**: The line's detail names the reason:
 
-- **No volume at `/data`** — `Outpost can't update itself because /data isn't on a volume, so its account and history would be lost`.
+- **No volume at `/config`** — `Outpost can't update itself because /config isn't on a volume, so its account and history would be lost`.
 - **No socket from the host** — `Outpost can't update itself because the Docker socket at /var/run/docker.sock isn't mounted from the host`.
 - **Own container not found** — `Outpost couldn't find its own container, so it leaves Outpost containers alone`, shown for every container running an image named `outpost`.
 - **Image failed before** — `The new image (3f2a9c1b7d4e) didn't start last time, so Outpost waits for a newer one`, after an earlier check rolled that image back.
@@ -171,7 +171,7 @@ The server applies all selected sections in one database transaction, so an impo
 
 **Solution**:
 
-- Mount a volume at `/data` and the socket from the host, as in the [Quick Start](/docs/getting-started/quick-start/#start-outpost), then let the next check run.
+- Mount a volume at `/config` and the socket from the host, as in the [Quick Start](/docs/getting-started/quick-start/#start-outpost), then let the next check run.
 - If Outpost can't find its own container, run it on Docker Engine and keep Docker's default hostname, which is the container ID that Outpost falls back to.
 - For an image that failed before, read the earlier `rolled-back` line in **History** to see why. Outpost tries again once a newer image is published.
 - If `An earlier self-update hasn't finished` keeps coming back, restart Outpost with `docker restart outpost`, which finishes that update first.
@@ -233,23 +233,22 @@ The server applies all selected sections in one database transaction, so an impo
 
 **Symptom**: The dashboard's **History** page, or `lastReport` in `/v1/status`, is empty after the container was recreated.
 
-**Cause**: The history is saved to `/data/history.json`. Without a volume at `/data`, it is lost whenever the container is replaced.
+**Cause**: The history is saved to `/config/history.json`. Without a volume at `/config`, it is lost whenever the container is replaced.
 
 **Solution**:
 
-- Mount a volume at `/data`, such as `outpost-data:/data`.
-- If you changed `OUTPOST_DATA_DIRECTORY`, mount the volume at that path instead and make sure it belongs to `PUID`, since only `/data` is prepared at startup.
+- Mount a volume at `/config`, such as `outpost-data:/config`.
 - Look for `Could not save update history` in `docker logs outpost`, which means the directory isn't writable by `PUID`.
 
 ## Dashboard Asks for Setup Again
 
 **Symptom**: After the container was recreated, the dashboard shows **Set up your account** again.
 
-**Cause**: The account is saved in `outpost.sqlite3` in the data directory. Without a volume at `/data`, it is lost whenever the container is replaced.
+**Cause**: The account is saved in `database/outpost.sqlite3` in the state directory. Without a volume at `/config`, it is lost whenever the container is replaced.
 
 **Solution**:
 
-- Mount a volume at `/data`, such as `outpost-data:/data`, then set up the account once more.
+- Mount a volume at `/config`, such as `outpost-data:/config`, then set up the account once more.
 - If you had a volume, check that the new container uses the same one. `docker volume ls` lists them, and Compose puts the project name in front of each name.
 
 ## Too Many Failed Sign-Ins

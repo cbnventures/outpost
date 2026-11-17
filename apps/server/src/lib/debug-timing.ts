@@ -105,12 +105,12 @@ async function timeEngineCall(name: Lib_DebugTiming_TimeEngineCall_Name, started
     const elapsed: Lib_DebugTiming_TimeEngineCall_Elapsed = Date.now() - startedAt;
 
     if (elapsed >= slowDockerMilliseconds) {
-      logDebug(`Slow Docker call: ${name} took ${String(elapsed)} ms`);
+      logDebug('docker', `Slow Docker call: ${name} took ${String(elapsed)} ms`);
     }
 
     return resolved;
   } catch (error) {
-    logDebug(`Docker call ${name} failed after ${String(Date.now() - startedAt)} ms: ${reason(error)}`);
+    logDebug('docker', `Docker call ${name} failed after ${String(Date.now() - startedAt)} ms: ${reason(error)}`);
 
     throw error;
   }
@@ -187,11 +187,11 @@ export function timedFetch(fetchFunction: Lib_DebugTiming_TimedFetch_FetchFuncti
     try {
       const response: Lib_DebugTiming_TimedFetch_Response = await fetchFunction(input, init);
 
-      logDebug(`Registry request ${method} ${address} answered ${String(response.status)} after ${String(Date.now() - startedAt)} ms`);
+      logDebug('registry', `Registry request ${method} ${address} answered ${String(response.status)} after ${String(Date.now() - startedAt)} ms`);
 
       return response;
     } catch (error) {
-      logDebug(`Registry request ${method} ${address} failed after ${String(Date.now() - startedAt)} ms: ${reason(error)}`);
+      logDebug('registry', `Registry request ${method} ${address} failed after ${String(Date.now() - startedAt)} ms: ${reason(error)}`);
 
       throw error;
     }

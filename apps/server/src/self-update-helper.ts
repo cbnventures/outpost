@@ -9,6 +9,7 @@ import {
   resolveImageConfig,
   Runner as ImageConfigCache,
 } from './image-config-cache.js';
+import { logInfo } from './lib/logger.js';
 
 import type {
   SelfUpdateHelper_Config,
@@ -140,6 +141,6 @@ handoff.recordOutcome({
   finishedAt: new Date().toISOString(),
 });
 
-process.stdout.write(`Outpost self-update: ${outcome['status']} - ${outcome['detail']}\n`);
+logInfo('self-update-helper', `Outpost self-update: ${outcome['status']} - ${outcome['detail']}`);
 
 process.exitCode = (outcome['status'] === 'updated') ? 0 : 1;

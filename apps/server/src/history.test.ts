@@ -22,7 +22,7 @@ import type {
 /**
  * History - Directory.
  *
- * Temporary data directory standing in for the /data volume, removed
+ * Temporary data directory standing in for the /config volume, removed
  * after the suite.
  *
  * @since 0.0.1

@@ -24,7 +24,7 @@ Start Outpost next to your other containers and let it check them for new images
 
 - **Docker Engine** — On Linux, for `amd64` or `arm64`.
 - **Docker socket** — Outpost talks to Docker through `/var/run/docker.sock`, which you mount into the container.
-- **A user ID and group ID** — Outpost runs as `PUID` and `PGID` (both `1000` by default) and joins the socket's group on its own.
+- **A user ID and group ID** — Outpost runs as `PUID` and `PGID` (both `1000` by default and each from `1` through `60000`) and joins the socket's group on its own. The container starts as root so s6 can prepare state and drop the server to those IDs.
 
 ## Pick an Image
 
@@ -62,24 +62,19 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
         image: cbnventures/outpost:latest
         container_name: outpost
         environment:
-          PUID: "1000"
           PGID: "1000"
+          PUID: "1000"
           TZ: "America/New_York"
+        network_mode: host
+        restart: always
+        user: "0:0"
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
 
           # Keeps the dashboard account, access tokens, notification destinations,
           # registry sign-ins, and history across restarts, and lets Outpost
           # update itself.
-          - outpost-data:/data
-        ports:
-          - "22601:22601"
-        restart: unless-stopped
-
-    # Lets the dashboard see each IPv6 visitor's own address.
-    networks:
-      default:
-        enable_ipv6: true
+          - outpost-data:/config
 
     volumes:
       outpost-data:
@@ -95,18 +90,23 @@ Outpost skips this image as locally built, so it doesn't update itself. On Docke
     ```bash
     docker run --detach \
       --name outpost \
-      --restart unless-stopped \
-      --env PUID=1000 \
+      --restart always \
       --env PGID=1000 \
+      --env PUID=1000 \
       --env TZ=America/New_York \
+      --user 0:0 \
+      --net=host \
       --volume /var/run/docker.sock:/var/run/docker.sock \
-      --volume outpost-data:/data \
-      --publish 22601:22601 \
+      --volume outpost-data:/config \
       cbnventures/outpost:latest
     ```
 
   </TabItem>
 </Tabs>
+
+Earlier Outpost versions mounted state at `/data`. Reuse the same host folder or named volume at `/config`; on first start, Outpost preserves the key and moves the flat SQLite files into `database/` without overwriting existing state.
+
+An unchanged old run line that mounts only `/data` also starts safely. Outpost uses that mount, performs the same layout migration under `/data`, and logs a reminder to change the mount target to `/config`.
 
 By default, Outpost checks every running container at 04:00 in your time zone. New images are pulled and the containers are recreated on them. The schedule and update behavior can be changed later from the dashboard's **Settings** page.
 
@@ -127,14 +127,15 @@ docker logs outpost
 A healthy start prints the dashboard address, the schedule with its next run time in UTC, and the <Terminology title="Update everything by default, or only what you label" to="/docs/reference/terminology#container-selection">label mode</Terminology>. Until the dashboard account exists, it also prints a <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology>:
 
 ```text
-Outpost
-  Dashboard: http://localhost:22601/admin/
-  Schedule: 0 0 4 * * * (next run 2026-10-25T08:00:00.000Z)
-  Mode: opt-out
-No account exists yet. Open the dashboard to create it with the setup code.
-  Setup code: K7Q2M-XR9TD-P4W8N
-  Expires: 2026-10-24T22:30:00.000Z
+2026-10-24T22:00:00Z INFO server: Dashboard: http://localhost:22601/admin/
+2026-10-24T22:00:00Z INFO server: Schedule: 0 0 4 * * * (next run 2026-10-25T08:00:00.000Z)
+2026-10-24T22:00:00Z INFO server: Mode: opt-out
+2026-10-24T22:00:00Z INFO server: No account exists yet. Open the dashboard to create it with the setup code.
+2026-10-24T22:00:00Z INFO server: Setup code: K7Q2M-XR9TD-P4W8N
+2026-10-24T22:00:00Z INFO server: Setup code expires: 2026-10-24T22:30:00.000Z
 ```
+
+Docker also checks that every supervised service is up and that `GET /health` answers `200` on port `22601`. Confirm its result with `docker inspect --format '{{.State.Health.Status}}' outpost`; a ready container reports `healthy`.
 
 If Outpost can't reach the Docker socket, the server stops before printing this and the error repeats in the logs. See [Troubleshooting](/docs/reference/troubleshooting/#permission-denied-on-the-docker-socket) for the fix.
 
@@ -167,9 +168,9 @@ curl --request POST \
 The check resolves registry digests and records available updates without pulling or recreating anything. Each container gets one line in the logs when the <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> finishes:
 
 ```text
-postgres (postgres:17): up-to-date - sha256:9c1d...
-web (ghcr.io/example/web:latest): available - New digest sha256:7a3e...
-outpost (cbnventures/outpost:latest): up-to-date - sha256:4e7b...
+2026-10-24T22:05:00Z INFO scheduler: postgres (postgres:17): up-to-date - sha256:9c1d...
+2026-10-24T22:05:00Z INFO scheduler: web (ghcr.io/example/web:latest): available - New digest sha256:7a3e...
+2026-10-24T22:05:00Z INFO scheduler: outpost (cbnventures/outpost:latest): up-to-date - sha256:4e7b...
 ```
 
 :::tip

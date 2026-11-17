@@ -244,7 +244,7 @@ Only one <Terminology title="One check-and-update pass over your containers" to=
 - The **History** page lists the last 50 checks and updates, newest first. Each row is labeled **Check** or **Update** and shows when it started, what started it (**Schedule**, **Startup**, **API**, or **Dashboard**), how long it took, and how many containers had each result.
 - A one-container update that disabled rollback is labeled **Rollback disabled**. A failed replacement is **Kept after failure**, in red, and its detail includes the previous image and configuration summary for manual recovery.
 - Select a row to see each container's result. A run that failed as a whole shows its error at the top.
-- The history is saved to `history.json` in the data directory, so it survives a restart when `/data` is on a volume.
+- The history is saved to `history.json` in the data directory, so it survives a restart when `/config` is on a volume.
 
 <Frame caption="The History page with a failed update expanded">
   <ThemedImage sources={{ light: dashboardEightLight, dark: dashboardEightDark }} alt="Outpost History page with a scheduled update expanded, showing immich-server failed because the registry returned HTTP 503, an update available for jellyfin, and the other containers up to date or skipped, with outpost last and up to date" width={1280} height={998} style={{ maxWidth: '100%', height: 'auto' }} />
@@ -284,7 +284,7 @@ While it's on, Outpost adds `DEBUG` lines to the container log, which `docker lo
 - **Self-update** — Each step of [Outpost updating itself](/docs/features/updates-and-rollback/#how-outpost-updates-itself): the helper starting, how long it ran and how it ended, and stopped helpers being removed.
 - **Slow and canceled requests** — Dashboard and API requests that took a second or more, and requests the browser canceled before the answer arrived.
 
-The lines `debug logging is on` and `debug logging is off` mark each change, and Outpost prints `debug logging is on` again when it starts with the switch on.
+The facts `INFO dashboard: Debug logging is on.` and `INFO dashboard: Debug logging is off.` mark each change after their timestamps. On a later start with the switch enabled, Outpost prints `INFO server: Debug logging is on.` instead.
 
 ## Appearance
 
@@ -292,7 +292,7 @@ Choose **System**, **Light**, or **Dark** under **Appearance** in the account me
 
 ## Keep Your Data
 
-The account, its sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, the private registry sign-ins, and the history live in the data directory, which is `/data` by default. Mount a volume at `/data` so they survive when the container is replaced.
+The account, its sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, the private registry sign-ins, and the history live in the data directory, which is `/config` by default. Mount a volume at `/config` so they survive when the container is replaced.
 
 Without a volume, they're lost whenever the container is replaced, and the dashboard asks for setup again. See [Backup and Recovery](/docs/reference/backup-and-recovery/) for what the folder holds and how to back it up.
 
@@ -334,7 +334,7 @@ A proxy on the same host or on the same Docker network falls in these ranges.
 - **Own hostname** — Give Outpost its own hostname, such as `https://outpost.example.net`, because a sub-path such as `https://example.net/outpost/` isn't supported.
 
 :::warning
-A device on your network with a private address can send these headers itself and choose the address its limits count against. When the reverse proxy runs on the Docker host, bind Outpost to `127.0.0.1` instead of every address, as the Quick Start publishes it, so only that proxy can reach it.
+A device on your network with a private address can send these headers itself and choose the address its limits count against. When the reverse proxy runs on the Docker host, use the host firewall to limit port `22601` to that proxy or to trusted clients.
 :::
 
 ## Security Notes

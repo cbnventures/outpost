@@ -44,6 +44,7 @@ import type {
   SelfUpdate_OutpostContainer,
   SelfUpdate_Pending,
   SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan,
+  SelfUpdate_PlanHelper_PlansAHelperWithTheLegacyDataMount_Plan,
   SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutData,
   SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutSocket,
   SelfUpdate_RemoveExitedHelpers_RemovesOnlyStoppedHelpers_Engine,
@@ -71,7 +72,7 @@ const directory: SelfUpdate_Directory = mkdtempSync(join(tmpdir(), 'outpost-self
  */
 const settings: SelfUpdate_Settings = {
   cleanup: true,
-  dataDirectory: '/data',
+  dataDirectory: '/config',
   dockerHost: 'unix:///var/run/docker.sock',
   healthTimeoutSeconds: 120,
   identity: {
@@ -111,7 +112,7 @@ const outpostContainer: SelfUpdate_OutpostContainer = {
       Type: 'volume',
       Name: 'outpost_outpost-data',
       Source: '/var/lib/docker/volumes/outpost_outpost-data/_data',
-      Destination: '/data',
+      Destination: '/config',
       RW: true,
     },
     {
@@ -254,6 +255,7 @@ describe('self update', () => {
         User: '1000:1000',
         Env: [
           'TZ=UTC',
+          'OUTPOST_DATA_DIRECTORY=/config',
           `OUTPOST_SELF_UPDATE_CONTAINER=${'a'.repeat(64)}`,
           'OUTPOST_SELF_UPDATE_REFERENCE=cbnventures/outpost:latest',
         ],
@@ -265,13 +267,43 @@ describe('self update', () => {
         HostConfig: {
           AutoRemove: false,
           Binds: [
-            'outpost_outpost-data:/data',
+            'outpost_outpost-data:/config',
             '/var/run/docker.sock:/var/run/docker.sock',
           ],
           GroupAdd: ['999'],
           Init: true,
           NetworkMode: 'outpost_default',
           RestartPolicy: { Name: 'no' },
+        },
+      },
+    });
+
+    return;
+  });
+
+  it('plans a helper with the legacy data mount', () => {
+    const plan: SelfUpdate_PlanHelper_PlansAHelperWithTheLegacyDataMount_Plan = planHelper({
+      ...outpostContainer,
+      Mounts: (outpostContainer['Mounts'] ?? []).map((mount) => {
+        if (mount['Destination'] === '/config') {
+          return {
+            ...mount,
+            Destination: '/data',
+          };
+        }
+
+        return mount;
+      }),
+    }, request['newImageReference'], 'cbnventures/outpost:latest', settings);
+
+    expect(plan).toMatchObject({
+      body: {
+        Env: expect.arrayContaining(['OUTPOST_DATA_DIRECTORY=/data']),
+        HostConfig: {
+          Binds: [
+            'outpost_outpost-data:/data',
+            '/var/run/docker.sock:/var/run/docker.sock',
+          ],
         },
       },
     });
@@ -286,10 +318,10 @@ describe('self update', () => {
     }, request['newImageReference'], 'cbnventures/outpost:latest', settings);
     const withoutSocket: SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutSocket = planHelper({
       ...outpostContainer,
-      Mounts: (outpostContainer['Mounts'] ?? []).filter((mount) => mount['Destination'] === '/data'),
+      Mounts: (outpostContainer['Mounts'] ?? []).filter((mount) => mount['Destination'] === '/config'),
     }, request['newImageReference'], 'cbnventures/outpost:latest', settings);
 
-    expect(withoutData).toBe('Outpost can\'t update itself because /data isn\'t on a volume, so its account and history would be lost');
+    expect(withoutData).toBe('Outpost can\'t update itself because /config isn\'t on a volume, so its account and history would be lost');
 
     expect(withoutSocket).toBe('Outpost can\'t update itself because the Docker socket at /var/run/docker.sock isn\'t mounted from the host');
 
@@ -571,13 +603,13 @@ describe('self update', () => {
     write.mockRestore();
 
     expect(lines).toEqual([
-      'DEBUG Self-update: started helper outpost-outpost-self-update to move outpost to image new\n',
-      'DEBUG Self-update: helper outpost-outpost-self-update stopped with exit code 1 after 0 ms, before replacing Outpost\n',
-      'DEBUG Self-update: waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n',
-      'DEBUG Self-update: helper outpost-outpost-self-update reported updated after 0 ms\n',
-      'DEBUG Self-update: waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n',
-      'DEBUG Self-update: helper outpost-outpost-self-update ended after 0 ms without saying how the swap went\n',
-      'DEBUG Self-update: removed the stopped helper outpost-outpost-self-update\n',
+      expect.stringContaining(' DEBUG self-update: Started helper outpost-outpost-self-update to move outpost to image new\n'),
+      expect.stringContaining(' DEBUG self-update: Helper outpost-outpost-self-update stopped with exit code 1 after 0 ms, before replacing Outpost\n'),
+      expect.stringContaining(' DEBUG self-update: Waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n'),
+      expect.stringContaining(' DEBUG self-update: Helper outpost-outpost-self-update reported updated after 0 ms\n'),
+      expect.stringContaining(' DEBUG self-update: Waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n'),
+      expect.stringContaining(' DEBUG self-update: Helper outpost-outpost-self-update ended after 0 ms without saying how the swap went\n'),
+      expect.stringContaining(' DEBUG self-update: Removed the stopped helper outpost-outpost-self-update\n'),
     ]);
 
     return;

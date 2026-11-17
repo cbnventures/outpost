@@ -68,14 +68,30 @@ RUN set -eux; \
 ###############################
 FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS runtime
 ARG DEBIAN_FRONTEND="noninteractive"
+LABEL org.opencontainers.image.title="Outpost" \
+  org.opencontainers.image.description="Self-hosted container auto-updater for Docker, a modern Watchtower replacement" \
+  org.opencontainers.image.url="https://outpost.cbnventures.io/" \
+  org.opencontainers.image.source="https://github.com/cbnventures/outpost" \
+  org.opencontainers.image.documentation="https://outpost.cbnventures.io/" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.vendor="CBN Ventures LLC"
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
+    diffutils \
     tzdata \
+    util-linux \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
+  PATH="/command:${PATH}" \
   PGID=1000 \
   PUID=1000 \
+  S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+  S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \
+  S6_KILL_FINISH_MAXTIME=1000 \
+  S6_KILL_GRACETIME=1000 \
+  S6_SERVICES_GRACETIME=6000 \
   TZ=UTC
 WORKDIR /app
 COPY --from=s6-overlay /s6-rootfs/ /
@@ -85,9 +101,9 @@ RUN find /usr/local/libexec/nova-docker -type f -exec sed -i 's/\r$//' {} \; \
   && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec sed -i 's/\r$//' {} \; \
   && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod 0755 {} \;
 COPY --from=build /runtime/ /app/
-RUN mkdir -p '/data'
+RUN mkdir -p /config /data
 EXPOSE 22601
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["/usr/local/libexec/nova-docker/healthcheck"]
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]

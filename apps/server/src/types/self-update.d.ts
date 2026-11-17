@@ -183,6 +183,10 @@ export type SelfUpdate_PlanHelper_Name = string;
 
 export type SelfUpdate_PlanHelper_Mounts = SelfUpdate_Mount[];
 
+export type SelfUpdate_PlanHelper_ConfiguredDataMount = SelfUpdate_Mount | undefined;
+
+export type SelfUpdate_PlanHelper_LegacyDataMount = SelfUpdate_Mount | undefined;
+
 export type SelfUpdate_PlanHelper_DataMount = SelfUpdate_Mount | undefined;
 
 export type SelfUpdate_PlanHelper_Binds = string[];

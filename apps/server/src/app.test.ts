@@ -153,6 +153,7 @@ import type {
   App_EncodeCborHead_Returns,
   App_ErrorsAndTheDashboardPage_AnswersMalformedRequestsWithTheErrorEnvelope_Client,
   App_ErrorsAndTheDashboardPage_AnswersMalformedRequestsWithTheErrorEnvelope_Limited,
+  App_ErrorsAndTheDashboardPage_AnswersTheContainerHealthCheckWithoutAuthentication_Client,
   App_ErrorsAndTheDashboardPage_ServesThePageForEveryDashboardPath_Asset,
   App_ErrorsAndTheDashboardPage_ServesThePageForEveryDashboardPath_Client,
   App_ErrorsAndTheDashboardPage_ServesThePageForEveryDashboardPath_OldApi,
@@ -3985,6 +3986,21 @@ describe('errors and the dashboard page', () => {
     return;
   });
 
+  it('answers the container health check without authentication', async () => {
+    harness = await startHarness();
+
+    const client: App_ErrorsAndTheDashboardPage_AnswersTheContainerHealthCheckWithoutAuthentication_Client = createClient(harness['baseUrl']);
+
+    expect(await client.request('GET', '/health')).toEqual(expect.objectContaining({
+      body: {
+        status: 'ok',
+      },
+      status: 200,
+    }));
+
+    return;
+  });
+
   it('serves the page for every dashboard path', async () => {
     harness = await startHarness();
 
@@ -4026,13 +4042,6 @@ describe('errors and the dashboard page', () => {
         },
       },
       status: 404,
-    }));
-
-    expect(await client.request('GET', '/health')).toEqual(expect.objectContaining({
-      body: {
-        status: 'ok',
-      },
-      status: 200,
     }));
 
     return;

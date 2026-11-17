@@ -253,6 +253,10 @@ export type Lib_State_Runner_ConfirmAdministratorPassword_IsValid = boolean;
  */
 export type Lib_State_Runner_Constructor_DataDirectory = string;
 
+export type Lib_State_Runner_Constructor_DatabaseDirectory = string;
+
+export type Lib_State_Runner_Constructor_InstallationKeyFile = string;
+
 export type Lib_State_Runner_Constructor_Now = () => number;
 
 export type Lib_State_Runner_Constructor_DirectoryMode = number;

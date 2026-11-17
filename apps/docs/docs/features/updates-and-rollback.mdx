@@ -141,7 +141,7 @@ The dashboard loses its connection while Outpost restarts, and reconnects on its
 
 ### Requirements
 
-- **`/data` on a volume** — The new Outpost needs the account and the history, so the data directory has to be a volume or a bind mount. Otherwise Outpost's line is `skipped` with `Outpost can't update itself because /data isn't on a volume, so its account and history would be lost`.
+- **`/config` on a volume** — The new Outpost needs the account and the history, so the data directory has to be a volume or a bind mount. Otherwise Outpost's line is `skipped` with `Outpost can't update itself because /config isn't on a volume, so its account and history would be lost`.
 - **The Docker socket from the host** — With a `unix://` `DOCKER_HOST`, the helper mounts the same socket, so it has to come from the host. Otherwise the line is `skipped` with `Outpost can't update itself because the Docker socket at /var/run/docker.sock isn't mounted from the host`.
 - **Its own container** — Outpost has to recognize its own container, as described in [Labels and Modes](/docs/features/labels-and-modes/#outpost-itself). Otherwise it leaves every Outpost container alone with `Outpost couldn't find its own container, so it leaves Outpost containers alone`.
 

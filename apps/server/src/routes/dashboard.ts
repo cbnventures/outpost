@@ -2,7 +2,7 @@ import { ENABLE_LABEL, MONITOR_ONLY_LABEL, selectContainers } from 'outpost-pack
 
 import { applyRuntimeSettings, runtimeSettingsFromConfig } from '../config.js';
 import { sendError, sendValidationError } from '../lib/http.js';
-import { setDebugLogging } from '../lib/logger.js';
+import { logError, logInfo, setDebugLogging } from '../lib/logger.js';
 import {
   checkStart,
   diagnosticsUpdate,
@@ -447,7 +447,7 @@ export class Runner {
     } catch (error) {
       const errorMessage: Routes_Dashboard_Runner_RouteContainers_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
 
-      process.stderr.write(`Could not list containers: ${errorMessage}\n`);
+      logError('dashboard', `Could not list containers: ${errorMessage}`);
 
       sendError(response, 502, 'docker_unreachable', 'Outpost can\'t reach Docker. Check that the Docker socket is mounted.');
     }
@@ -679,7 +679,7 @@ export class Runner {
 
       setDebugLogging(enabled);
 
-      process.stdout.write((enabled === true) ? 'debug logging is on\n' : 'debug logging is off\n');
+      logInfo('dashboard', (enabled === true) ? 'Debug logging is on.' : 'Debug logging is off.');
     }
 
     response.json({

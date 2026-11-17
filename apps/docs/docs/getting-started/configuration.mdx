@@ -35,19 +35,15 @@ services:
     image: cbnventures/outpost:latest
     container_name: outpost
     environment:
-      PUID: "1000"
       PGID: "1000"
+      PUID: "1000"
       TZ: "Europe/London"
+    network_mode: host
+    restart: always
+    user: "0:0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - outpost-data:/data
-    ports:
-      - "22601:22601"
-    restart: unless-stopped
-
-networks:
-  default:
-    enable_ipv6: true
+      - outpost-data:/config
 
 volumes:
   outpost-data:
@@ -85,17 +81,26 @@ If a <Terminology title="One check-and-update pass over your containers" to="/do
 
 See [Labels and Modes](/docs/features/labels-and-modes/) for the label rules and [Updates and Rollback](/docs/features/updates-and-rollback/) for how the timeouts are used.
 
-## Data Directory
+## State Directory
 
-| Variable                 | Description                                                                                                                                                                                                                                                                                             |
-|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_DATA_DIRECTORY` | Folder that holds the dashboard database (`outpost.sqlite3`), its <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> (`keys/installation.key`), and the check history (`history.json`). Default `/data`. |
+App state lives at `/config`, with this layout:
 
-The dashboard account, runtime settings, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and private registry sign-ins are kept in the database in the data directory.
+| Path                                 | Purpose                                                                                                                                                                                                                                                                              |
+|--------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/config/keys/installation.key`      | The 32-byte <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>, stored as 64 lowercase hexadecimal characters plus a newline. The folder is mode `0700`, and the file is mode `0600`. |
+| `/config/database/outpost.sqlite3`   | The dashboard account, runtime settings, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification destinations, and private registry sign-ins.                                             |
+| `/config/database/outpost.sqlite3-*` | SQLite's write-ahead log and shared-memory companions when they exist.                                                                                                                                                                                                               |
+| `/config/history.json`               | The last 50 checks and updates.                                                                                                                                                                                                                                                      |
+| `/config/image-config-cache.json`    | Image defaults needed to recreate containers accurately.                                                                                                                                                                                                                             |
+| `/config/self-update.json`           | A self-update that is in progress or a new Outpost image that failed.                                                                                                                                                                                                                |
+
+Nova's initializer resolves the active state folder and exports `NOVA_STATE_DIRECTORY`, `NOVA_KEYS_DIRECTORY`, `NOVA_INSTALLATION_KEY_FILE`, `NOVA_DATABASE_DIRECTORY`, and `OUTPOST_DATA_DIRECTORY` to the server. It recursively changes the complete state directory to `PUID:PGID` on every start, then restores the key permissions.
+
+`/data` is not used for new Outpost state. Existing installations may keep an old `/data`-only mount for this release; the initializer detects it and uses it without data loss, while a host folder remounted at `/config` is migrated there automatically.
+
+The dashboard account, runtime settings, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and private registry sign-ins are kept in the database directory.
 
 You create the account on the first visit, with a <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology> from the container log, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account). <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">Destinations</Terminology> are added on the **Notifications** page, as shown in [Notifications](/docs/features/notifications/#add-a-destination).
-
-Only the default `/data` is created and handed to `PUID` when the container starts. A custom `OUTPOST_DATA_DIRECTORY` must already belong to `PUID`, or Outpost stops at startup with a permission error.
 
 :::info
 Behavior settings, such as the schedule, label mode, monitor-only, cleanup, and timeouts, live on the **Settings** page, not in environment variables. Private registry sign-ins are added there too, as described in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in), and a reverse proxy needs no setting, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
@@ -111,58 +116,33 @@ Behavior settings, such as the schedule, label mode, monitor-only, cleanup, and 
 
 ## Container Identity
 
-| Variable | Description                                                               |
-|----------|---------------------------------------------------------------------------|
-| `PUID`   | User ID the Outpost process runs as. Default `1000`.                      |
-| `PGID`   | Group ID the Outpost process runs as. Default `1000`.                     |
-| `TZ`     | Time zone the schedule runs in, such as `America/Chicago`. Default `UTC`. |
+| Variable | Description                                                                                    |
+|----------|------------------------------------------------------------------------------------------------|
+| `PUID`   | User ID the Outpost process runs as, from `1` through `60000`. Default `1000`.                 |
+| `PGID`   | Group ID the Outpost process runs as, from `1` through `60000`. Default `1000`.                |
+| `TZ`     | IANA time zone the schedule and container clock use, such as `America/Chicago`. Default `UTC`. |
 
-Outpost also joins the group that owns the Docker socket, so `PGID` doesn't need to match the `docker` group.
+The container starts as root so the initializer can change ownership and write `/etc/localtime` and `/etc/timezone`. The server then runs as `PUID:PGID` and also joins the group that owns the Docker socket, so `PGID` doesn't need to match the `docker` group.
 
 ## Port
 
-Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API always listen on `22601` inside the container. The examples publish it on every IPv4 and IPv6 address so another computer on the network can reach the Docker host.
+Outpost is assigned fixed port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The standard host-network setup needs no port mapping, so the dashboard and HTTP API use port `22601` on the Docker host.
 
-To use a different port, change the host side of the mapping, such as `-p 8080:22601` with `docker run` or `"8080:22601"` in `compose.yml`:
+## Health Check
 
-```yaml title="compose.yml"
-services:
-  outpost:
-    ports:
-      - "8080:22601"
+Docker runs the generated health check every 30 seconds, with a 5-second timeout, 30-second start period, and three retries. It reports healthy only when every required s6 service is up and `GET /health` answers `200` on port `22601`.
+
+The server is critical. If it exits, s6 stops the container, and the shutdown timing keeps the complete stop within Docker's default 10 seconds.
+
+## Logs
+
+Every initializer, supervisor, and application record is one plain-text line in this shape:
+
+```text
+2026-10-24T22:05:00Z INFO scheduler: web (ghcr.io/example/web:latest): updated - Recreated on the new image
 ```
 
-With host networking, there is no mapping, so the port is always `22601`.
-
-## IPv6
-
-The examples turn on IPv6 for Outpost's Compose network, so the sign-in limit and the API's rate limit count each IPv6 client by its own `/56` network instead of by Docker's gateway address. Docker Engine 27 or later picks the IPv6 subnet on its own, and on a host without IPv6, you can delete the `networks` block. For `docker run`, create the network first with `docker network create --ipv6 outpost`, then add `--network outpost`.
-
-IPv6 addresses are often reachable from the internet, so it is recommended to check that your router or host firewall blocks inbound connections to port `22601`.
-
-## Read-Only Root Filesystem
-
-The image can run with a read-only root filesystem, as described in the repository's `compose.yml`. It needs `S6_READ_ONLY_ROOT` set to `1`, tmpfs mounts for the s6-overlay runtime paths `/run` and `/tmp`, and a writable mount at `/data`:
-
-```yaml title="compose.yml"
-services:
-  outpost:
-    image: cbnventures/outpost:latest
-    environment:
-      S6_READ_ONLY_ROOT: "1"
-    read_only: true
-    tmpfs:
-      - /run
-      - /tmp
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-      # Prepared for PUID on every start, so it must be writable.
-      - outpost-data:/data
-
-volumes:
-  outpost-data:
-```
+The fields are an ISO UTC time, `DEBUG`, `INFO`, `WARN`, or `ERROR`, a component, and one fact. Outpost never emits JSON logs; turn on **Debug logging** under **Settings** only when the extra timing records are useful.
 
 ## Backup
 
@@ -180,8 +160,8 @@ The **Settings** page validates runtime behavior before saving it:
 
 Outpost checks bootstrap values at startup and refuses to start when one is invalid:
 
-- **`PUID` and `PGID`** — Must be whole numbers from `1` to `2147483647`, so `0` is refused. The image's init step checks them and logs messages such as `PUID must be between 1 and 2147483647.`
+- **`PUID` and `PGID`** — Must be whole numbers from `1` through `60000`, so `0` and larger IDs are refused. The image's init step logs `PUID must be an integer between 1 and 60000.` or the matching `PGID` message.
 - **`TZ`** — Must name a time zone installed in the image, such as `America/Chicago`. Otherwise the init step logs `Unknown timezone:` followed by the value.
 - **<Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">Encryption key</Terminology>** — The key file in the data directory must belong to the database, or startup stops, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match). A missing key file doesn't stop startup, because Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the saved registry passwords.
 
-`DOCKER_HOST` and `OUTPOST_DATA_DIRECTORY` are not checked for format. A wrong `DOCKER_HOST`, or a data directory that `PUID` can't use, stops Outpost at startup instead.
+`DOCKER_HOST` is not checked for format. A wrong address stops Outpost at startup when its Docker connection fails.

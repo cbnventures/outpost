@@ -53,7 +53,7 @@ flowchart TD
     Self --> Resume[New or restored Outpost finishes the cycle]
     Resume --> Report
     Report --> Notify[Notifier: destinations that chose each event]
-    Report --> History["history.json on /data"]
+    Report --> History["history.json on /config"]
     History --> Status["/api/v1, /v1/status, /metrics, and the dashboard"]
 ```
 
@@ -82,7 +82,7 @@ flowchart TD
 The dashboard itself is a React app in `apps/server/src/web`, which Vite builds into `apps/server/build/admin`. Running `npm run mock` in `apps/server` serves it on port `5176` against an in-memory mock API.
 
 - **Access** — `lib/access.ts` checks a bearer token first and the session cookie second, and enforces each route's <Terminology title="What a token may do, such as read status or run updates" to="/docs/reference/terminology#api-access">scope</Terminology>. Session changes also need the `X-CSRF-Token` header, and the account, security, token, notification, and registry routes refuse tokens.
-- **State** — `lib/state.ts` keeps the account, sessions, sign-in challenges, the authenticator app, <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and private registry sign-ins in `<OUTPOST_DATA_DIRECTORY>/outpost.sqlite3` through `node:sqlite`. An `account.json` from an earlier build is moved into the database once.
+- **State** — `lib/state.ts` keeps the account, sessions, sign-in challenges, the authenticator app, <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and private registry sign-ins in `<NOVA_DATABASE_DIRECTORY>/outpost.sqlite3` through `node:sqlite`. `lib/state-layout.ts` moves a flat database into that directory before it opens, and an `account.json` from an earlier build is moved into the database once.
 - **Secrets** — The password is a scrypt hash with a random salt (`N=32768`, `r=8`, `p=1`), and tokens, sessions, and <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> are SHA-256 hashes. The authenticator secret, each <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>'s <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology>, and each registry sign-in's password are sealed with AES-256-GCM using the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> in `keys/installation.key`, which is checked against the database at startup.
 - **Lost key** — When the key file is missing, `lib/state.ts` makes a new key, turns off the authenticator apps whose secrets the old key sealed, deletes their <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, and clears unfinished setups. It also drops every <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>'s sealed secrets and lists those fields in `missing_secrets`, so the notifier skips the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> until they're entered again. Registry sign-ins keep their host and username but lose their password until it's entered again.
 - **Removed secrets** — Each account that lost its authenticator app, each <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> that lost secrets, and each registry sign-in that lost its password gets a row in `removed_secrets`, which `GET /api/v1/auth/me` returns as `removedSecrets`. A row goes away when its secret is entered again, or when `DELETE /api/v1/auth/removed-secrets` clears them all.
@@ -142,15 +142,21 @@ Containers are never removed with their volumes, and Outpost never swaps its own
 
 ## Image and Process Model
 
-The image is built on Debian trixie slim with s6-overlay as PID 1, which starts as root. Its `nova-container-init` step runs `packages/docker/rootfs/usr/local/libexec/nova-docker/init-user` as root only to prepare `/data`: it checks `PUID`, `PGID`, and `TZ`, then creates `/data` and hands it to `PUID` and `PGID`.
+The image is built on Debian trixie slim with s6-overlay as PID 1, which starts as root. Nova's generated initializer validates `PUID` and `PGID` from `1` through `60000`, installs `TZ` in `/etc/localtime` and `/etc/timezone`, resolves `/config` or an old `/data` mount, and recursively hands the complete state directory to `PUID:PGID` on every start.
 
-The `server` service then starts through `packages/docker/rootfs/etc/s6-overlay/s6-rc.d/server/run`:
+The initializer creates `keys/` at mode `0700` and `database/`, restores mode `0600` on key files, and writes the resolved `NOVA_STATE_DIRECTORY`, `NOVA_KEYS_DIRECTORY`, `NOVA_INSTALLATION_KEY_FILE`, `NOVA_DATABASE_DIRECTORY`, and `OUTPOST_DATA_DIRECTORY` values to `/run/nova-docker/environment`. When an old host folder is remounted at `/config`, `lib/state-layout.ts` moves the flat SQLite database and companions into `database/` only when the destination is empty; a conflict or partial layout stops startup.
+
+The generated `server` service then calls Outpost's `apps/server/docker/start-server.sh`:
 
 1. Resolves the socket path from `DOCKER_HOST`.
 2. Reads the group ID that owns the socket.
 3. Runs `node build/index.js` with `s6-applyuidgid` as `PUID` and `PGID`, adding the socket's group as a supplementary group.
 
-The updater process therefore runs as `PUID` and `PGID`, never as root, and `PGID` doesn't need to match the host's `docker` group. The image healthcheck calls `GET /health` on port `22601`.
+The updater process therefore runs as `PUID` and `PGID`, never as root, and `PGID` doesn't need to match the host's `docker` group. The service is critical, so an unexpected exit stops the container instead of leaving it running without Outpost.
+
+The generated healthcheck requires every supervised service to be up and `GET /health` to answer `200` on port `22601`. It runs every 30 seconds with a 5-second timeout, 30-second start period, and three retries; the s6 stop limits keep shutdown within Docker's default 10 seconds.
+
+Both Nova's shell helpers and Outpost's logger write one plain line per fact as `<ISO UTC time> <LEVEL> <component>: <message>`. The runtime never emits JSON logs.
 
 :::warning
 Access to the Docker socket is equivalent to root on the host, because the Docker API can start privileged containers and mount any host path. Running the updater as `PUID` limits the process itself, not what it can ask Docker to do.

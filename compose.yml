@@ -7,43 +7,26 @@ services:
     environment:
       PGID: "${PGID:-1000}"
       PUID: "${PUID:-1000}"
-      S6_READ_ONLY_ROOT: "${S6_READ_ONLY_ROOT:-0}"
       TZ: "${TZ:-UTC}"
+    network_mode: host
+    restart: always
+    user: "0:0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
       # Dashboard account, access tokens, notification destinations, registry
-      # sign-ins, and update history. Keep /data on a volume: Outpost needs it to
+      # sign-ins, and update history. Keep /config on a volume: Outpost needs it to
       # update itself.
-      - outpost-data:/data
+      - outpost-data:/config
 
     # Dashboard at http://localhost:22601/admin/. On the first visit, create the
     # account with the setup code from "docker compose logs outpost". Access
     # tokens for POST /v1/update, GET /v1/status, and GET /metrics are made
     # on the dashboard's Access tokens page.
-    ports:
-      - "22601:22601"
-    restart: unless-stopped
-
     # Outpost follows the same labels for its own container, so it updates
     # itself too, last in each check. Uncomment to keep it on its current image.
     # labels:
     #   io.cbnventures.outpost.enable: "false"
-
-    # The appliance supports a read-only root filesystem when project-specific
-    # writable paths are mounted, s6 runtime paths use tmpfs, and
-    # S6_READ_ONLY_ROOT is set to 1.
-    # read_only: true
-    # tmpfs:
-    #   - /run
-    #   - /tmp
-
-# Gives Outpost's network IPv6, so the dashboard sees each IPv6 visitor's own
-# address. Docker Engine 27 or later picks the subnet; on a host without IPv6,
-# delete this block.
-networks:
-  default:
-    enable_ipv6: true
 
 volumes:
   outpost-data:

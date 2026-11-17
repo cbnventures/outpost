@@ -800,6 +800,13 @@ export type App_ErrorsAndTheDashboardPage_AnswersMalformedRequestsWithTheErrorEn
 export type App_ErrorsAndTheDashboardPage_AnswersMalformedRequestsWithTheErrorEnvelope_Limited = App_CreateClient_Request_Returns_Response;
 
 /**
+ * App - Errors And The Dashboard Page - Answers The Container Health Check Without Authentication.
+ *
+ * @since 1.2.0
+ */
+export type App_ErrorsAndTheDashboardPage_AnswersTheContainerHealthCheckWithoutAuthentication_Client = App_CreateClient_Returns_Client;
+
+/**
  * App - Errors And The Dashboard Page - Serves The Page For Every Dashboard Path.
  *
  * @since 1.0.0

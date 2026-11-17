@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   cgroupContainerIdPattern,
@@ -14,6 +15,7 @@ import type {
   Config_DefaultRuntimeSettings,
   Config_LoadConfig_Environment,
   Config_LoadConfig_Returns,
+  Config_LoadConfig_Settings_DataDirectory,
   Config_ReadSelfId_Cgroup,
   Config_ReadSelfId_CgroupMatch,
   Config_ReadSelfId_Hostname,
@@ -71,12 +73,16 @@ export const defaultRuntimeSettings: Config_DefaultRuntimeSettings = {
  * @since 0.0.1
  */
 export function loadConfig(environment: Config_LoadConfig_Environment): Config_LoadConfig_Returns {
+  const dataDirectory: Config_LoadConfig_Settings_DataDirectory = readString(environment['OUTPOST_DATA_DIRECTORY'], '/config');
+
   return {
     port: consolePort,
     dockerHost: readString(environment['DOCKER_HOST'], 'unix:///var/run/docker.sock'),
     schedule: defaultRuntimeSettings['schedule'],
     runOnStart: defaultRuntimeSettings['runOnStart'],
-    dataDirectory: readString(environment['OUTPOST_DATA_DIRECTORY'], '/data'),
+    dataDirectory,
+    databaseDirectory: readString(environment['NOVA_DATABASE_DIRECTORY'], join(dataDirectory, 'database')),
+    installationKeyFile: readString(environment['NOVA_INSTALLATION_KEY_FILE'], join(dataDirectory, 'keys', 'installation.key')),
     updater: {
       labelMode: defaultRuntimeSettings['labelMode'],
       monitorOnly: defaultRuntimeSettings['monitorOnly'],

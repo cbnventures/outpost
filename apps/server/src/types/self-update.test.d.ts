@@ -117,6 +117,13 @@ export type SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Result = U
 export type SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan = SelfUpdate_HelperPlan | string;
 
 /**
+ * Self Update - Plan Helper - Plans A Helper With The Legacy Data Mount.
+ *
+ * @since 1.2.0
+ */
+export type SelfUpdate_PlanHelper_PlansAHelperWithTheLegacyDataMount_Plan = SelfUpdate_HelperPlan | string;
+
+/**
  * Self Update - Plan Helper - Refuses Without A Data Volume Or Socket Mount.
  *
  * @since 1.0.0

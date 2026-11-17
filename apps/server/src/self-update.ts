@@ -36,10 +36,12 @@ import type {
   SelfUpdate_MountBind_Returns,
   SelfUpdate_MountBind_Source,
   SelfUpdate_PlanHelper_Binds,
+  SelfUpdate_PlanHelper_ConfiguredDataMount,
   SelfUpdate_PlanHelper_Container,
   SelfUpdate_PlanHelper_DataMount,
   SelfUpdate_PlanHelper_HelperImage,
   SelfUpdate_PlanHelper_Identity,
+  SelfUpdate_PlanHelper_LegacyDataMount,
   SelfUpdate_PlanHelper_Mounts,
   SelfUpdate_PlanHelper_Name,
   SelfUpdate_PlanHelper_Reference,
@@ -93,7 +95,9 @@ export const HELPER_LABEL = 'io.cbnventures.outpost.self-update-helper';
 export function planHelper(container: SelfUpdate_PlanHelper_Container, helperImage: SelfUpdate_PlanHelper_HelperImage, reference: SelfUpdate_PlanHelper_Reference, settings: SelfUpdate_PlanHelper_Settings): SelfUpdate_PlanHelper_Returns {
   const name: SelfUpdate_PlanHelper_Name = container['Name'].replace('/', '');
   const mounts: SelfUpdate_PlanHelper_Mounts = container['Mounts'] ?? [];
-  const dataMount: SelfUpdate_PlanHelper_DataMount = mounts.find((mount) => mount['Destination'] === settings['dataDirectory']);
+  const configuredDataMount: SelfUpdate_PlanHelper_ConfiguredDataMount = mounts.find((mount) => mount['Destination'] === settings['dataDirectory']);
+  const legacyDataMount: SelfUpdate_PlanHelper_LegacyDataMount = (configuredDataMount === undefined && settings['dataDirectory'] === '/config') ? mounts.find((mount) => mount['Destination'] === '/data') : undefined;
+  const dataMount: SelfUpdate_PlanHelper_DataMount = configuredDataMount ?? legacyDataMount;
 
   // Recreating Outpost without its data volume would lose the account, tokens, and history.
   if (dataMount === undefined) {
@@ -127,7 +131,11 @@ export function planHelper(container: SelfUpdate_PlanHelper_Container, helperIma
       WorkingDir: '/app/apps/server',
       ...((identity['uid'] !== undefined && identity['gid'] !== undefined) ? { User: `${String(identity['uid'])}:${String(identity['gid'])}` } : {}),
       Env: [
-        ...(container['Config']['Env'] ?? []).filter((entry) => entry.startsWith('OUTPOST_SELF_UPDATE_') === false),
+        ...(container['Config']['Env'] ?? []).filter((entry) => (
+          entry.startsWith('OUTPOST_DATA_DIRECTORY=') === false
+          && entry.startsWith('OUTPOST_SELF_UPDATE_') === false
+        )),
+        `OUTPOST_DATA_DIRECTORY=${dataMount['Destination']}`,
         `OUTPOST_SELF_UPDATE_CONTAINER=${container['Id']}`,
         `OUTPOST_SELF_UPDATE_REFERENCE=${reference}`,
       ],
@@ -243,7 +251,7 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
 
   const helperStartedAt: SelfUpdate_HandOver_HelperStartedAt = context.now().getTime();
 
-  logDebug(`Self-update: started helper ${plan['name']} to move ${name} to image ${shortImageId(request['newImageId'])}`);
+  logDebug('self-update', `Started helper ${plan['name']} to move ${name} to image ${shortImageId(request['newImageId'])}`);
 
   // Reaching the end of this wait means the helper stopped without swapping Outpost.
   const exitCode: SelfUpdate_HandOver_ExitCode = await waitForExit(helperId, deadline, context);
@@ -257,7 +265,7 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
     helperEnding = 'was stopped at its deadline';
   }
 
-  logDebug(`Self-update: helper ${plan['name']} ${helperEnding} after ${String(helperRan)} ms, before replacing Outpost`);
+  logDebug('self-update', `Helper ${plan['name']} ${helperEnding} after ${String(helperRan)} ms, before replacing Outpost`);
 
   await context['engine'].removeContainer(helperId).catch(() => undefined);
 
@@ -287,7 +295,7 @@ export async function finishSelfUpdate(pending: SelfUpdate_FinishSelfUpdate_Pend
   const current: SelfUpdate_FinishSelfUpdate_Current = context['handoff'].read();
   const waitStartedAt: SelfUpdate_FinishSelfUpdate_WaitStartedAt = context.now().getTime();
 
-  logDebug(`Self-update: waiting for helper ${pending['helperName']} to finish moving ${pending['containerName']} to image ${shortImageId(pending['newImageId'])}`);
+  logDebug('self-update', `Waiting for helper ${pending['helperName']} to finish moving ${pending['containerName']} to image ${shortImageId(pending['newImageId'])}`);
 
   await waitForExit(pending['helperName'], pending['deadline'], context);
 
@@ -298,9 +306,9 @@ export async function finishSelfUpdate(pending: SelfUpdate_FinishSelfUpdate_Pend
   let detail: SelfUpdate_FinishSelfUpdate_Detail = `The self-update helper stopped before it finished; see docker logs ${pending['helperName']}`;
 
   if (outcome === undefined) {
-    logDebug(`Self-update: helper ${pending['helperName']} ended after ${String(waited)} ms without saying how the swap went`);
+    logDebug('self-update', `Helper ${pending['helperName']} ended after ${String(waited)} ms without saying how the swap went`);
   } else {
-    logDebug(`Self-update: helper ${pending['helperName']} reported ${outcome['status']} after ${String(waited)} ms`);
+    logDebug('self-update', `Helper ${pending['helperName']} reported ${outcome['status']} after ${String(waited)} ms`);
   }
 
   if (outcome !== undefined && outcome['status'] === 'updated') {
@@ -395,7 +403,7 @@ export async function removeExitedHelpers(engine: SelfUpdate_RemoveExitedHelpers
 
       await engine.removeContainer(helper['Id']);
 
-      logDebug(`Self-update: removed the stopped helper ${helperName}`);
+      logDebug('self-update', `Removed the stopped helper ${helperName}`);
     }
   }
 

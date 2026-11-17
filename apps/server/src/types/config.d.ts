@@ -33,6 +33,10 @@ export type Config_LoadConfig_Settings_RunOnStart = boolean;
 
 export type Config_LoadConfig_Settings_DataDirectory = string;
 
+export type Config_LoadConfig_Settings_DatabaseDirectory = string;
+
+export type Config_LoadConfig_Settings_InstallationKeyFile = string;
+
 export type Config_LoadConfig_Settings_Updater = UpdaterOptions;
 
 export type Config_LoadConfig_Settings = {
@@ -41,6 +45,8 @@ export type Config_LoadConfig_Settings = {
   schedule: Config_LoadConfig_Settings_Schedule;
   runOnStart: Config_LoadConfig_Settings_RunOnStart;
   dataDirectory: Config_LoadConfig_Settings_DataDirectory;
+  databaseDirectory: Config_LoadConfig_Settings_DatabaseDirectory;
+  installationKeyFile: Config_LoadConfig_Settings_InstallationKeyFile;
   updater: Config_LoadConfig_Settings_Updater;
 };
 

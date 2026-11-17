@@ -8,6 +8,8 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
+import { logError } from './lib/logger.js';
+
 import type {
   History_Runner_Add_Report,
   History_Runner_Add_Returns,
@@ -77,7 +79,7 @@ export class Runner {
   /**
    * History - File Path.
    *
-   * Location of the JSON file, normally /data/history.json inside the
+   * Location of the JSON file, normally /config/history.json inside the
    * container.
    *
    * @private
@@ -212,7 +214,7 @@ export class Runner {
     } catch (error) {
       const errorMessage: History_Runner_Save_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
 
-      process.stderr.write(`Could not save update history to "${this.#filePath}": ${errorMessage}\n`);
+      logError('history', `Could not save update history to "${this.#filePath}": ${errorMessage}`);
     }
 
     return;

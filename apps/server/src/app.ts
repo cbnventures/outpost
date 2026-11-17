@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { Runner as Access } from './lib/access.js';
 import { Runner as Attempts } from './lib/attempts.js';
 import { getClientLimitKey, isTrustedProxyAddress, sendError } from './lib/http.js';
-import { isDebugLogging, logDebug } from './lib/logger.js';
+import { isDebugLogging, logDebug, logError } from './lib/logger.js';
 import { Runner as Notifier } from './lib/notifier.js';
 import { Runner as Auth } from './routes/auth.js';
 import { Runner as Backup } from './routes/backup.js';
@@ -210,7 +210,7 @@ function handleError(error: App_HandleError_Error, _request: App_HandleError_Req
 
   const errorMessage: App_HandleError_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
 
-  process.stderr.write(`Request failed: ${errorMessage}\n`);
+  logError('http', `Request failed: ${errorMessage}`);
 
   sendError(response, 500, 'internal_error', 'Something went wrong. Try again.');
 
@@ -266,7 +266,7 @@ function logRequestTiming(request: App_LogRequestTiming_Request, response: App_L
     const eventStream: App_LogRequestTiming_EventStream = String(response.getHeader('Content-Type')).startsWith('text/event-stream');
 
     if (elapsed >= slowRequestMilliseconds && eventStream === false) {
-      logDebug(`Slow request: ${request.method} ${path} answered ${String(response.statusCode)} after ${String(elapsed)} ms`);
+      logDebug('http', `Slow request: ${request.method} ${path} answered ${String(response.statusCode)} after ${String(elapsed)} ms`);
     }
 
     return;
@@ -276,7 +276,7 @@ function logRequestTiming(request: App_LogRequestTiming_Request, response: App_L
     const eventStream: App_LogRequestTiming_EventStream = String(response.getHeader('Content-Type')).startsWith('text/event-stream');
 
     if (response.writableFinished === false && eventStream === false) {
-      logDebug(`The browser canceled ${request.method} ${path} after ${String(Date.now() - startedAt)} ms`);
+      logDebug('http', `The browser canceled ${request.method} ${path} after ${String(Date.now() - startedAt)} ms`);
     }
 
     return;

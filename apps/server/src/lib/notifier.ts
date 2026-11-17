@@ -1,3 +1,4 @@
+import { logError } from './logger.js';
 import {
   buildEventNotification,
   buildSecretsRemovedNotification,
@@ -360,7 +361,7 @@ export class Runner {
     } catch (error) {
       const reason: Lib_Notifier_Runner_Deliver_Reason = (error instanceof Error) ? error.message : String(error);
 
-      process.stderr.write(`Notification destinations could not be loaded for ${notification['event']}: ${reason}\n`);
+      logError('notifier', `Notification destinations could not be loaded for ${notification['event']}: ${reason}`);
 
       return;
     }
@@ -373,7 +374,7 @@ export class Runner {
       }).catch((error: Lib_Notifier_Runner_Deliver_Error) => {
         const reason: Lib_Notifier_Runner_Deliver_Reason = (error instanceof Error) ? error.message : String(error);
 
-        process.stderr.write(`A notification to ${delivery['name']} failed: ${reason}\n`);
+        logError('notifier', `A notification to ${delivery['name']} failed: ${reason}`);
 
         return;
       });

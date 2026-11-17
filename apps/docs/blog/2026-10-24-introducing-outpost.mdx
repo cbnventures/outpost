@@ -53,9 +53,14 @@ All it needs is the Docker socket and a volume for its data:
 ```bash
 docker run --detach \
   --name outpost \
-  --restart unless-stopped \
+  --restart always \
+  --env PGID=1000 \
+  --env PUID=1000 \
+  --env TZ=UTC \
+  --user 0:0 \
+  --net=host \
   --volume /var/run/docker.sock:/var/run/docker.sock \
-  --volume outpost-data:/data \
+  --volume outpost-data:/config \
   cbnventures/outpost:latest
 ```
 

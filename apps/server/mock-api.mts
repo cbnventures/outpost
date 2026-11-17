@@ -650,7 +650,7 @@ const settings: MockSettings = {
     stopTimeoutSeconds: 30,
   },
   system: {
-    dataDirectory: '/data',
+    dataDirectory: '/config',
     dockerHost: 'unix:///var/run/docker.sock',
     timeZone: 'UTC',
   },
@@ -804,7 +804,7 @@ const containers: MockContainer[] = [
           ],
           exposedPorts: ['22601/tcp'],
           mounts: [
-            '/data',
+            '/config',
             '/var/run/docker.sock',
           ],
           name: 'e2e-app',

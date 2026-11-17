@@ -148,7 +148,7 @@ import type {
  * Lib - State - Data Directory.
  *
  * Points each test at its own temporary directory, standing in for the
- * /data volume. Cleanup never touches a repository folder.
+ * /config volume. Cleanup never touches a repository folder.
  *
  * @since 1.0.0
  */
@@ -227,7 +227,7 @@ describe('first-run setup', () => {
     const state: Lib_State_FirstRunSetup_StartsWithoutAnAccountAndKeepsAGeneratedKeyBesideTheData_State = new State(getDataDirectory());
     const keyPath: Lib_State_FirstRunSetup_StartsWithoutAnAccountAndKeepsAGeneratedKeyBesideTheData_KeyPath = join(getDataDirectory(), 'keys', 'installation.key');
     const keyMode: Lib_State_FirstRunSetup_StartsWithoutAnAccountAndKeepsAGeneratedKeyBesideTheData_KeyMode = (statSync(keyPath).mode % 512).toString(8);
-    const databaseMode: Lib_State_FirstRunSetup_StartsWithoutAnAccountAndKeepsAGeneratedKeyBesideTheData_DatabaseMode = (statSync(join(getDataDirectory(), 'outpost.sqlite3')).mode % 512).toString(8);
+    const databaseMode: Lib_State_FirstRunSetup_StartsWithoutAnAccountAndKeepsAGeneratedKeyBesideTheData_DatabaseMode = (statSync(join(getDataDirectory(), 'database', 'outpost.sqlite3')).mode % 512).toString(8);
 
     expect(state.hasAdministrator()).toBe(false);
 
@@ -253,7 +253,7 @@ describe('first-run setup', () => {
 
     claimed.startTotpEnrollment(administrator['id'], secret);
 
-    expect(readFileSync(join(getDataDirectory(), 'outpost.sqlite3')).includes(secret)).toBe(false);
+    expect(readFileSync(join(getDataDirectory(), 'database', 'outpost.sqlite3')).includes(secret)).toBe(false);
 
     claimed.close();
 
@@ -303,7 +303,7 @@ describe('first-run setup', () => {
 
     expect(await state.authenticateAdministrator('someone', 'fixture admin password')).toBeUndefined();
 
-    expect(readFileSync(join(getDataDirectory(), 'outpost.sqlite3')).includes(setupClaim['code'])).toBe(false);
+    expect(readFileSync(join(getDataDirectory(), 'database', 'outpost.sqlite3')).includes(setupClaim['code'])).toBe(false);
 
     state.close();
 
@@ -731,7 +731,7 @@ describe('first-run setup', () => {
 
     writeFileSync(keyPath, 'not a key\n');
 
-    expect(() => new State(getDataDirectory())).toThrow('is not 64 hexadecimal characters');
+    expect(() => new State(getDataDirectory())).toThrow('is not 32 raw bytes or 64 hexadecimal characters');
 
     return;
   });
@@ -783,7 +783,7 @@ describe('account file import', () => {
 
     expect(existsSync(accountPath)).toBe(false);
 
-    expect(stdout).toHaveBeenCalledWith('Moved the dashboard account from "account.json" into "outpost.sqlite3".\n');
+    expect(stdout).toHaveBeenCalledWith(expect.stringContaining(' INFO state: Moved the dashboard account from "account.json" into "outpost.sqlite3".\n'));
 
     expect(state.prepareSetupClaim()).toBeUndefined();
 
@@ -933,7 +933,7 @@ describe('sign-in state', () => {
     }
 
     const session: Lib_State_SignInState_RecordsWhenAndFromWhereASessionWasLastSeen_Session = state.createSession(administrator['id'], '192.168.1.20', 'Fixture browser');
-    const database: Lib_State_SignInState_RecordsWhenAndFromWhereASessionWasLastSeen_Database = new DatabaseSync(join(getDataDirectory(), 'outpost.sqlite3'));
+    const database: Lib_State_SignInState_RecordsWhenAndFromWhereASessionWasLastSeen_Database = new DatabaseSync(join(getDataDirectory(), 'database', 'outpost.sqlite3'));
 
     Reflect.set(clock, 'value', clock['value'] + (2 * 60 * 1000));
 
@@ -1172,7 +1172,7 @@ describe('token state', () => {
       scopes: ['metrics:read'],
     })).toBeUndefined();
 
-    expect(readFileSync(join(getDataDirectory(), 'outpost.sqlite3')).includes(createdToken['personalAccessToken'])).toBe(false);
+    expect(readFileSync(join(getDataDirectory(), 'database', 'outpost.sqlite3')).includes(createdToken['personalAccessToken'])).toBe(false);
 
     expect(state.authenticateToken(createdToken['personalAccessToken'])).toEqual({
       id: tokenId,
@@ -1202,7 +1202,7 @@ describe('token state', () => {
       'Home Assistant',
     ]);
 
-    const database: Lib_State_TokenState_AppliesTokenLifecycleChangesImmediatelyAndRecordsLastUse_Database = new DatabaseSync(join(getDataDirectory(), 'outpost.sqlite3'));
+    const database: Lib_State_TokenState_AppliesTokenLifecycleChangesImmediatelyAndRecordsLastUse_Database = new DatabaseSync(join(getDataDirectory(), 'database', 'outpost.sqlite3'));
 
     database.prepare('UPDATE api_tokens SET created_at = ? WHERE id = ?').run('2099-01-01T00:00:00.000Z', tokenId);
 
@@ -1680,7 +1680,7 @@ describe('registry sign-ins', () => {
 
     state.close();
 
-    expect(readFileSync(join(getDataDirectory(), 'outpost.sqlite3')).includes('ghp_rotated')).toBe(false);
+    expect(readFileSync(join(getDataDirectory(), 'database', 'outpost.sqlite3')).includes('ghp_rotated')).toBe(false);
 
     return;
   });
@@ -1696,7 +1696,7 @@ describe('registry sign-ins', () => {
     state.close();
 
     // Put the database back the way version 3 left it, with one notice waiting.
-    const database: Lib_State_RegistrySignIns_KeepsEarlierNoticesWhenAnOlderDatabaseGainsSignIns_Database = new DatabaseSync(join(getDataDirectory(), 'outpost.sqlite3'));
+    const database: Lib_State_RegistrySignIns_KeepsEarlierNoticesWhenAnOlderDatabaseGainsSignIns_Database = new DatabaseSync(join(getDataDirectory(), 'database', 'outpost.sqlite3'));
 
     database.exec([
       'DROP TABLE removed_secrets;',

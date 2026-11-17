@@ -33,6 +33,7 @@ import {
   normalizeSetupCode,
   verifyAdministratorPassword,
 } from './auth.js';
+import { logError, logInfo, logWarn } from './logger.js';
 import {
   legacyAccountFile,
   personalAccessTokenScope,
@@ -48,6 +49,7 @@ import {
   storedRejectedImage,
   storedRemovedSecret,
 } from './schema.js';
+import { prepareStateLayout } from './state-layout.js';
 import { verifyTotpCode } from './totp.js';
 
 import type {
@@ -107,9 +109,11 @@ import type {
   Lib_State_Runner_ConfirmAdministratorPassword_Password,
   Lib_State_Runner_ConfirmAdministratorPassword_PasswordHash,
   Lib_State_Runner_ConfirmAdministratorPassword_Returns,
+  Lib_State_Runner_Constructor_DatabaseDirectory,
   Lib_State_Runner_Constructor_DataDirectory,
   Lib_State_Runner_Constructor_DirectoryMode,
   Lib_State_Runner_Constructor_FileMode,
+  Lib_State_Runner_Constructor_InstallationKeyFile,
   Lib_State_Runner_Constructor_Now,
   Lib_State_Runner_ConsumeRecoveryCode_AdministratorId,
   Lib_State_Runner_ConsumeRecoveryCode_Code,
@@ -689,12 +693,14 @@ export class Runner {
    * Opens the protected database, applies the schema, and resolves the encryption key.
    * An account left in account.json is then moved into the database once.
    *
-   * @param {Lib_State_Runner_Constructor_DataDirectory} dataDirectory - Data directory.
-   * @param {Lib_State_Runner_Constructor_Now}           [now]         - Now.
+   * @param {Lib_State_Runner_Constructor_DataDirectory}       dataDirectory         - Data directory.
+   * @param {Lib_State_Runner_Constructor_Now}                 [now]                 - Now.
+   * @param {Lib_State_Runner_Constructor_DatabaseDirectory}   [databaseDirectory]   - Database directory.
+   * @param {Lib_State_Runner_Constructor_InstallationKeyFile} [installationKeyFile] - Installation key file.
    *
    * @since 1.0.0
    */
-  public constructor(dataDirectory: Lib_State_Runner_Constructor_DataDirectory, now?: Lib_State_Runner_Constructor_Now) {
+  public constructor(dataDirectory: Lib_State_Runner_Constructor_DataDirectory, now?: Lib_State_Runner_Constructor_Now, databaseDirectory: Lib_State_Runner_Constructor_DatabaseDirectory = join(dataDirectory, 'database'), installationKeyFile: Lib_State_Runner_Constructor_InstallationKeyFile = join(dataDirectory, 'keys', 'installation.key')) {
     const directoryMode: Lib_State_Runner_Constructor_DirectoryMode = parseInt('700', 8);
     const fileMode: Lib_State_Runner_Constructor_FileMode = parseInt('600', 8);
 
@@ -707,10 +713,12 @@ export class Runner {
 
     process.umask(parseInt('077', 8));
 
-    this.#keyPath = join(dataDirectory, 'keys', 'installation.key');
+    prepareStateLayout(dataDirectory, databaseDirectory, installationKeyFile);
+
+    this.#keyPath = installationKeyFile;
     this.#legacyAccountPath = join(dataDirectory, 'account.json');
     this.#now = now ?? (() => Date.now());
-    this.#database = new DatabaseSync(join(dataDirectory, Runner.#databaseFileName));
+    this.#database = new DatabaseSync(join(databaseDirectory, Runner.#databaseFileName));
     this.#dummyPasswordHash = createDummyPasswordHash();
 
     this.#database.exec('PRAGMA foreign_keys = ON;');
@@ -725,7 +733,7 @@ export class Runner {
 
     this.createSchema();
 
-    chmodSync(join(dataDirectory, Runner.#databaseFileName), fileMode);
+    chmodSync(join(databaseDirectory, Runner.#databaseFileName), fileMode);
 
     this.#encryptionKey = this.resolveEncryptionKey();
 
@@ -3316,7 +3324,7 @@ export class Runner {
     try {
       account = legacyAccountFile.parse(JSON.parse(readFileSync(this.#legacyAccountPath, 'utf8')));
     } catch {
-      process.stderr.write(`Could not import the account in "${this.#legacyAccountPath}": it is not a valid account file.\n`);
+      logError('state', `Could not import the account in "${this.#legacyAccountPath}": it is not a valid account file.`);
 
       return;
     }
@@ -3330,10 +3338,10 @@ export class Runner {
     } catch (error) {
       const errorMessage: Lib_State_Runner_ImportLegacyAccount_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
 
-      process.stderr.write(`Could not remove "${this.#legacyAccountPath}" after importing it: ${errorMessage}\n`);
+      logError('state', `Could not remove "${this.#legacyAccountPath}" after importing it: ${errorMessage}`);
     }
 
-    process.stdout.write(`Moved the dashboard account from "account.json" into "${Runner.#databaseFileName}".\n`);
+    logInfo('state', `Moved the dashboard account from "account.json" into "${Runner.#databaseFileName}".`);
 
     return;
   }
@@ -3661,7 +3669,7 @@ export class Runner {
       this.#keyReplacement = removedSecrets;
 
       if (removedSecrets.length > 0) {
-        process.stderr.write(`No encryption key was found at "${this.#keyPath}", so Outpost made a new one. These saved secrets were locked with the old key and were removed: ${removedSecrets.join(', ')}. Enter them again in the dashboard.\n`);
+        logWarn('state', `No encryption key was found at "${this.#keyPath}", so Outpost made a new one. These saved secrets were locked with the old key and were removed: ${removedSecrets.join(', ')}. Enter them again in the dashboard.`);
       }
 
       return;

@@ -21,7 +21,7 @@ import {
   Runner as ImageConfigCache,
 } from './image-config-cache.js';
 import { timedEngine, timedFetch } from './lib/debug-timing.js';
-import { isDebugLogging, setDebugLogging } from './lib/logger.js';
+import { isDebugLogging, logInfo, setDebugLogging } from './lib/logger.js';
 import { Runner as Notifier } from './lib/notifier.js';
 import { Runner as State } from './lib/state.js';
 import {
@@ -133,7 +133,7 @@ const history: Index_History = new History(join(config['dataDirectory'], 'histor
  *
  * @since 1.0.0
  */
-const state: Index_State = new State(config['dataDirectory']);
+const state: Index_State = new State(config['dataDirectory'], undefined, config['databaseDirectory'], config['installationKeyFile']);
 
 applyRuntimeSettings(config, state.getRuntimeSettings(defaultRuntimeSettings));
 
@@ -325,25 +325,18 @@ app.listen(config['port'], (error) => {
   const nextRunLabel: Index_NextRunLabel = (nextRunAt !== null) ? nextRunAt.toISOString() : 'never';
   const modeSuffix: Index_ModeSuffix = (config['updater']['monitorOnly'] === true) ? ', monitor only' : '';
 
-  process.stdout.write([
-    'Outpost',
-    `  Dashboard: http://localhost:${String(config['port'])}/admin/`,
-    `  Schedule: ${config['schedule']} (next run ${nextRunLabel})`,
-    `  Mode: ${config['updater']['labelMode']}${modeSuffix}`,
-    '',
-  ].join('\n'));
+  logInfo('server', `Dashboard: http://localhost:${String(config['port'])}/admin/`);
+  logInfo('server', `Schedule: ${config['schedule']} (next run ${nextRunLabel})`);
+  logInfo('server', `Mode: ${config['updater']['labelMode']}${modeSuffix}`);
 
   if (isDebugLogging() === true) {
-    process.stdout.write('debug logging is on\n');
+    logInfo('server', 'Debug logging is on.');
   }
 
   if (setupClaim !== undefined) {
-    process.stdout.write([
-      'No account exists yet. Open the dashboard to create it with the setup code.',
-      `  Setup code: ${setupClaim['code']}`,
-      `  Expires: ${setupClaim['expiresAt']}`,
-      '',
-    ].join('\n'));
+    logInfo('server', 'No account exists yet. Open the dashboard to create it with the setup code.');
+    logInfo('server', `Setup code: ${setupClaim['code']}`);
+    logInfo('server', `Setup code expires: ${setupClaim['expiresAt']}`);
   }
 
   // A check finished after a self-update counts as this start's check.

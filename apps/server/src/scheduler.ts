@@ -1,4 +1,4 @@
-import { logDebug } from './lib/logger.js';
+import { logDebug, logError, logInfo } from './lib/logger.js';
 
 import type {
   Scheduler_Runner_Action,
@@ -347,7 +347,7 @@ export class Runner {
     const cycleStartedAt: Scheduler_Runner_Execute_CycleStartedAt = Date.now();
     let report: Scheduler_Runner_Execute_Report = undefined;
 
-    logDebug(`${cycleLabel} started by ${source}`);
+    logDebug('scheduler', `${cycleLabel} started by ${source}`);
 
     try {
       const cycleReport: Scheduler_Runner_Execute_CycleReport = await run();
@@ -374,10 +374,10 @@ export class Runner {
       )).length);
 
       for (const result of report['results']) {
-        process.stdout.write(`${result['container']} (${result['image']}): ${result['status']} - ${result['detail']}\n`);
+        logInfo('scheduler', `${result['container']} (${result['image']}): ${result['status']} - ${result['detail']}`);
       }
 
-      logDebug(`${cycleLabel} finished after ${String(Date.now() - cycleStartedAt)} ms (results: ${String(report['results'].length)})`);
+      logDebug('scheduler', `${cycleLabel} finished after ${String(Date.now() - cycleStartedAt)} ms (results: ${String(report['results'].length)})`);
     } catch (error) {
       const errorMessage: Scheduler_Runner_Execute_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
       const finishedAt: Scheduler_Runner_Execute_FinishedAt = new Date().toISOString();
@@ -402,7 +402,7 @@ export class Runner {
 
       Reflect.set(this.#totals, 'failed', this.#totals['failed'] + 1);
 
-      process.stderr.write(`${cycleLabel} failed: ${errorMessage}\n`);
+      logError('scheduler', `${cycleLabel} failed: ${errorMessage}`);
     } finally {
       Reflect.set(this.#totals, 'cycles', this.#totals['cycles'] + 1);
       this.#running = false;
