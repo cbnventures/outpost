@@ -1,5 +1,7 @@
 import { ENABLE_LABEL } from 'outpost-package-updater';
 
+import { logDebug } from './lib/logger.js';
+
 import type {
   SelfUpdate_FinishSelfUpdate_CleanupErrorMessage,
   SelfUpdate_FinishSelfUpdate_CleanupNote,
@@ -7,16 +9,22 @@ import type {
   SelfUpdate_FinishSelfUpdate_Current,
   SelfUpdate_FinishSelfUpdate_Detail,
   SelfUpdate_FinishSelfUpdate_FailedImageId,
+  SelfUpdate_FinishSelfUpdate_ImageNote,
   SelfUpdate_FinishSelfUpdate_Outcome,
   SelfUpdate_FinishSelfUpdate_Pending,
   SelfUpdate_FinishSelfUpdate_Returns,
   SelfUpdate_FinishSelfUpdate_Status,
+  SelfUpdate_FinishSelfUpdate_Waited,
+  SelfUpdate_FinishSelfUpdate_WaitStartedAt,
   SelfUpdate_HandOver_Context,
   SelfUpdate_HandOver_Current,
   SelfUpdate_HandOver_Deadline,
   SelfUpdate_HandOver_ErrorMessage,
   SelfUpdate_HandOver_ExitCode,
+  SelfUpdate_HandOver_HelperEnding,
   SelfUpdate_HandOver_HelperId,
+  SelfUpdate_HandOver_HelperRan,
+  SelfUpdate_HandOver_HelperStartedAt,
   SelfUpdate_HandOver_Name,
   SelfUpdate_HandOver_Outcome,
   SelfUpdate_HandOver_Plan,
@@ -30,6 +38,7 @@ import type {
   SelfUpdate_PlanHelper_Binds,
   SelfUpdate_PlanHelper_Container,
   SelfUpdate_PlanHelper_DataMount,
+  SelfUpdate_PlanHelper_HelperImage,
   SelfUpdate_PlanHelper_Identity,
   SelfUpdate_PlanHelper_Mounts,
   SelfUpdate_PlanHelper_Name,
@@ -42,6 +51,7 @@ import type {
   SelfUpdate_ReadOutcome_Handoff,
   SelfUpdate_ReadOutcome_Returns,
   SelfUpdate_RemoveExitedHelpers_Engine,
+  SelfUpdate_RemoveExitedHelpers_HelperName,
   SelfUpdate_RemoveExitedHelpers_Helpers,
   SelfUpdate_RemoveExitedHelpers_Returns,
   SelfUpdate_ShortImageId_ImageId,
@@ -67,18 +77,20 @@ export const HELPER_LABEL = 'io.cbnventures.outpost.self-update-helper';
 /**
  * Self Update - Plan Helper.
  *
- * Builds the helper container: the image Outpost runs now, its data and socket
- * mounts, user, and network, with no ports. Returns the reason when it can't.
+ * Builds the helper container from the newly pulled image, with Outpost's data
+ * and socket mounts, user, and network, but no ports. Returns the reason when
+ * it can't.
  *
- * @param {SelfUpdate_PlanHelper_Container} container - Container.
- * @param {SelfUpdate_PlanHelper_Reference} reference - Reference.
- * @param {SelfUpdate_PlanHelper_Settings}  settings  - Settings.
+ * @param {SelfUpdate_PlanHelper_Container}   container   - Container.
+ * @param {SelfUpdate_PlanHelper_HelperImage} helperImage - Helper image.
+ * @param {SelfUpdate_PlanHelper_Reference}   reference   - Reference.
+ * @param {SelfUpdate_PlanHelper_Settings}    settings    - Settings.
  *
  * @returns {SelfUpdate_PlanHelper_Returns}
  *
  * @since 1.0.0
  */
-export function planHelper(container: SelfUpdate_PlanHelper_Container, reference: SelfUpdate_PlanHelper_Reference, settings: SelfUpdate_PlanHelper_Settings): SelfUpdate_PlanHelper_Returns {
+export function planHelper(container: SelfUpdate_PlanHelper_Container, helperImage: SelfUpdate_PlanHelper_HelperImage, reference: SelfUpdate_PlanHelper_Reference, settings: SelfUpdate_PlanHelper_Settings): SelfUpdate_PlanHelper_Returns {
   const name: SelfUpdate_PlanHelper_Name = container['Name'].replace('/', '');
   const mounts: SelfUpdate_PlanHelper_Mounts = container['Mounts'] ?? [];
   const dataMount: SelfUpdate_PlanHelper_DataMount = mounts.find((mount) => mount['Destination'] === settings['dataDirectory']);
@@ -106,7 +118,7 @@ export function planHelper(container: SelfUpdate_PlanHelper_Container, reference
   return {
     name: `${name}-outpost-self-update`,
     body: {
-      Image: container['Image'],
+      Image: helperImage,
       Entrypoint: [
         'node',
         'build/self-update-helper.js',
@@ -182,7 +194,7 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
     return row('skipped', `The new image (${shortImageId(request['newImageId'])}) didn't start last time, so Outpost waits for a newer one`);
   }
 
-  const plan: SelfUpdate_HandOver_Plan = planHelper(request['container'], request['reference'], context['settings']);
+  const plan: SelfUpdate_HandOver_Plan = planHelper(request['container'], request['newImageReference'], request['reference'], context['settings']);
 
   if (typeof plan === 'string') {
     return row('skipped', plan);
@@ -229,9 +241,23 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
     return row('failed', `Couldn't start the self-update helper: ${errorMessage}`);
   }
 
+  const helperStartedAt: SelfUpdate_HandOver_HelperStartedAt = context.now().getTime();
+
+  logDebug(`Self-update: started helper ${plan['name']} to move ${name} to image ${shortImageId(request['newImageId'])}`);
+
   // Reaching the end of this wait means the helper stopped without swapping Outpost.
   const exitCode: SelfUpdate_HandOver_ExitCode = await waitForExit(helperId, deadline, context);
   const outcome: SelfUpdate_HandOver_Outcome = readOutcome(context['handoff']);
+  const helperRan: SelfUpdate_HandOver_HelperRan = context.now().getTime() - helperStartedAt;
+  let helperEnding: SelfUpdate_HandOver_HelperEnding = 'was gone';
+
+  if (exitCode !== undefined) {
+    helperEnding = `stopped with exit code ${String(exitCode)}`;
+  } else if (context.now().getTime() >= Date.parse(deadline)) {
+    helperEnding = 'was stopped at its deadline';
+  }
+
+  logDebug(`Self-update: helper ${plan['name']} ${helperEnding} after ${String(helperRan)} ms, before replacing Outpost`);
 
   await context['engine'].removeContainer(helperId).catch(() => undefined);
 
@@ -259,18 +285,29 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
  */
 export async function finishSelfUpdate(pending: SelfUpdate_FinishSelfUpdate_Pending, context: SelfUpdate_FinishSelfUpdate_Context): SelfUpdate_FinishSelfUpdate_Returns {
   const current: SelfUpdate_FinishSelfUpdate_Current = context['handoff'].read();
+  const waitStartedAt: SelfUpdate_FinishSelfUpdate_WaitStartedAt = context.now().getTime();
+
+  logDebug(`Self-update: waiting for helper ${pending['helperName']} to finish moving ${pending['containerName']} to image ${shortImageId(pending['newImageId'])}`);
 
   await waitForExit(pending['helperName'], pending['deadline'], context);
 
   const outcome: SelfUpdate_FinishSelfUpdate_Outcome = readOutcome(context['handoff']);
+  const waited: SelfUpdate_FinishSelfUpdate_Waited = context.now().getTime() - waitStartedAt;
   let failedImageId: SelfUpdate_FinishSelfUpdate_FailedImageId = (current !== undefined) ? current['failedImageId'] : undefined;
   let status: SelfUpdate_FinishSelfUpdate_Status = 'failed';
   let detail: SelfUpdate_FinishSelfUpdate_Detail = `The self-update helper stopped before it finished; see docker logs ${pending['helperName']}`;
 
+  if (outcome === undefined) {
+    logDebug(`Self-update: helper ${pending['helperName']} ended after ${String(waited)} ms without saying how the swap went`);
+  } else {
+    logDebug(`Self-update: helper ${pending['helperName']} reported ${outcome['status']} after ${String(waited)} ms`);
+  }
+
   if (outcome !== undefined && outcome['status'] === 'updated') {
     let cleanupNote: SelfUpdate_FinishSelfUpdate_CleanupNote = '';
+    const imageNote: SelfUpdate_FinishSelfUpdate_ImageNote = (outcome['previousImageMetadataAvailable'] === false) ? ' (previous image metadata was unavailable, so its defaults were carried over)' : '';
 
-    // The helper runs the previous image, so it goes first.
+    // Remove the helper before cleaning the outgoing image after the swap.
     await context['engine'].removeContainer(pending['helperName']).catch(() => undefined);
 
     if (context['settings']['cleanup'] === true) {
@@ -284,7 +321,7 @@ export async function finishSelfUpdate(pending: SelfUpdate_FinishSelfUpdate_Pend
     }
 
     status = 'updated';
-    detail = `${outcome['detail']}${cleanupNote}`;
+    detail = `${outcome['detail']}${imageNote}${cleanupNote}`;
     failedImageId = undefined;
   } else if (outcome !== undefined && outcome['status'] === 'rolled-back') {
     await context['engine'].removeContainer(pending['helperName']).catch(() => undefined);
@@ -354,7 +391,11 @@ export async function removeExitedHelpers(engine: SelfUpdate_RemoveExitedHelpers
 
   for (const helper of helpers) {
     if (helper['State'] !== 'running') {
+      const helperName: SelfUpdate_RemoveExitedHelpers_HelperName = (helper['Names'][0] ?? helper['Id']).replace('/', '');
+
       await engine.removeContainer(helper['Id']);
+
+      logDebug(`Self-update: removed the stopped helper ${helperName}`);
     }
   }
 

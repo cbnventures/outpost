@@ -1,0 +1,52 @@
+---
+title: "Outpost Now Updates Itself, With the Same Rollback"
+description: Outpost keeps its own container current as the last step of each cycle, and a short-lived helper puts the old Outpost back if the new one fails.
+slug: outpost-updates-itself
+authors:
+  - mrjackyliang
+keywords:
+  - outpost
+  - docker
+  - self-update
+  - rollback
+  - container updates
+tags:
+  - release
+  - docker
+  - self-update
+---
+
+Outpost 1.0 updates its own container. The updater that keeps your containers current now keeps itself current too, and rolls itself back when a new image fails, so it never needs a manual pull.
+
+{/* truncate */}
+
+## Why It Matters
+
+An updater that can't update itself turns into the one container you have to remember by hand. The hard part is that a container can't stop itself and still watch its replacement start. Outpost solves that with a helper that does the swap and reports back.
+
+## How It Works
+
+Outpost updates itself last in each cycle, after every other managed container:
+
+1. **Hand over** — Outpost saves the check so far to its data directory and starts a short-lived helper from the image it runs now.
+2. **Swap** — The helper stops Outpost, creates and starts the new one, and waits until it's healthy. It's the same recreation every container gets, with settings, volumes, and networks carried over.
+3. **Finish the check** — Whichever Outpost runs afterwards, new or restored, finishes the check. The whole run gets one History entry and one round of notifications, and the helper is removed.
+
+## When the New Image Fails
+
+If the new Outpost stops, turns unhealthy, or isn't healthy in time, the helper starts the old one again and the run records `rolled-back`. Later checks skip that image until a newer one appears, so a bad release is tried once, not on every schedule.
+
+From the dashboard, updating Outpost's own row asks first and explains that the page reconnects on its own while Outpost restarts. **Update all** keeps Outpost last, and its rollback always stays on.
+
+## What It Needs
+
+- **`/data` on a volume** — The new Outpost keeps the account and the history.
+- **The Docker socket from the host** — The helper mounts the same socket.
+
+Both are already part of the standard setup.
+
+## Get Started
+
+Run Outpost with the [Quick Start](/docs/getting-started/quick-start/), and read [How Outpost Updates Itself](/docs/features/updates-and-rollback/#how-outpost-updates-itself) for every status the helper can report.
+
+**About Outpost** — Outpost is a self-hosted container updater for Docker that recreates containers on new images with their settings intact and rolls back when an update breaks.

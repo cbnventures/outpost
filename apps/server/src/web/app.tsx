@@ -20,14 +20,26 @@ import {
   logout,
   revokeToken,
   startCheck,
+  startUpdate,
   updateSettings,
   updateToken,
 } from '@/web/api.ts';
+import {
+  appRouteForView,
+  resolveAppNavigationPath,
+} from '@/web/app-navigation.ts';
 import { AppShell } from '@/web/app-shell.tsx';
 import { AuthenticationScreen } from '@/web/auth-screen.tsx';
 import { ContainersView } from '@/web/containers-view.tsx';
 import { HistoryView } from '@/web/history-view.tsx';
 import { KeyNotice } from '@/web/key-notice.tsx';
+import { describeScheduler } from '@/web/labels.ts';
+import {
+  applyNavigationPath,
+  pushNavigationPath,
+  replaceNavigationPath,
+  startNavigationHistory,
+} from '@/web/navigation.ts';
 import { NotificationsView } from '@/web/notifications-view.tsx';
 import { OverviewView } from '@/web/overview-view.tsx';
 import { BrandMark } from '@/web/primitives.tsx';
@@ -53,10 +65,18 @@ import type {
   Web_Api_UpdateTokenInput,
 } from '@/types/web/api.d.ts';
 import type {
+  Web_AppNavigation_PathMatch,
+  Web_AppNavigation_Route,
+} from '@/types/web/app-navigation.d.ts';
+import type {
   Web_App_Phase,
   Web_App_RemovedSecretAction,
 } from '@/types/web/app.d.ts';
-import type { Web_Components_View } from '@/types/web/components.d.ts';
+import type {
+  Web_Components_SchedulerStatus,
+  Web_Components_ShellStatus,
+  Web_Components_View,
+} from '@/types/web/components.d.ts';
 
 // How long to wait before opening the event stream again after it closed.
 
@@ -122,6 +142,7 @@ const describeRemovedSecret = (removedSecret: Web_Api_RemovedSecret): Web_App_Re
  * @since 1.0.0
  */
 export const App = (): ReactElement => {
+  const initialNavigation: Web_AppNavigation_PathMatch = resolveAppNavigationPath(window.location.pathname);
   const [
     phase,
     setPhase,
@@ -131,9 +152,10 @@ export const App = (): ReactElement => {
     setUsername,
   ] = useState<string>('');
   const [
-    activeView,
-    setActiveView,
-  ] = useState<Web_Components_View>('overview');
+    activeRoute,
+    setActiveRoute,
+  ] = useState<Web_AppNavigation_Route>(initialNavigation['route']);
+  const activeView: Web_Components_View = activeRoute['view'];
   const [
     overview,
     setOverview,
@@ -171,10 +193,6 @@ export const App = (): ReactElement => {
     setTokens,
   ] = useState<Web_Api_Token[]>([]);
   const [
-    createdToken,
-    setCreatedToken,
-  ] = useState<Web_Api_CreatedToken | null>(null);
-  const [
     removedSecrets,
     setRemovedSecrets,
   ] = useState<Web_Api_RemovedSecret[]>([]);
@@ -207,9 +225,7 @@ export const App = (): ReactElement => {
     setSettings(null);
     setSettingsError(null);
     setTokens([]);
-    setCreatedToken(null);
     setRemovedSecrets([]);
-    setActiveView('overview');
     setPhase('login');
   };
 
@@ -359,6 +375,29 @@ export const App = (): ReactElement => {
   });
 
   /**
+   * App - Applies route.
+   *
+   * Keeps the rendered page synchronized with a resolved browser address.
+   * Browser Back and Forward reuse this transition without pushing history.
+   *
+   * @param {Web_AppNavigation_Route} route - Route.
+   *
+   * @since 1.1.0
+   */
+  const applyAppRoute = (route: Web_AppNavigation_Route): void => {
+    setActiveRoute(route);
+    window.scrollTo(0, 0);
+
+    return;
+  };
+
+  useEffect((): (() => void) => startNavigationHistory(
+    window,
+    resolveAppNavigationPath,
+    applyAppRoute,
+  ), []);
+
+  /**
    * App - Enter application.
    *
    * Centralizes this operation for the surrounding workflow.
@@ -376,6 +415,11 @@ export const App = (): ReactElement => {
 
     setUsername(principal['username'] ?? 'Administrator');
     setRemovedSecrets(principal['removedSecrets'] ?? []);
+    applyNavigationPath(
+      window,
+      resolveAppNavigationPath,
+      applyAppRoute,
+    );
     setPhase('application');
 
     await Promise.all([
@@ -412,6 +456,23 @@ export const App = (): ReactElement => {
 
     void bootstrap();
   }, []);
+
+  useEffect((): void => {
+    if (phase !== 'application') {
+      return;
+    }
+
+    if (activeRoute['view'] === 'history') {
+      void loadHistory();
+    } else if (activeRoute['view'] === 'settings') {
+      void loadSettings();
+    }
+
+    return;
+  }, [
+    activeRoute,
+    phase,
+  ]);
 
   // The overview follows the scheduler live, and each finished check lands in the history.
   useEffect((): (() => void) | undefined => {
@@ -518,29 +579,58 @@ export const App = (): ReactElement => {
   });
 
   /**
-   * App - Opens view.
+   * App - Run update.
    *
-   * Centralizes this operation for the surrounding workflow.
-   * Callers reuse one implementation instead of repeating the behavior.
+   * Starts an apply cycle for all managed containers or one selected container.
+   * Reloading the overview exposes the scheduler lock immediately.
    *
-   * @since 1.0.0
+   * @since 1.1.0
    */
-  const openView = (view: Web_Components_View): void => {
-    setActiveView(view);
-    window.scrollTo(0, 0);
+  const runUpdate = async (containerId?: string, rollback: boolean = true): Promise<void> => guard(async (): Promise<void> => {
+    await startUpdate(containerId, rollback);
+    await loadOverview();
+  });
 
-    if (view === 'overview') {
+  /**
+   * App - Opens route.
+   *
+   * Pushes browser history, applies the selected page, and keeps each page's
+   * existing refresh behavior when navigation comes from the interface.
+   *
+   * @param {Web_AppNavigation_Route} route - Route.
+   *
+   * @since 1.1.0
+   */
+  const openRoute = (route: Web_AppNavigation_Route): void => {
+    pushNavigationPath(window, route['path']);
+    applyAppRoute(route);
+
+    if (route['view'] === 'overview') {
       void loadOverview();
       void loadContainers();
-    } else if (view === 'containers') {
+    } else if (route['view'] === 'containers') {
       void loadContainers();
-    } else if (view === 'history') {
-      void loadHistory();
-    } else if (view === 'settings') {
-      void loadSettings();
-    } else if (view === 'access') {
+    } else if (route['view'] === 'access') {
       void loadTokens();
     }
+
+    return;
+  };
+
+  /**
+   * App - Opens view.
+   *
+   * Resolves shell destinations through the app-owned path table before the
+   * shared History API transition runs.
+   *
+   * @param {Web_Components_View} view - View.
+   *
+   * @since 1.1.0
+   */
+  const openView = (view: Web_Components_View): void => {
+    openRoute(appRouteForView(view));
+
+    return;
   };
 
   /**
@@ -555,6 +645,10 @@ export const App = (): ReactElement => {
     try {
       await logout();
     } finally {
+      const rootNavigation: Web_AppNavigation_PathMatch = resolveAppNavigationPath('/');
+
+      replaceNavigationPath(window, rootNavigation['path']);
+      applyAppRoute(rootNavigation['route']);
       resetSession();
     }
   };
@@ -587,14 +681,13 @@ export const App = (): ReactElement => {
       case 'access': {
         return (
           <AccessView
-            createdToken={createdToken}
-            onCreateToken={async (input: Web_Api_CreateTokenInput): Promise<void> => {
+            onCreateToken={async (input: Web_Api_CreateTokenInput): Promise<Web_Api_CreatedToken> => {
               const nextToken: Web_Api_CreatedToken = await createToken(input);
 
-              setCreatedToken(nextToken);
               await loadTokens();
+
+              return nextToken;
             }}
-            onDismissCreatedToken={(): void => setCreatedToken(null)}
             onRevokeToken={async (tokenId: string): Promise<void> => {
               await revokeToken(tokenId);
               await loadTokens();
@@ -614,6 +707,7 @@ export const App = (): ReactElement => {
             error={containersError}
             onRefresh={loadContainers}
             onStartCheck={runCheck}
+            onStartUpdate={runUpdate}
             overview={overview}
           />
         );
@@ -642,7 +736,20 @@ export const App = (): ReactElement => {
         );
       }
       case 'settings': {
-        return <SettingsView error={settingsError} onSave={saveSettings} settings={settings} />;
+        return (
+          <SettingsView
+            error={settingsError}
+            onImported={async (): Promise<void> => {
+              await Promise.all([
+                loadSettings(),
+                loadTokens(),
+                loadRemovedSecrets(),
+              ]);
+            }}
+            onSave={saveSettings}
+            settings={settings}
+          />
+        );
       }
       default: {
         return (
@@ -652,6 +759,7 @@ export const App = (): ReactElement => {
             onOpenContainers={(): void => openView('containers')}
             onOpenHistory={(): void => openView('history')}
             onStartCheck={runCheck}
+            onStartUpdate={runUpdate}
             overview={overview}
           />
         );
@@ -675,17 +783,22 @@ export const App = (): ReactElement => {
       removedAt={removedSecrets.at(-1)?.['removedAt'] ?? ''}
     />
   );
+  const dockerUnreachable: boolean = containersError instanceof ApiError && containersError.code === 'docker_unreachable';
+  const schedulerStatus: Web_Components_SchedulerStatus = describeScheduler(overview, dockerUnreachable);
+  const shellStatus: Web_Components_ShellStatus = {
+    ...schedulerStatus,
+    onOpen: (): void => openView('overview'),
+  };
 
   return (
     <AppShell
       activeView={activeView}
-      dockerUnreachable={containersError instanceof ApiError && containersError.code === 'docker_unreachable'}
       notice={notice}
       onLogout={(): void => {
         void signOut();
       }}
       onViewChange={openView}
-      overview={overview}
+      status={shellStatus}
       username={username}
     >
       {renderView()}

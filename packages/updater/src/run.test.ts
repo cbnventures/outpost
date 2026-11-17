@@ -21,6 +21,8 @@ import type {
   Run_InspectContainer,
   Run_InspectImage,
   Run_Options,
+  Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Dependencies,
+  Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Report,
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_Dependencies,
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_OlderDependencies,
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_OlderReport,
@@ -29,23 +31,31 @@ import type {
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_RolledBackReport,
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_UntaggedDependencies,
   Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_UntaggedReport,
+  Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Dependencies,
+  Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Report,
   Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Dependencies,
   Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report,
+  Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Dependencies,
+  Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Report,
   Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Dependencies,
   Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWhenTheOldContainerWasUnhealthy_Report,
+  Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Dependencies,
+  Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Report,
   Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Dependencies,
   Run_RunUpdateCycle_KeepsAReplacementWhoseHealthcheckAnswersAfterTheTimeout_Report,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Dependencies,
   Run_RunUpdateCycle_KeepsCheckingPulledImagesThatTheRegistryTurnsAway_Report,
   Run_RunUpdateCycle_LooksUpEachRegistrySignInOncePerCycle_Dependencies,
+  Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Dependencies,
+  Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Report,
   Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Dependencies,
   Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Report,
   Run_RunUpdateCycle_ReportsACycleFailure_Dependencies,
   Run_RunUpdateCycle_ReportsACycleFailure_Report,
+  Run_RunUpdateCycle_ReportsMissingImageMetadata_Dependencies,
+  Run_RunUpdateCycle_ReportsMissingImageMetadata_Report,
   Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Dependencies,
   Run_RunUpdateCycle_ReportsUpdatedWhenCleanupFails_Report,
-  Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies,
-  Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report,
   Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Dependencies,
   Run_RunUpdateCycle_RollsBackAnUnhealthyReplacementOfAHealthyContainer_Report,
   Run_RunUpdateCycle_RollsBackAReplacementStillStartingWhenItsHealthcheckShouldHaveAnswered_Dependencies,
@@ -70,6 +80,10 @@ import type {
   Run_RunUpdateCycle_SkipsPullingWhenTheDigestMatches_Report,
   Run_RunUpdateCycle_UpdatesAndCleansUpWhenANewImageExists_Dependencies,
   Run_RunUpdateCycle_UpdatesAndCleansUpWhenANewImageExists_Report,
+  Run_RunUpdateCycle_UsesCachedImageDefaults_CreateBody,
+  Run_RunUpdateCycle_UsesCachedImageDefaults_CreateCall,
+  Run_RunUpdateCycle_UsesCachedImageDefaults_Dependencies,
+  Run_RunUpdateCycle_UsesCachedImageDefaults_Report,
   Run_Sleep,
   Run_UpdateSelf,
 } from './types/run.test.d.ts';
@@ -130,6 +144,10 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
         }];
       }),
       inspectContainer: vi.fn<Run_InspectContainer>(async (id) => {
+        if (id === 'web-outpost-previous') {
+          throw new Error(`Docker Engine API returned HTTP 404: No such container: ${id}`);
+        }
+
         if (id === 'new-id') {
           const isCreated: Run_CreateDependencies_IsCreated = newInspectCount === 0;
 
@@ -163,7 +181,7 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
           Id: id,
           Name: '/web',
           Image: 'sha256:old',
-          Config: { Image: 'nginx:1' },
+          Config: state['currentContainerConfig'] ?? { Image: 'nginx:1' },
           HostConfig: {
             NetworkMode: 'bridge',
             AutoRemove: false,
@@ -179,13 +197,19 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
           },
         };
       }),
-      inspectImage: vi.fn<Run_InspectImage>(async (reference) => ({
-        Id: (reference === 'sha256:old') ? 'sha256:old' : 'sha256:new',
-        RepoDigests: (reference === 'sha256:old') ? (state['currentRepoDigests'] ?? [`nginx@${state['localDigest']}`]) : ['nginx@sha256:remote'],
-        Config: {},
-        ...((reference === 'sha256:old' && state['identity'] !== undefined) ? { Identity: state['identity'] } : {}),
-        ...((reference === 'sha256:old' && state['descriptor'] === true) ? { Descriptor: { digest: 'sha256:old' } } : {}),
-      })),
+      inspectImage: vi.fn<Run_InspectImage>(async (reference) => {
+        if (reference === 'sha256:old' && state['currentImageMissing'] === true) {
+          return undefined;
+        }
+
+        return {
+          Id: (reference === 'sha256:old') ? 'sha256:old' : 'sha256:new',
+          RepoDigests: (reference === 'sha256:old') ? (state['currentRepoDigests'] ?? [`nginx@${state['localDigest']}`]) : ['nginx@sha256:remote'],
+          Config: (reference === 'sha256:old') ? (state['currentImageConfig'] ?? {}) : (state['newImageConfig'] ?? {}),
+          ...((reference === 'sha256:old' && state['identity'] !== undefined) ? { Identity: state['identity'] } : {}),
+          ...((reference === 'sha256:old' && state['descriptor'] === true) ? { Descriptor: { digest: 'sha256:old' } } : {}),
+        };
+      }),
       pullImage: vi.fn(async () => undefined),
       stopContainer: vi.fn(async () => undefined),
       startContainer: vi.fn(async () => undefined),
@@ -221,6 +245,9 @@ function createDependencies(state: Run_CreateDependencies_State, runningAfterSta
     findRejectedImage: vi.fn(() => undefined),
     rememberRejectedImage: vi.fn(() => undefined),
     forgetRejectedImage: vi.fn(() => undefined),
+    findImageConfig: vi.fn(() => undefined),
+    rememberImageConfig: vi.fn(() => undefined),
+    pruneImageConfigs: vi.fn(async () => undefined),
   };
 }
 
@@ -315,6 +342,9 @@ function createSelfDependencies(withUpdateSelf: Run_CreateSelfDependencies_WithU
     findRejectedImage: vi.fn(() => undefined),
     rememberRejectedImage: vi.fn(() => undefined),
     forgetRejectedImage: vi.fn(() => undefined),
+    findImageConfig: vi.fn(() => undefined),
+    rememberImageConfig: vi.fn(() => undefined),
+    pruneImageConfigs: vi.fn(async () => undefined),
     ...((withUpdateSelf === true) ? {
       updateSelf: vi.fn<Run_UpdateSelf>(async (request) => ({
         container: 'outpost',
@@ -335,6 +365,44 @@ function createSelfDependencies(withUpdateSelf: Run_CreateSelfDependencies_WithU
  * @since 0.0.1
  */
 describe('runUpdateCycle', () => {
+  it('checks without pulling or recreating', async () => {
+    const dependencies: Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Dependencies = createSelfDependencies(true);
+    const report: Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Report = await runUpdateCycle({
+      ...options,
+      selfId: 'self-id',
+    }, dependencies, undefined, 'check');
+
+    expect(report['results']).toMatchObject([
+      { status: 'up-to-date' },
+      {
+        status: 'available',
+        detail: 'New digest sha256:outpost-remote',
+      },
+    ]);
+
+    expect(dependencies['fetchFunction']).toHaveBeenCalled();
+
+    expect(dependencies['engine']['pullImage']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['startContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['renameContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['removeContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['createContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['connectNetwork']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['removeImage']).not.toHaveBeenCalled();
+
+    expect(dependencies['updateSelf']).not.toHaveBeenCalled();
+
+    return;
+  });
+
   it('skips pulling when the digest matches', async () => {
     const dependencies: Run_RunUpdateCycle_SkipsPullingWhenTheDigestMatches_Dependencies = createDependencies({ localDigest: 'sha256:remote' }, true);
     const report: Run_RunUpdateCycle_SkipsPullingWhenTheDigestMatches_Report = await runUpdateCycle(options, dependencies);
@@ -359,9 +427,77 @@ describe('runUpdateCycle', () => {
     return;
   });
 
+  it('uses cached image defaults when Docker removed the old image record', async () => {
+    const dependencies: Run_RunUpdateCycle_UsesCachedImageDefaults_Dependencies = createDependencies({
+      currentContainerConfig: {
+        Image: 'nginx:1',
+        Cmd: ['old-default'],
+        Env: [
+          'IMAGE_DEFAULT=old',
+          'USER_OVERRIDE=kept',
+        ],
+        Labels: {
+          'io.example.default': 'old',
+          'io.example.user': 'kept',
+        },
+        User: 'old-user',
+      },
+      currentImageMissing: true,
+      localDigest: 'sha256:local',
+    }, true);
+
+    dependencies['findImageConfig'].mockReturnValue({
+      Cmd: ['old-default'],
+      Env: ['IMAGE_DEFAULT=old'],
+      Labels: { 'io.example.default': 'old' },
+      User: 'old-user',
+    });
+
+    const report: Run_RunUpdateCycle_UsesCachedImageDefaults_Report = await runUpdateCycle(options, dependencies);
+    const createCall: Run_RunUpdateCycle_UsesCachedImageDefaults_CreateCall = dependencies['engine']['createContainer'].mock.calls.at(0);
+
+    if (createCall === undefined) {
+      throw new Error('The replacement container was not created.');
+    }
+
+    const createBody: Run_RunUpdateCycle_UsesCachedImageDefaults_CreateBody = createCall[1];
+
+    expect(report['results']).toMatchObject([{
+      status: 'updated',
+      detail: expect.not.stringContaining('previous image metadata was unavailable'),
+    }]);
+
+    expect(createBody['Env']).toStrictEqual(['USER_OVERRIDE=kept']);
+
+    expect(createBody['Labels']).toStrictEqual({ 'io.example.user': 'kept' });
+
+    expect(createBody).not.toHaveProperty('Cmd');
+
+    expect(createBody).not.toHaveProperty('User');
+
+    expect(dependencies['findImageConfig']).toHaveBeenCalledWith('sha256:old');
+
+    return;
+  });
+
+  it('reports when live and cached image metadata are both unavailable', async () => {
+    const dependencies: Run_RunUpdateCycle_ReportsMissingImageMetadata_Dependencies = createDependencies({
+      currentImageMissing: true,
+      localDigest: 'sha256:local',
+    }, true);
+    const report: Run_RunUpdateCycle_ReportsMissingImageMetadata_Report = await runUpdateCycle(options, dependencies);
+
+    expect(report['results']).toMatchObject([{
+      status: 'updated',
+      detail: expect.stringContaining('(previous image metadata was unavailable, so its defaults were carried over)'),
+    }]);
+
+    return;
+  });
+
   it('rolls back when the new container stops', async () => {
     const dependencies: Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Dependencies = createDependencies({ localDigest: 'sha256:local' }, false);
-    const report: Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Report = await runUpdateCycle(options, dependencies);
+    const report: Run_RunUpdateCycle_RollsBackWhenTheNewContainerStops_Report = await runUpdateCycle(options, dependencies, undefined, 'update', true);
 
     expect(report['results'].map((result) => result['status'])).toStrictEqual(['rolled-back']);
 
@@ -372,6 +508,38 @@ describe('runUpdateCycle', () => {
     expect(dependencies['engine']['startContainer']).toHaveBeenLastCalledWith('old-id');
 
     expect(dependencies['engine']['removeImage']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('keeps an unhealthy replacement without rollback', async () => {
+    const dependencies: Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Dependencies = createDependencies({
+      localDigest: 'sha256:local',
+      newHealth: 'unhealthy',
+      oldHealth: 'healthy',
+    }, true);
+    const report: Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Report = await runUpdateCycle(options, dependencies, ['old-id'], 'update', false);
+
+    expect(report['results']).toMatchObject([{
+      status: 'kept-unhealthy',
+      detail: expect.stringContaining('rollback was disabled for this run'),
+    }]);
+
+    expect(report['results']).toMatchObject([{
+      detail: expect.stringContaining('previous image ID: sha256:old'),
+    }]);
+
+    expect(report['results']).toMatchObject([{
+      detail: expect.stringContaining('"configuredImage":"nginx:1"'),
+    }]);
+
+    expect(dependencies['engine']['removeContainer']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['startContainer']).toHaveBeenCalledExactlyOnceWith('new-id');
+
+    expect(dependencies['engine']['removeImage']).not.toHaveBeenCalled();
+
+    expect(dependencies['rememberRejectedImage']).toHaveBeenCalledWith('web', 'sha256:new');
 
     return;
   });
@@ -491,7 +659,7 @@ describe('runUpdateCycle', () => {
     return;
   });
 
-  it('skips an image that was rolled back', async () => {
+  it('holds an image that was rolled back during an update', async () => {
     const dependencies: Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
 
     dependencies['findRejectedImage'].mockReturnValue({
@@ -502,28 +670,84 @@ describe('runUpdateCycle', () => {
     const report: Run_RunUpdateCycle_SkipsAnImageThatWasRolledBack_Report = await runUpdateCycle(options, dependencies);
 
     expect(report['results']).toMatchObject([{
-      status: 'skipped',
-      detail: expect.stringContaining('The new image (new) was rolled back last time'),
+      status: 'held',
+      detail: expect.stringContaining('Rolled back last time; waiting for a newer image'),
     }]);
 
     expect(dependencies['engine']['stopContainer']).not.toHaveBeenCalled();
 
+    expect(dependencies['engine']['pullImage']).not.toHaveBeenCalled();
+
     return;
   });
 
-  it('retries a rolled-back image when a check names the container', async () => {
-    const dependencies: Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
+  it('holds a rejected remote image during checks without pulling it', async () => {
+    const dependencies: Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
 
     dependencies['findRejectedImage'].mockReturnValue({
       imageId: 'sha256:new',
       rejectedAt: '2026-10-23T04:00:00.000Z',
     });
 
-    const report: Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report = await runUpdateCycle(options, dependencies, ['old-id']);
+    const report: Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Report = await runUpdateCycle(options, dependencies, undefined, 'check');
 
-    expect(report['results'].map((result) => result['status'])).toStrictEqual(['updated']);
+    expect(report['results']).toMatchObject([{
+      status: 'held',
+      detail: expect.stringContaining('Update this container with rollback disabled'),
+    }]);
 
-    expect(dependencies['forgetRejectedImage']).toHaveBeenCalledWith('web');
+    expect(dependencies['engine']['inspectImage']).toHaveBeenCalledWith('nginx:1');
+
+    expect(dependencies['engine']['pullImage']).not.toHaveBeenCalled();
+
+    expect(dependencies['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    return;
+  });
+
+  it('bypasses a rolled-back image only without rollback', async () => {
+    const dependencies: Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
+    const overrideDependencies: Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Dependencies = createDependencies({ localDigest: 'sha256:local' }, true);
+
+    dependencies['findRejectedImage'].mockReturnValue({
+      imageId: 'sha256:new',
+      rejectedAt: '2026-10-23T04:00:00.000Z',
+    });
+
+    overrideDependencies['findRejectedImage'].mockReturnValue({
+      imageId: 'sha256:new',
+      rejectedAt: '2026-10-23T04:00:00.000Z',
+    });
+
+    const report: Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Report = await runUpdateCycle(options, dependencies, ['old-id']);
+    const overrideReport: Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Report = await runUpdateCycle(options, overrideDependencies, ['old-id'], 'update', false);
+
+    expect(report['results'].map((result) => result['status'])).toStrictEqual(['held']);
+
+    expect(dependencies['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    expect(overrideReport['results'].map((result) => result['status'])).toStrictEqual(['updated']);
+
+    expect(overrideDependencies['forgetRejectedImage']).toHaveBeenCalledWith('web');
+
+    return;
+  });
+
+  it('refuses disabled rollback for Outpost', async () => {
+    const dependencies: Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Dependencies = createSelfDependencies(true);
+    const report: Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Report = await runUpdateCycle({
+      ...options,
+      selfId: 'self-id',
+    }, dependencies, ['self-id'], 'update', false);
+
+    expect(report['results']).toMatchObject([{
+      status: 'failed',
+      detail: 'Rollback cannot be disabled when updating Outpost itself',
+    }]);
+
+    expect(dependencies['engine']['pullImage']).not.toHaveBeenCalled();
+
+    expect(dependencies['updateSelf']).not.toHaveBeenCalled();
 
     return;
   });
@@ -731,6 +955,7 @@ describe('runUpdateCycle', () => {
     expect(dependencies['updateSelf']).toHaveBeenCalledWith({
       container: expect.objectContaining({ Id: 'self-id' }),
       newImageId: 'sha256:outpost-new',
+      newImageReference: 'cbnventures/outpost@sha256:outpost-remote',
       reference: 'cbnventures/outpost:latest',
       results: [expect.objectContaining({
         container: 'web',

@@ -17,72 +17,59 @@ tags:
   - glossary
 ---
 
-Define the update, selection, recovery, sign-in, and notification terms that appear throughout the Outpost documentation.
+import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
-## Access Token
+Short, practical definitions for the update, selection, notification, sign-in, and backup terms used throughout the Outpost documentation. Tables list the term first, also known as, then the definition.
 
-A key that a script or app sends to call the API, made of `outpost_` and 43 random characters. Each one has a name, one or more scopes, and an optional expiry, and Outpost stores only a hash of it.
+:::tip[Glossary Terms]
+Throughout the docs, you will see <Terminology title="A quick reminder, right where you read it" to="/docs/reference/terminology">highlighted terms</Terminology> with a dotted underline. Hover over any of them for a quick reminder of what they mean, or click to jump to the full definition.
+:::
 
-## Cycle
+## Update Cycles
 
-One pass over all selected containers, or over one container checked from the dashboard or the API, producing one report. The schedule, **Check when Outpost starts**, the API, or the dashboard starts it, the dashboard calls it a check, and only one cycle runs at a time.
+| Term              | Also known as   | Definition                                                                                                                                                                                                                                            |
+|-------------------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **cycle**         | check           | One pass over all selected containers, or over one container checked from the dashboard or the API, producing one report. The schedule, startup, the API, or the dashboard starts it, and only one runs at a time.                                    |
+| **report**        | —               | The per-container results of a cycle, with its `action` (`check` or `update`) and what started it. Each container is `updated`, `available`, `held`, `up-to-date`, `skipped`, `rolled-back`, `kept-unhealthy`, or `failed`.                           |
+| **remote digest** | manifest digest | The manifest digest the registry reports for an image tag. Outpost compares it with the running image's digest to find updates without pulling.                                                                                                       |
+| **recreation**    | —               | Stopping a container, starting an identical one on the new image, and removing the old one once the new one is up. Settings, volumes, and networks carry over.                                                                                        |
+| **settle period** | Settle time     | How long a container without a healthcheck must keep running before an update counts as successful. It is set with **Settle time** on the **Settings** page.                                                                                          |
+| **rollback**      | —               | Removing a failed replacement and restarting the previous container under its original name, when any step of the swap fails or the new container stops or turns unhealthy. It can be disabled only for one non-Outpost container in a manual update. |
 
-## Destination
+## Container Selection
 
-A place Outpost sends alerts to, such as an ntfy topic, a Telegram chat, or an email inbox, set up on the dashboard's **Notifications** page. Each one has a name, a service, its own fields, and the notification events it listens to.
+| Term             | Also known as       | Definition                                                                                                                                 |
+|------------------|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| **label mode**   | Container selection | How Outpost picks containers. `opt-out` updates every container unless it is labeled off, and `opt-in` updates only containers labeled on. |
+| **monitor-only** | Monitor only        | Reporting available updates without recreating containers. It can be turned on for every container or for single containers with a label.  |
 
-## Encryption Key
+## Notifications
 
-The key file `keys/installation.key` in the data directory, which encrypts the authenticator app's secret, the secret fields of notification destinations, and the passwords of private registry sign-ins in the database. Outpost creates it on the first start, and if the file goes missing, makes a new key, turns off the authenticator app, and removes those secret fields and passwords.
+| Term                   | Also known as            | Definition                                                                                                                                                                                                      |
+|------------------------|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **destination**        | notification destination | A place Outpost sends alerts to, such as an ntfy topic, a Telegram chat, or an email inbox, set up on the **Notifications** page. Each one has a name, a service, its own fields, and the events it listens to. |
+| **notification event** | event                    | Something Outpost can send an alert about, such as **Containers updated**, **Update failed**, or **Sign-in locked**. Each destination picks its own events, and one check sends at most one alert per event.    |
+| **secret field**       | —                        | A destination field, such as a token, a password, or a webhook URL, that Outpost seals with the encryption key. Ordinary pages and API reads never return it, and a lost encryption key removes it.             |
 
-## Label Mode
+## Dashboard Sign-In
 
-How Outpost picks containers. `opt-out` updates every container unless it is labeled off, and `opt-in` updates only containers labeled on.
+| Term              | Also known as | Definition                                                                                                                                                                                                      |
+|-------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **setup code**    | —             | The one-time code, such as `K7Q2M-XR9TD-P4W8N`, that Outpost prints to the container log while no dashboard account exists. It creates the account, works for 30 minutes, and changes each time Outpost starts. |
+| **passkey**       | —             | A sign-in kept by your device or password manager that replaces the username, password, and authenticator code. It works only at the address it was added on: a domain name over HTTPS, or `localhost`.         |
+| **recovery code** | —             | One of ten single-use codes, such as `7KQ2M-XW9PD`, shown once when you turn on the authenticator app. It stands in for an authenticator code at sign-in, and Outpost stores only a hash of it.                 |
 
-## Monitor-Only
+## API Access
 
-Reporting available updates without recreating containers. It can be turned on for every container or for single containers with a label.
+| Term             | Also known as | Definition                                                                                                                                                                              |
+|------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **access token** | API token     | A key that a script or app sends to call the API, made of `outpost_` and 43 random characters. Each has a name, scopes, and an optional expiry, and Outpost stores only a hash of it.   |
+| **scope**        | —             | What an access token is allowed to do: `status:read` reads the status, `updates:run` starts checks and updates, and `metrics:read` reads the Prometheus metrics. None includes another. |
 
-## Notification Event
+## Backup and Encryption
 
-Something Outpost can send an alert about, such as **Containers updated**, **Update failed**, or **Sign-in locked**. Each destination chooses its own events, and one check sends at most one alert per event.
-
-## Passkey
-
-A sign-in kept by your device or password manager that replaces the username, the password, and the authenticator code. It works only at the address it was added on, which has to be a domain name over HTTPS, or `localhost`.
-
-## Recovery Code
-
-One of ten single-use codes, such as `7KQ2M-XW9PD`, shown once when you turn on the authenticator app. It stands in for an authenticator code at sign-in, and Outpost stores only a hash of it.
-
-## Recreation
-
-Stopping a container, starting an identical one on the new image, and removing the old one once the new one is up. Settings, volumes, and networks carry over.
-
-## Remote Digest
-
-The manifest digest the registry reports for an image tag. Outpost compares it with the digest of the running image to decide whether an update exists without pulling.
-
-## Report
-
-The per-container results of a cycle, along with what started it. Each container is `updated`, `available`, `up-to-date`, `skipped`, `rolled-back`, or `failed`.
-
-## Rollback
-
-Removing a failed replacement and restarting the previous container under its original name. It happens when any step of the swap fails, from stopping the old container to removing it, including when the new container stops, turns unhealthy, or doesn't become healthy in time.
-
-## Scope
-
-What an access token is allowed to do: `status:read` reads the status, `updates:run` starts checks, and `metrics:read` reads the Prometheus metrics. A token can hold several scopes, and none of them includes another.
-
-## Secret Field
-
-A destination field, such as a token, a password, or a webhook URL, that Outpost seals with the encryption key when you save it. Neither the dashboard nor the API shows it again, and a lost encryption key removes it.
-
-## Settle Period
-
-How long a container without a healthcheck must keep running before an update counts as successful. It is set with **Settle time** on the **Settings** page.
-
-## Setup Code
-
-The one-time code, in three groups of five characters such as `K7Q2M-XR9TD-P4W8N`, that Outpost prints to the container log while no dashboard account exists. It creates the account, works for 30 minutes, and is replaced by a new code each time Outpost starts.
+| Term                 | Also known as           | Definition                                                                                                                                                                                                                                     |
+|----------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **encryption key**   | `keys/installation.key` | The key file in the data directory that encrypts the authenticator secret, destination secret fields, and private registry passwords. If it goes missing, Outpost makes a new one, turns off the authenticator app, and removes those secrets. |
+| **export file**      | —                       | A portable JSON backup of the sections picked under **Settings** > **Backup** > **Export…**. It holds selected passwords and secrets in plain text and stores access-token hashes, not raw tokens.                                             |
+| **Confirm it’s you** | —                       | The fresh account check before an export or import, using the password and authenticator code or a passkey. It issues a five-minute, one-use grant for that operation and browser session.                                                     |

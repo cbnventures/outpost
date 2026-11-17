@@ -4,6 +4,7 @@ import type { Runner as History } from '../history.js';
 import type {
   Shared_CheckReport,
   Shared_CheckTrigger,
+  Shared_CycleAction,
   Shared_SchedulerEvent,
   Shared_SchedulerListener,
 } from './shared.d.ts';
@@ -13,9 +14,11 @@ import type {
  *
  * @since 0.0.1
  */
-export type Scheduler_Runner_RunCycle = (containerIds: string[] | undefined, source: Shared_CheckTrigger) => Promise<UpdateReport>;
+export type Scheduler_Runner_RunCycle = (containerIds: string[] | undefined, source: Shared_CheckTrigger, action: Shared_CycleAction, rollback: boolean) => Promise<UpdateReport>;
 
 export type Scheduler_Runner_Running = boolean;
+
+export type Scheduler_Runner_Action = Shared_CycleAction | undefined;
 
 export type Scheduler_Runner_History = Pick<History, 'add' | 'list'>;
 
@@ -44,7 +47,7 @@ export type Scheduler_Runner_Totals = {
  *
  * @since 0.0.1
  */
-export type Scheduler_Runner_Constructor_RunCycle = (containerIds: string[] | undefined, source: Shared_CheckTrigger) => Promise<UpdateReport>;
+export type Scheduler_Runner_Constructor_RunCycle = (containerIds: string[] | undefined, source: Shared_CheckTrigger, action: Shared_CycleAction, rollback: boolean) => Promise<UpdateReport>;
 
 export type Scheduler_Runner_Constructor_History = Pick<History, 'add' | 'list'>;
 
@@ -56,6 +59,10 @@ export type Scheduler_Runner_Constructor_GetNextRun = () => Date | undefined;
  * @since 0.0.1
  */
 export type Scheduler_Runner_Execute_Source = Shared_CheckTrigger;
+
+export type Scheduler_Runner_Execute_Action = Shared_CycleAction;
+
+export type Scheduler_Runner_Execute_Rollback = boolean;
 
 export type Scheduler_Runner_Execute_Run = () => Promise<UpdateReport>;
 
@@ -73,12 +80,18 @@ export type Scheduler_Runner_Execute_ErrorMessage = string;
 
 export type Scheduler_Runner_Execute_FinishedAt = string;
 
+export type Scheduler_Runner_Execute_CycleLabel = 'Check cycle' | 'Update cycle';
+
+export type Scheduler_Runner_Execute_CycleStartedAt = number;
+
 /**
  * Scheduler - Get State.
  *
  * @since 0.0.1
  */
 export type Scheduler_Runner_GetState_NextRun = Date | undefined;
+
+export type Scheduler_Runner_GetState_Returns_Action = Shared_CycleAction | undefined;
 
 export type Scheduler_Runner_GetState_Returns_Running = boolean;
 
@@ -93,6 +106,7 @@ export type Scheduler_Runner_GetState_Returns_LastError = string | undefined;
 export type Scheduler_Runner_GetState_Returns_Totals = Scheduler_Runner_Totals;
 
 export type Scheduler_Runner_GetState_Returns = {
+  action: Scheduler_Runner_GetState_Returns_Action;
   running: Scheduler_Runner_GetState_Returns_Running;
   startedAt: Scheduler_Runner_GetState_Returns_StartedAt;
   nextRun: Scheduler_Runner_GetState_Returns_NextRun;
@@ -148,4 +162,17 @@ export type Scheduler_Runner_Trigger_Source = Shared_CheckTrigger;
 
 export type Scheduler_Runner_Trigger_ContainerIds = string[] | undefined;
 
+export type Scheduler_Runner_Trigger_Action = Shared_CycleAction;
+
+export type Scheduler_Runner_Trigger_Rollback = boolean;
+
 export type Scheduler_Runner_Trigger_Returns = boolean;
+
+/**
+ * Scheduler - Scheduled cycle action.
+ *
+ * @since 1.1.0
+ */
+export type Scheduler_ScheduledCycleAction_MonitorOnly = boolean;
+
+export type Scheduler_ScheduledCycleAction_Returns = Shared_CycleAction;

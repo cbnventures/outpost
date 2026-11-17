@@ -150,7 +150,9 @@ export default [
     name: 'node-sqlite-runtime',
     files: [
       'src/lib/state.test.ts',
+      'src/lib/backup-state.test.ts',
       'src/lib/state.ts',
+      'src/types/lib/backup-state.test.d.ts',
       'src/types/lib/state.d.ts',
       'src/types/lib/state.test.d.ts',
     ],

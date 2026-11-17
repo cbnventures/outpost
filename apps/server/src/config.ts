@@ -10,14 +10,10 @@ import type {
   Config_ApplyRuntimeSettings_Config,
   Config_ApplyRuntimeSettings_Returns,
   Config_ApplyRuntimeSettings_Settings,
+  Config_ConsolePort,
   Config_DefaultRuntimeSettings,
   Config_LoadConfig_Environment,
   Config_LoadConfig_Returns,
-  Config_ReadNumber_Fallback,
-  Config_ReadNumber_Name,
-  Config_ReadNumber_Parsed,
-  Config_ReadNumber_Returns,
-  Config_ReadNumber_Value,
   Config_ReadSelfId_Cgroup,
   Config_ReadSelfId_CgroupMatch,
   Config_ReadSelfId_Hostname,
@@ -31,6 +27,17 @@ import type {
   Config_RuntimeSettingsFromConfig_Config,
   Config_RuntimeSettingsFromConfig_Returns,
 } from './types/config.d.ts';
+
+/**
+ * Config - Console Port.
+ *
+ * The port the dashboard and HTTP API listen on inside the container. A
+ * different host port is chosen with the port mapping, such as
+ * `-p 8080:22601`.
+ *
+ * @since 1.1.0
+ */
+export const consolePort: Config_ConsolePort = 22601;
 
 /**
  * Config - Default Runtime Settings.
@@ -65,7 +72,7 @@ export const defaultRuntimeSettings: Config_DefaultRuntimeSettings = {
  */
 export function loadConfig(environment: Config_LoadConfig_Environment): Config_LoadConfig_Returns {
   return {
-    port: readNumber('PORT', environment['PORT'], 22601),
+    port: consolePort,
     dockerHost: readString(environment['DOCKER_HOST'], 'unix:///var/run/docker.sock'),
     schedule: defaultRuntimeSettings['schedule'],
     runOnStart: defaultRuntimeSettings['runOnStart'],
@@ -131,34 +138,6 @@ export function runtimeSettingsFromConfig(config: Config_RuntimeSettingsFromConf
     healthTimeoutSeconds: config['updater']['healthTimeoutSeconds'],
     settleSeconds: config['updater']['settleSeconds'],
   };
-}
-
-/**
- * Config - Read Number.
- *
- * Reads a positive integer variable. Unset or empty values use the
- * fallback; anything else that is not a positive integer is rejected.
- *
- * @param {Config_ReadNumber_Name}     name     - Name.
- * @param {Config_ReadNumber_Value}    value    - Value.
- * @param {Config_ReadNumber_Fallback} fallback - Fallback.
- *
- * @returns {Config_ReadNumber_Returns}
- *
- * @since 0.0.1
- */
-function readNumber(name: Config_ReadNumber_Name, value: Config_ReadNumber_Value, fallback: Config_ReadNumber_Fallback): Config_ReadNumber_Returns {
-  if (value === undefined || value === '') {
-    return fallback;
-  }
-
-  const parsed: Config_ReadNumber_Parsed = Number(value);
-
-  if (Number.isInteger(parsed) === false || parsed < 1) {
-    throw new Error(`${name} must be a positive integer, received "${value}".`);
-  }
-
-  return parsed;
 }
 
 /**

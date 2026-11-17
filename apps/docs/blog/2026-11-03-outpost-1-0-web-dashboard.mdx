@@ -1,0 +1,57 @@
+---
+title: "Outpost 1.0 Puts Every Container Update on One Dashboard"
+description: Outpost 1.0 adds a web dashboard that follows each check live, keeps the last 50 runs, and lets you update one container or all of them.
+slug: outpost-1-0-web-dashboard
+authors:
+  - mrjackyliang
+keywords:
+  - outpost
+  - docker
+  - web dashboard
+  - container updates
+  - passkeys
+  - self-hosted
+tags:
+  - release
+  - docker
+  - dashboard
+---
+
+Outpost 1.0 ships with a web dashboard. Every scheduled check, every update, and every rollback is now on one page you open in a browser, instead of in a container log.
+
+{/* truncate */}
+
+## Why It Matters
+
+An updater you leave running overnight has to answer one question in the morning: what changed? Before the dashboard, that answer lived in log lines. Now Outpost shows it on the **Overview** page, and keeps the last 50 checks and updates on disk so the record survives a restart.
+
+## What's Included
+
+### Overview
+
+The **Overview** follows the scheduler live. It shows whether Outpost is idle, checking, or updating, when the next check runs, how many containers are managed, and the result of the last run for each one. **Check now** looks up every image's registry digest without pulling anything, and **Update all** applies what the check found.
+
+### Containers
+
+The **Containers** page lists every running container and says why each one is or isn't managed, such as `Opted out by label` or `Pinned image`. A missing update traces back to its cause in one glance. Each managed container has its own **Check** and **Update** button, and every one-container update asks first.
+
+### History
+
+**History** keeps the last 50 runs, newest first, labeled by what started them: the schedule, startup, the API, or the dashboard. Expand a run to see what was updated, what is waiting, what was skipped, and why anything failed.
+
+### Settings, Notifications, and Access
+
+- **Settings** — The schedule, update behavior, and replacement timing, saved to Outpost's database and applied right away.
+- **Notifications** — Destinations such as ntfy, Telegram, Discord, and email, each with a test send.
+- **Private registries** — Sign-ins with encrypted passwords or access tokens.
+- **Access tokens** — Named, scoped tokens for scripts and Prometheus, with expiration and revocation.
+
+## Signed In Without a Password in Compose
+
+The first visit claims the account with a one-time code from the container log, so no password sits in your Compose file. From there, the account can add an authenticator app with ten recovery codes, and passkeys that sign in without typing a password.
+
+## Get Started
+
+Follow the [Quick Start](/docs/getting-started/quick-start/) to run Outpost, then open the dashboard on port 22601. [Web Dashboard](/docs/features/dashboard/) tours each page.
+
+**About Outpost** — Outpost is a self-hosted container updater for Docker that recreates containers on new images with their settings intact and rolls back when an update breaks.

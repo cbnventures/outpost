@@ -39,10 +39,10 @@ Let Outpost check and pull images that need a login by adding a sign-in for each
 4. Select **Add registry** to save it.
 
 <Frame caption="Adding a Docker Hub sign-in" style={{ maxWidth: 586, marginInline: 'auto' }}>
-  <ThemedImage sources={{ light: privateRegistriesOneLight, dark: privateRegistriesOneDark }} alt="Add registry dialog with docker.io in Registry, cbnventures in Username, a hidden access token in Password, and Cancel and Add registry buttons" width={584} height={483} style={{ maxWidth: '100%', height: 'auto' }} />
+  <ThemedImage sources={{ light: privateRegistriesOneLight, dark: privateRegistriesOneDark }} alt="Add registry dialog with docker.io in Registry, example-user in Username, a hidden access token in Password, and Cancel and Add registry buttons" width={584} height={483} style={{ maxWidth: '100%', height: 'auto' }} />
 </Frame>
 
-Outpost uses the sign-in from the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, without a restart. Each registry host can have one sign-in, so a second one for the same host is refused.
+Outpost uses the sign-in from the next <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology>, without a restart. Each registry host can have one sign-in, so a second one for the same host is refused.
 
 :::tip
 It is recommended to use a registry access token with read-only access, such as a Docker Hub personal access token or a GitHub token with the `read:packages` scope, instead of your account password.
@@ -63,21 +63,21 @@ Docker Hub's other names, `index.docker.io`, `registry-1.docker.io`, and `https:
 ## Edit or Remove a Sign-in
 
 <Frame caption="Private registries on the Settings page">
-  <ThemedImage sources={{ light: privateRegistriesTwoLight, dark: privateRegistriesTwoDark }} alt="Private registries section listing docker.io, ghcr.io, and registry.example.com, each with its username, the date it was added, and Edit and Remove buttons, under an Add registry button" width={960} height={281} style={{ maxWidth: '100%', height: 'auto' }} />
+  <ThemedImage sources={{ light: privateRegistriesTwoLight, dark: privateRegistriesTwoDark }} alt="Private registries section listing docker.io, ghcr.io, and registry.example.com, each with its username, the date it was added, and Edit and Remove buttons, under an Add registry button" width={960} height={279} style={{ maxWidth: '100%', height: 'auto' }} />
 </Frame>
 
 - **Edit** — Changes the host or the username. Leave **Password** blank to keep the saved one, or enter a new one to replace it.
-- **Remove** — Asks to confirm in a dialog, then deletes the sign-in, so Outpost checks that registry without a login from the next <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>.
+- **Remove** — Asks to confirm in a dialog, then deletes the sign-in, so Outpost checks that registry without a login from the next <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology>.
 
 ## How the Password Is Kept
 
-- **Sealed in `/data`** — The password is encrypted with the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> and stored in the database in the data directory, like the other saved secrets. Neither the dashboard nor the API shows it again.
-- **Dashboard only** — Only a signed-in browser session can list or change sign-ins. <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">Access tokens</Terminology> can't reach them.
-- **Lost encryption key** — If Outpost starts without its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, it removes each saved registry password but keeps the host and username. Until you enter the password again from the **Saved secrets were removed** notice, Outpost checks that registry without a login.
+- **Sealed in `/data`** — The password is encrypted with the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> and stored in the database in the data directory, like the other saved secrets. Neither the dashboard nor the API shows it again.
+- **Dashboard only** — Only a signed-in browser session can list or change sign-ins. <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">Access tokens</Terminology> can't reach them.
+- **Lost encryption key** — If Outpost starts without its <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>, it removes each saved registry password but keeps the host and username. Until you enter the password again from the **Saved secrets were removed** notice, Outpost checks that registry without a login.
 
 ## How the Sign-in Is Used
 
-- **Digest lookups** — Outpost uses the sign-in to answer the registry's sign-in challenge when it asks for the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology>.
+- **Digest lookups** — Outpost uses the sign-in to answer the registry's sign-in challenge when it asks for the <Terminology title="The registry's image fingerprint, compared without pulling" to="/docs/reference/terminology#update-cycles">remote digest</Terminology>.
 - **Pulls** — The same sign-in is passed to Docker when a new image is pulled.
 
 Outpost doesn't read Docker's `config.json`, so a `docker login` on the host or a credential helper such as `credsStore` has no effect. Add the same login here instead.

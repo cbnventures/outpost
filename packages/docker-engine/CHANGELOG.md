@@ -1,5 +1,9 @@
 # outpost-package-docker-engine
 
+## 1.1.0 - 2026-11-17
+
+No changes.
+
 ## 1.0.4 - 2026-11-06
 
 No changes.
@@ -19,4 +23,4 @@ No changes.
 ## 1.0.0 - 2026-11-03
 
 ### ADDED
-- Added a validated Docker Engine API client for container, image, network, and lifecycle operations over the local Unix socket.
+- A validated Docker Engine API client for container, image, network, and lifecycle operations over the local Unix socket.

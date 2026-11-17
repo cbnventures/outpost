@@ -7,6 +7,8 @@ import {
   issueFor,
   summaryFor,
 } from '@/web/api.ts';
+import { BackupView } from '@/web/backup-view.tsx';
+import { DebugLoggingPanel } from '@/web/debug-logging-panel.tsx';
 import { Button } from '@/web/primitives.tsx';
 import { RegistriesSection } from '@/web/registries-section.tsx';
 import { SchedulePicker } from '@/web/schedule-picker.tsx';
@@ -83,6 +85,7 @@ const switchFields = {
  */
 export const SettingsView = ({
   error,
+  onImported,
   onSave,
   settings,
 }: Web_Components_SettingsView_Props): ReactElement => {
@@ -98,6 +101,10 @@ export const SettingsView = ({
     saveError,
     setSaveError,
   ] = useState<unknown>(null);
+  const [
+    configurationRevision,
+    setConfigurationRevision,
+  ] = useState<number>(0);
 
   useEffect((): void => {
     setValues((settings === null) ? null : settings['runtime']);
@@ -235,11 +242,12 @@ export const SettingsView = ({
             <div className="form-section-head">
               <div>
                 <h2>Schedule</h2>
-                <p>Choose when automatic checks run.</p>
+                <p>{`Choose when automatic ${(values['monitorOnly']) ? 'checks' : 'updates'} run.`}</p>
               </div>
             </div>
             <SchedulePicker
               issue={issueFor(saveError, 'schedule')}
+              monitorOnly={values['monitorOnly']}
               onChange={(cron: string): void => changeValue('schedule', cron)}
               timeZone={settings['system']['timeZone']}
               value={values['schedule']}
@@ -329,7 +337,7 @@ export const SettingsView = ({
         ) : null}
       </form>
 
-      <RegistriesSection />
+      <RegistriesSection key={configurationRevision} />
 
       <div className="panel settings-panel">
         <section className="form-section">
@@ -351,6 +359,17 @@ export const SettingsView = ({
           </dl>
         </section>
       </div>
+
+      <BackupView
+        currentSettings={settings['runtime']}
+        onImported={async (): Promise<void> => {
+          await onImported();
+          setConfigurationRevision((revision: number): number => revision + 1);
+        }}
+        timeZone={settings['system']['timeZone']}
+      />
+
+      <DebugLoggingPanel />
     </section>
   );
 };

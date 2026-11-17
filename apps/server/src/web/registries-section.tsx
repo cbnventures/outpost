@@ -150,6 +150,7 @@ export const RegistriesSection = (): ReactElement => {
                     Edit
                   </Button>
                   <Button
+                    icon="remove"
                     onClick={(): void => {
                       setRemoveError('');
                       setRemoving(registry);

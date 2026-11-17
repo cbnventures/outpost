@@ -6,8 +6,10 @@ import type {
 } from 'outpost-package-registry';
 
 import type {
+  Shared_ContainerConfig,
   Shared_ContainerInspect,
   Shared_ContainerSummary,
+  Shared_CycleAction,
   Shared_Dependencies,
   Shared_Engine,
   Shared_ImageInspect,
@@ -37,7 +39,13 @@ export type Run_CheckContainer_Cycle_StartedAt = string;
 
 export type Run_CheckContainer_Cycle_Targeted = boolean;
 
+export type Run_CheckContainer_Cycle_Action = Shared_CycleAction;
+
+export type Run_CheckContainer_Cycle_Rollback = boolean;
+
 export type Run_CheckContainer_Cycle = {
+  action: Run_CheckContainer_Cycle_Action;
+  rollback: Run_CheckContainer_Cycle_Rollback;
   results: Run_CheckContainer_Cycle_Results;
   startedAt: Run_CheckContainer_Cycle_StartedAt;
   targeted: Run_CheckContainer_Cycle_Targeted;
@@ -61,11 +69,17 @@ export type Run_CheckContainer_Credentials = RegistryCredentials | undefined;
 
 export type Run_CheckContainer_CurrentImage = Shared_ImageInspect | undefined;
 
+export type Run_CheckContainer_LiveImageConfig = Shared_ContainerConfig | undefined;
+
+export type Run_CheckContainer_ImageConfig = Shared_ContainerConfig | undefined;
+
 export type Run_CheckContainer_Origin = Run_ImageOrigin_Returns;
 
 export type Run_CheckContainer_RemoteDigest = string | undefined;
 
 export type Run_CheckContainer_LookupStatus = RemoteDigestStatus | undefined;
+
+export type Run_CheckContainer_LookupError = string | undefined;
 
 export type Run_CheckContainer_Lookup = RemoteDigest;
 
@@ -73,15 +87,26 @@ export type Run_CheckContainer_MonitorOnly = boolean;
 
 export type Run_CheckContainer_PulledImage = Shared_ImageInspect | undefined;
 
+export type Run_CheckContainer_PulledImageConfig = Shared_ContainerConfig | undefined;
+
 export type Run_CheckContainer_RejectedImage = Shared_RejectedImage | undefined;
+
+export type Run_CheckContainer_RejectedRemoteImage = boolean;
+
+export type Run_CheckContainer_TaggedImage = Shared_ImageInspect | undefined;
+
+export type Run_CheckContainer_NewImageReference = string;
 
 export type Run_CheckContainer_Outcome_Status = Shared_ResultStatus;
 
 export type Run_CheckContainer_Outcome_Detail = string;
 
+export type Run_CheckContainer_Outcome_Summary = string | undefined;
+
 export type Run_CheckContainer_Outcome = {
   status: Run_CheckContainer_Outcome_Status;
   detail: Run_CheckContainer_Outcome_Detail;
+  summary?: Run_CheckContainer_Outcome_Summary;
 };
 
 export type Run_CheckContainer_CleanupNote = string;
@@ -89,6 +114,37 @@ export type Run_CheckContainer_CleanupNote = string;
 export type Run_CheckContainer_CleanupErrorMessage = string;
 
 export type Run_CheckContainer_ImageNote = string;
+
+export type Run_CheckContainer_RecoveryNote = string;
+
+export type Run_CheckContainer_Summary = string | undefined;
+
+/**
+ * Run - Manual Recovery Detail.
+ *
+ * @since 1.1.0
+ */
+export type Run_ManualRecoveryDetail_Container = Shared_ContainerInspect;
+
+export type Run_ManualRecoveryDetail_EnvironmentVariables = string[];
+
+export type Run_ManualRecoveryDetail_ExposedPorts = string[];
+
+export type Run_ManualRecoveryDetail_Mounts = string[];
+
+export type Run_ManualRecoveryDetail_Networks = string[];
+
+export type Run_ManualRecoveryDetail_Summary = {
+  configuredImage: string;
+  containerId: string;
+  environmentVariables: Run_ManualRecoveryDetail_EnvironmentVariables;
+  exposedPorts: Run_ManualRecoveryDetail_ExposedPorts;
+  mounts: Run_ManualRecoveryDetail_Mounts;
+  name: string;
+  networks: Run_ManualRecoveryDetail_Networks;
+};
+
+export type Run_ManualRecoveryDetail_Returns = string;
 
 /**
  * Run - Image Origin.
@@ -122,6 +178,10 @@ export type Run_RunUpdateCycle_ContainerId = string;
 
 export type Run_RunUpdateCycle_ContainerIds = Run_RunUpdateCycle_ContainerId[] | undefined;
 
+export type Run_RunUpdateCycle_Action = Shared_CycleAction;
+
+export type Run_RunUpdateCycle_Rollback = boolean;
+
 export type Run_RunUpdateCycle_Returns = Promise<Shared_Report>;
 
 export type Run_RunUpdateCycle_StartedAt = string;
@@ -152,5 +212,7 @@ export type Run_RunUpdateCycle_Results = Shared_Result[];
 export type Run_RunUpdateCycle_Result = Shared_Result | undefined;
 
 export type Run_RunUpdateCycle_ErrorMessage = string;
+
+export type Run_RunUpdateCycle_CycleLabel = 'Check cycle' | 'Update cycle';
 
 export type Run_RunUpdateCycle_Report = Shared_Report | undefined;

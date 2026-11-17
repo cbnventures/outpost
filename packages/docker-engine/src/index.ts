@@ -1,4 +1,5 @@
 export { Runner as DockerEngine } from './engine.js';
+export { containerConfigSchema } from './schema.js';
 
 export type {
   Shared_ContainerConfig as DockerContainerConfig,

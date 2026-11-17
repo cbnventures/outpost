@@ -8,11 +8,11 @@ import {
   summaryFor,
 } from '@/web/api.ts';
 import { ConfirmDialog } from '@/web/confirm-dialog.tsx';
+import { formatRelative } from '@/web/format.ts';
 import {
-  formatRelative,
-  shortDigests,
-} from '@/web/format.ts';
-import { ImageName } from '@/web/image-name.tsx';
+  BreakableText,
+  ImageName,
+} from '@/web/image-name.tsx';
 import {
   statusClasses,
   statusLabels,
@@ -21,6 +21,7 @@ import {
   Button,
   Icon,
 } from '@/web/primitives.tsx';
+import { showToast } from '@/web/toast.ts';
 
 import type { ReactElement } from 'react';
 
@@ -28,6 +29,7 @@ import type { Web_Api_Container } from '@/types/web/api.d.ts';
 import type {
   Web_Components_ContainerCell_Props,
   Web_Components_ContainersView_Props,
+  Web_Components_UpdateConfirmationDialog_Props,
 } from '@/types/web/components.d.ts';
 
 // LastResult shows what the last check did with a container, or that none has looked at it yet.
@@ -44,6 +46,7 @@ const LastResult = ({
   container,
 }: Web_Components_ContainerCell_Props): ReactElement => {
   const status: Web_Api_Container['lastStatus'] = container['lastStatus'];
+  const detail: Web_Api_Container['lastDetail'] = container['lastSummary'] ?? container['lastDetail'];
 
   if (status === null || status === undefined) {
     return <span className="container-note">Not checked yet</span>;
@@ -55,32 +58,36 @@ const LastResult = ({
         <span aria-hidden="true" className={statusClasses[status]} />
         {statusLabels[status]}
       </span>
-      {(container['lastDetail'] === null || container['lastDetail'] === undefined || container['lastDetail'] === '') ? null : (
-        <span className="container-note" title={container['lastDetail']}>{shortDigests(container['lastDetail'])}</span>
+      {(detail === null || detail === undefined || detail === '') ? null : (
+        <BreakableText breakAtNameSeparators className="container-note container-detail" text={detail} title={detail} />
       )}
       {(container['lastCheckedAt'] === null || container['lastCheckedAt'] === undefined) ? null : (
-        <span className="container-note">{`Checked ${formatRelative(container['lastCheckedAt'])}`}</span>
+        <span className="container-note">{`${(status === 'updated') ? 'Updated' : 'Checked'} ${formatRelative(container['lastCheckedAt'])}`}</span>
       )}
     </>
   );
 };
 
-// checkLabel names a row's button: monitor-only containers are only checked.
+// actionLabel names the operation a row can start from its latest status.
 
 /**
- * Containers View - Checks label.
+ * Containers View - Action label.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
- * @since 1.0.0
+ * @since 1.1.0
  */
-const checkLabel = (container: Web_Api_Container, checking: boolean): string => {
+const actionLabel = (container: Web_Api_Container, checking: boolean, updating: boolean): string => {
+  if (updating) {
+    return 'Updating…';
+  }
+
   if (checking) {
     return 'Checking…';
   }
 
-  return (container['monitorOnly']) ? 'Check' : 'Check & update';
+  return ((container['lastStatus'] === 'available' || container['lastStatus'] === 'held') && !container['monitorOnly']) ? 'Update' : 'Check';
 };
 
 // Managed says whether Outpost updates a container, and why not when it doesn't.
@@ -128,7 +135,59 @@ const managedNote = (container: Web_Api_Container): string => [
   'Managed',
   ...((container['self']) ? ['Outpost itself'] : []),
   ...((container['monitorOnly']) ? ['Monitor only'] : []),
-].join(' · ');
+].join('\u00a0·\u00a0');
+
+/**
+ * Containers View - Update Confirmation Dialog.
+ *
+ * Confirms every one-container update. Non-self containers can deliberately
+ * keep a failed replacement, while Outpost itself always keeps rollback on.
+ *
+ * @since 1.1.0
+ */
+export const UpdateConfirmationDialog = ({
+  container,
+  onCancel,
+  onConfirm,
+}: Web_Components_UpdateConfirmationDialog_Props): ReactElement => {
+  const [
+    keepNewContainer,
+    setKeepNewContainer,
+  ] = useState<boolean>(container['lastStatus'] === 'held' && !container['self']);
+  const held: boolean = container['lastStatus'] === 'held' && !container['self'];
+  let message: string = `Outpost will recreate ${container['name']} with the new image and normally roll back if its health check fails.`;
+
+  if (container['self']) {
+    message = 'Outpost updates itself after every other selected container, then the dashboard reconnects on its own.';
+  } else if (held) {
+    message = `${container['name']} was rolled back from this image last time. Outpost is waiting for a newer image; proceeding now requires rollback to stay off so you can keep and inspect the rejected replacement.`;
+  }
+
+  return (
+    <ConfirmDialog
+      busy={false}
+      busyLabel=""
+      confirmLabel={(held) ? 'Update without rollback' : 'Update'}
+      error=""
+      message={message}
+      onCancel={onCancel}
+      onConfirm={(): void => onConfirm(!keepNewContainer)}
+      open
+      title={(container['self']) ? 'Update Outpost itself?' : `Update ${container['name']}?`}
+      tone="primary"
+    >
+      {(container['self']) ? null : (
+        <label aria-label="Keep the new container even if it fails its health check (don't roll back)" className="check-row check-row-danger">
+          <input checked={keepNewContainer} disabled={held} onChange={(event): void => setKeepNewContainer(event.currentTarget.checked)} type="checkbox" />
+          <span>
+            <strong>{'Keep the new container even if it fails its health check (don\'t roll back)'}</strong>
+            <small>The replacement may be stopped, unhealthy, or unable to serve traffic. Use the saved history detail to recover manually.</small>
+          </span>
+        </label>
+      )}
+    </ConfirmDialog>
+  );
+};
 
 /**
  * Containers View.
@@ -143,6 +202,7 @@ export const ContainersView = ({
   error,
   onRefresh,
   onStartCheck,
+  onStartUpdate,
   overview,
 }: Web_Components_ContainersView_Props): ReactElement => {
   const [
@@ -154,19 +214,28 @@ export const ContainersView = ({
     setChecking,
   ] = useState<string>('');
   const [
+    updating,
+    setUpdating,
+  ] = useState<string>('');
+  const [
     actionError,
     setActionError,
   ] = useState<string>('');
   const [
-    confirmingSelf,
-    setConfirmingSelf,
+    confirmingUpdate,
+    setConfirmingUpdate,
   ] = useState<Web_Api_Container | null>(null);
+  const [
+    confirmingUpdateAll,
+    setConfirmingUpdateAll,
+  ] = useState<boolean>(false);
   const running: boolean = overview !== null && overview['running'];
 
   // A row says "Checking…" only until the check it started is done.
   useEffect((): void => {
     if (!running) {
       setChecking('');
+      setUpdating('');
     }
   }, [running]);
 
@@ -184,8 +253,31 @@ export const ContainersView = ({
     try {
       await onStartCheck(container['id']);
       setChecking(container['id']);
+      showToast('Check started.', true);
     } catch (caughtError) {
       setActionError((caughtError instanceof Error) ? caughtError.message : 'The check could not be started.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Containers View - Update.
+   *
+   * Starts an apply cycle for one container, or for all managed containers.
+   * The scheduler completion event refreshes each row with its new result.
+   *
+   * @since 1.1.0
+   */
+  const update = async (container?: Web_Api_Container, rollback: boolean = true): Promise<void> => {
+    setBusy(true);
+    setActionError('');
+    try {
+      await onStartUpdate((container === undefined) ? undefined : container['id'], rollback);
+      setUpdating((container === undefined) ? '*' : container['id']);
+      showToast((container === undefined) ? 'Update started.' : `${container['name']} update started.`, true);
+    } catch (caughtError) {
+      setActionError((caughtError instanceof Error) ? caughtError.message : 'The update could not be started.');
     } finally {
       setBusy(false);
     }
@@ -207,6 +299,8 @@ export const ContainersView = ({
       setBusy(false);
     }
   };
+
+  const availableCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed'] && !container['monitorOnly'] && container['lastStatus'] === 'available').length;
 
   let content: ReactElement | null = null;
 
@@ -253,15 +347,15 @@ export const ContainersView = ({
           {containers.map((container: Web_Api_Container): ReactElement => (
             <tr key={container['id']}>
               <td className="cell-container">
-                <span className="container-name">{container['name']}</span>
-                <span className="container-note mono container-id">{container['id']}</span>
+                <BreakableText breakAtNameSeparators className="container-name" text={container['name']} />
+                <BreakableText className="container-note mono container-id" text={container['id']} title={container['fullId']} />
                 <ImageName className="container-note container-inline-image" image={container['image']} />
                 <span className="container-inline">
                   <LastResult container={container} />
                   {(container['managed']) ? (
                     <span className="container-note">{managedNote(container)}</span>
                   ) : (
-                    <span className="container-note">{`Not managed · ${container['note']}`}</span>
+                    <span className="container-note">{`Not managed\u00a0·\u00a0${container['note']}`}</span>
                   )}
                 </span>
               </td>
@@ -279,9 +373,8 @@ export const ContainersView = ({
                   <Button
                     disabled={busy || running}
                     onClick={(): void => {
-                      // Updating Outpost restarts it, so its own row asks first.
-                      if (container['self'] && !container['monitorOnly']) {
-                        setConfirmingSelf(container);
+                      if ((container['lastStatus'] === 'available' || container['lastStatus'] === 'held') && !container['monitorOnly']) {
+                        setConfirmingUpdate(container);
 
                         return;
                       }
@@ -289,7 +382,7 @@ export const ContainersView = ({
                       void check(container);
                     }}
                   >
-                    {checkLabel(container, running && checking === container['id'])}
+                    {actionLabel(container, running && checking === container['id'], running && updating === container['id'])}
                   </Button>
                 ) : null}
               </td>
@@ -307,15 +400,25 @@ export const ContainersView = ({
           <h1>Containers</h1>
           <p>Running containers and what Outpost last did with each one.</p>
         </div>
-        <Button
-          disabled={busy}
-          icon="refresh"
-          onClick={(): void => {
-            void refresh();
-          }}
-        >
-          Refresh
-        </Button>
+        <div className="panel-actions">
+          {(availableCount === 0) ? null : (
+            <Button
+              disabled={busy || running}
+              onClick={(): void => setConfirmingUpdateAll(true)}
+            >
+              {`Update all (${availableCount})`}
+            </Button>
+          )}
+          <Button
+            disabled={busy}
+            icon="refresh"
+            onClick={(): void => {
+              void refresh();
+            }}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {(actionError === '') ? null : (
@@ -334,22 +437,34 @@ export const ContainersView = ({
 
       <div className="table-card">{content}</div>
 
+      {(confirmingUpdate === null) ? null : (
+        <UpdateConfirmationDialog
+          container={confirmingUpdate}
+          onCancel={(): void => setConfirmingUpdate(null)}
+          onConfirm={(rollback): void => {
+            const container: Web_Api_Container = confirmingUpdate;
+
+            setConfirmingUpdate(null);
+
+            void update(container, rollback);
+          }}
+        />
+      )}
+
       <ConfirmDialog
         busy={false}
         busyLabel=""
-        confirmLabel="Check and update"
+        confirmLabel="Update all"
         error=""
-        message={'If there\'s a newer Outpost image, Outpost restarts on it. The dashboard reconnects on its own, and the check shows in History once it\'s done.'}
-        onCancel={(): void => setConfirmingSelf(null)}
+        message="Outpost checks every managed container, applies newer images, and updates itself last if needed. Monitor-only containers stay unchanged."
+        onCancel={(): void => setConfirmingUpdateAll(false)}
         onConfirm={(): void => {
-          if (confirmingSelf !== null) {
-            setConfirmingSelf(null);
+          setConfirmingUpdateAll(false);
 
-            void check(confirmingSelf);
-          }
+          void update();
         }}
-        open={confirmingSelf !== null}
-        title="Update Outpost itself?"
+        open={confirmingUpdateAll}
+        title="Update all available containers?"
         tone="primary"
       />
     </section>

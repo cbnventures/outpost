@@ -1,7 +1,7 @@
 ---
 id: configuration
 title: Configuration
-description: Configure update behavior in Outpost's dashboard and keep only bootstrap paths and container identity in Compose.
+description: Configure update behavior and portable backups in Outpost's dashboard, while keeping bootstrap paths and container identity in Compose.
 sidebar_position: 2
 keywords:
   - outpost
@@ -57,10 +57,10 @@ After Outpost starts, open **Settings** to choose the schedule and update behavi
 
 ## Schedule Settings
 
-| Setting                       | Description                                                                                                                                                                                                                                     |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Schedule**                  | **Every hour**, **Every few hours** (2, 3, 4, 6, 8, or 12), **Every day** or **Every week** on the days you pick at a set time, or **Custom (cron)** for a cron expression. Default every day at 04:00. The line under it shows the next check. |
-| **Check when Outpost starts** | Starts a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> as soon as Outpost starts, in addition to the schedule. Off by default.                                          |
+| Setting                       | Description                                                                                                                                                                                                                                                                        |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Schedule**                  | **Every hour**, **Every few hours** (2, 3, 4, 6, 8, or 12), **Every day** or **Every week** on the days you pick at a set time, or **Custom (cron)** for a cron expression. Default every day at 04:00. The line under it shows the next check.                                    |
+| **Check when Outpost starts** | Starts an automatic update <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> as soon as Outpost starts, or a check while **Monitor only** is on, in addition to the schedule. Off by default. |
 
 The schedule runs in the time zone set by `TZ`, which the next-check line names. **Custom (cron)** takes six fields, second, minute, hour, day of month, month, and day of week, for example:
 
@@ -70,30 +70,30 @@ The schedule runs in the time zone set by `TZ`, which the next-check line names.
 
 Five-field patterns without the seconds field, such as `0 4 * * *`, also work, as do the nicknames `@yearly`, `@monthly`, `@weekly`, `@daily`, and `@hourly`.
 
-If a <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> is still running when the schedule comes due, that scheduled run is dropped, not queued. The next one starts at its usual time.
+If a <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> is still running when the schedule comes due, that scheduled run is dropped, not queued. The next one starts at its usual time.
 
 ## Update Behavior Settings
 
-| Setting                 | Description                                                                                                              |
-|-------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| **Container selection** | **Opt-out** updates every container unless labeled off; **Opt-in** updates only labeled containers. Default **Opt-out**. |
-| **Monitor only**        | Reports newer images without recreating any container. Off by default.                                                   |
-| **Clean up old images** | Removes the old image after a successful update when nothing else uses it. On by default.                                |
-| **Stop timeout**        | Seconds Docker waits for the old container to stop before killing it. Default `30`.                                      |
-| **Health timeout**      | Seconds a new container with a healthcheck has to report healthy. Default `120`.                                         |
-| **Settle time**         | Seconds a new container without a healthcheck must keep running before the update counts. Default `10`.                  |
+| Setting                 | Description                                                                                                                                    |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Container selection** | **Opt-out** updates every container unless labeled off; **Opt-in** updates only labeled containers. Default **Opt-out**.                       |
+| **Monitor only**        | Reports newer images without recreating any container. Scheduled and startup runs become registry-only checks that never pull. Off by default. |
+| **Clean up old images** | Removes the old image after a successful update when nothing else uses it. On by default.                                                      |
+| **Stop timeout**        | Seconds Docker waits for the old container to stop before killing it. Default `30`.                                                            |
+| **Health timeout**      | Seconds a new container with a healthcheck has to report healthy. Default `120`.                                                               |
+| **Settle time**         | Seconds a new container without a healthcheck must keep running before the update counts. Default `10`.                                        |
 
 See [Labels and Modes](/docs/features/labels-and-modes/) for the label rules and [Updates and Rollback](/docs/features/updates-and-rollback/) for how the timeouts are used.
 
 ## Data Directory
 
-| Variable                 | Description                                                                                                                                                                                                                                                                               |
-|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `OUTPOST_DATA_DIRECTORY` | Folder that holds the dashboard database (`outpost.sqlite3`), its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> (`keys/installation.key`), and the check history (`history.json`). Default `/data`. |
+| Variable                 | Description                                                                                                                                                                                                                                                                                             |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `OUTPOST_DATA_DIRECTORY` | Folder that holds the dashboard database (`outpost.sqlite3`), its <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> (`keys/installation.key`), and the check history (`history.json`). Default `/data`. |
 
-The dashboard account, runtime settings, <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and private registry sign-ins are kept in the database in the data directory.
+The dashboard account, runtime settings, <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and private registry sign-ins are kept in the database in the data directory.
 
-You create the account on the first visit, with a <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> from the container log, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account). <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">Destinations</Terminology> are added on the **Notifications** page, as shown in [Notifications](/docs/features/notifications/#add-a-destination).
+You create the account on the first visit, with a <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology> from the container log, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account). <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">Destinations</Terminology> are added on the **Notifications** page, as shown in [Notifications](/docs/features/notifications/#add-a-destination).
 
 Only the default `/data` is created and handed to `PUID` when the container starts. A custom `OUTPOST_DATA_DIRECTORY` must already belong to `PUID`, or Outpost stops at startup with a permission error.
 
@@ -121,18 +121,18 @@ Outpost also joins the group that owns the Docker socket, so `PGID` doesn't need
 
 ## Port
 
-Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API listen on `22601` by default. The examples publish it on every IPv4 and IPv6 address so another computer on the network can reach the Docker host. To use a different port only on the host, change the host side of the mapping, such as `"8080:22601"`.
+Outpost is assigned port `22601` in CBN Ventures' `22600`–`22699` Docker port block. The dashboard and HTTP API always listen on `22601` inside the container. The examples publish it on every IPv4 and IPv6 address so another computer on the network can reach the Docker host.
 
-Set `PORT` to change the port inside the container too. The image healthcheck follows the same value, so the environment and both sides of the mapping must agree:
+To use a different port, change the host side of the mapping, such as `-p 8080:22601` with `docker run` or `"8080:22601"` in `compose.yml`:
 
 ```yaml title="compose.yml"
 services:
   outpost:
-    environment:
-      PORT: "8080"
     ports:
-      - "8080:8080"
+      - "8080:22601"
 ```
+
+With host networking, there is no mapping, so the port is always `22601`.
 
 ## IPv6
 
@@ -164,6 +164,12 @@ volumes:
   outpost-data:
 ```
 
+## Backup
+
+Near the end of **Settings**, just above **Diagnostics**, is **Backup**, with **Export…** and **Import…** beside **Export and import**. It works independently of the settings save bar and makes a portable <Terminology title="A JSON backup you can carry to another Outpost" to="/docs/reference/terminology#backup-and-encryption">export file</Terminology> for selected settings, private registry sign-ins, notifications, and <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access-token</Terminology> hashes.
+
+An import previews which values will be replaced, added, or skipped before it changes anything. See [Export and Import](/docs/reference/backup-and-recovery/#export-and-import) for the wizard steps and the difference between a portable file and a complete data-directory backup.
+
 ## Validation
 
 The **Settings** page validates runtime behavior before saving it:
@@ -176,6 +182,6 @@ Outpost checks bootstrap values at startup and refuses to start when one is inva
 
 - **`PUID` and `PGID`** — Must be whole numbers from `1` to `2147483647`, so `0` is refused. The image's init step checks them and logs messages such as `PUID must be between 1 and 2147483647.`
 - **`TZ`** — Must name a time zone installed in the image, such as `America/Chicago`. Otherwise the init step logs `Unknown timezone:` followed by the value.
-- **<Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">Encryption key</Terminology>** — The key file in the data directory must belong to the database, or startup stops, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match). A missing key file doesn't stop startup, because Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the saved registry passwords.
+- **<Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">Encryption key</Terminology>** — The key file in the data directory must belong to the database, or startup stops, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match). A missing key file doesn't stop startup, because Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the saved registry passwords.
 
 `DOCKER_HOST` and `OUTPOST_DATA_DIRECTORY` are not checked for format. A wrong `DOCKER_HOST`, or a data directory that `PUID` can't use, stops Outpost at startup instead.

@@ -9,6 +9,26 @@
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/;
 
 /**
+ * Regex - Backup Content Disposition Pattern.
+ *
+ * Matches the dated attachment header emitted for a portable Outpost export.
+ * Tests use it without duplicating filename-format knowledge.
+ *
+ * @since 1.1.0
+ */
+const backupContentDispositionPattern = /^attachment; filename="outpost-export-[0-9]{4}-[0-9]{2}-[0-9]{2}\.json"$/;
+
+/**
+ * Regex - Backup Grant Pattern.
+ *
+ * Matches the fixed prefix and Base64URL payload of a fresh confirmation grant.
+ * Malformed values never reach the in-memory digest lookup.
+ *
+ * @since 1.1.0
+ */
+const backupGrantPattern = /^obg_[A-Za-z0-9_-]{43}$/;
+
+/**
  * Regex - Bearer Authorization Pattern.
  *
  * Matches a complete Bearer authorization header and captures its credential.
@@ -220,6 +240,8 @@ const whitespacePattern = /\s+/;
 
 export {
   base64UrlPattern,
+  backupContentDispositionPattern,
+  backupGrantPattern,
   bearerAuthorizationPattern,
   cgroupContainerIdPattern,
   containerHostnamePattern,

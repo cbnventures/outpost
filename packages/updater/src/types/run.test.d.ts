@@ -45,6 +45,12 @@ export type Run_FakeDependencies_RememberRejectedImage = Mock<Shared_Dependencie
 
 export type Run_FakeDependencies_ForgetRejectedImage = Mock<Shared_Dependencies['forgetRejectedImage']>;
 
+export type Run_FakeDependencies_FindImageConfig = Mock<NonNullable<Shared_Dependencies['findImageConfig']>>;
+
+export type Run_FakeDependencies_RememberImageConfig = Mock<NonNullable<Shared_Dependencies['rememberImageConfig']>>;
+
+export type Run_FakeDependencies_PruneImageConfigs = Mock<NonNullable<Shared_Dependencies['pruneImageConfigs']>>;
+
 export type Run_FakeDependencies = {
   engine: Run_FakeDependencies_Engine;
   fetchFunction: Run_FakeDependencies_FetchFunction;
@@ -54,6 +60,9 @@ export type Run_FakeDependencies = {
   findRejectedImage: Run_FakeDependencies_FindRejectedImage;
   rememberRejectedImage: Run_FakeDependencies_RememberRejectedImage;
   forgetRejectedImage: Run_FakeDependencies_ForgetRejectedImage;
+  findImageConfig: Run_FakeDependencies_FindImageConfig;
+  rememberImageConfig: Run_FakeDependencies_RememberImageConfig;
+  pruneImageConfigs: Run_FakeDependencies_PruneImageConfigs;
 };
 
 /**
@@ -89,6 +98,14 @@ export type Run_CreateDependencies_State_NewHealth = string | undefined;
 
 export type Run_CreateDependencies_State_NewHealthcheck = Shared_ContainerInspect['Config']['Healthcheck'];
 
+export type Run_CreateDependencies_State_CurrentImageMissing = boolean | undefined;
+
+export type Run_CreateDependencies_State_CurrentContainerConfig = Shared_ContainerInspect['Config'] | undefined;
+
+export type Run_CreateDependencies_State_CurrentImageConfig = Shared_ImageInspect['Config'];
+
+export type Run_CreateDependencies_State_NewImageConfig = Shared_ImageInspect['Config'];
+
 export type Run_CreateDependencies_State = {
   localDigest: Run_CreateDependencies_State_LocalDigest;
   currentRepoDigests?: Run_CreateDependencies_State_CurrentRepoDigests;
@@ -104,6 +121,10 @@ export type Run_CreateDependencies_State = {
   oldHealth?: Run_CreateDependencies_State_OldHealth;
   newHealth?: Run_CreateDependencies_State_NewHealth;
   newHealthcheck?: Run_CreateDependencies_State_NewHealthcheck;
+  currentImageMissing?: Run_CreateDependencies_State_CurrentImageMissing;
+  currentContainerConfig?: Run_CreateDependencies_State_CurrentContainerConfig;
+  currentImageConfig?: Run_CreateDependencies_State_CurrentImageConfig;
+  newImageConfig?: Run_CreateDependencies_State_NewImageConfig;
 };
 
 export type Run_CreateDependencies_RunningAfterStart = boolean;
@@ -115,6 +136,28 @@ export type Run_CreateDependencies_Clock = number;
 export type Run_CreateDependencies_NewInspectCount = number;
 
 export type Run_CreateDependencies_IsCreated = boolean;
+
+/**
+ * Run - Run Update Cycle - Uses Cached Image Defaults.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_UsesCachedImageDefaults_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_UsesCachedImageDefaults_Report = Shared_Report;
+
+export type Run_RunUpdateCycle_UsesCachedImageDefaults_CreateCall = Parameters<Shared_Engine['createContainer']> | undefined;
+
+export type Run_RunUpdateCycle_UsesCachedImageDefaults_CreateBody = Record<string, unknown>;
+
+/**
+ * Run - Run Update Cycle - Reports Missing Image Metadata.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_ReportsMissingImageMetadata_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_ReportsMissingImageMetadata_Report = Shared_Report;
 
 /**
  * Run - Create Self Dependencies.
@@ -153,6 +196,15 @@ export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_Rolle
 export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_OlderReport = Shared_Report;
 
 /**
+ * Run - Run Update Cycle - Checks Without Pulling Or Recreating.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Dependencies = Run_CreateSelfDependencies_Returns;
+
+export type Run_RunUpdateCycle_ChecksWithoutPullingOrRecreating_Report = Shared_Report;
+
+/**
  * Run - Run Update Cycle - Hands Outpost To Update Self After The Other Containers.
  *
  * @since 1.0.0
@@ -160,6 +212,15 @@ export type Run_RunUpdateCycle_ChecksPulledImagesOnTheContainerdImageStore_Older
 export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Dependencies = Run_CreateSelfDependencies_Returns;
 
 export type Run_RunUpdateCycle_HandsOutpostToUpdateSelfAfterTheOtherContainers_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Holds A Rejected Image During Checks.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_HoldsARejectedImageDuringChecks_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Keeps An Unhealthy Replacement When The Old Container Was Unhealthy.
@@ -205,13 +266,31 @@ export type Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Dependencies = Run_
 export type Run_RunUpdateCycle_RemembersAnImageThatRollsBack_Report = Shared_Report;
 
 /**
- * Run - Run Update Cycle - Retries A Rolled Back Image When A Check Names The Container.
+ * Run - Run Update Cycle - Bypasses A Rolled Back Image Only Without Rollback.
  *
  * @since 1.0.3
  */
-export type Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Dependencies = Run_FakeDependencies;
+export type Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Dependencies = Run_FakeDependencies;
 
-export type Run_RunUpdateCycle_RetriesARolledBackImageWhenACheckNamesTheContainer_Report = Shared_Report;
+export type Run_RunUpdateCycle_BypassesARolledBackImageOnlyWithoutRollback_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Keeps An Unhealthy Replacement Without Rollback.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Dependencies = Run_FakeDependencies;
+
+export type Run_RunUpdateCycle_KeepsAnUnhealthyReplacementWithoutRollback_Report = Shared_Report;
+
+/**
+ * Run - Run Update Cycle - Refuses Disabled Rollback For Outpost.
+ *
+ * @since 1.1.0
+ */
+export type Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Dependencies = Run_CreateSelfDependencies_Returns;
+
+export type Run_RunUpdateCycle_RefusesDisabledRollbackForOutpost_Report = Shared_Report;
 
 /**
  * Run - Run Update Cycle - Rolls Back An Unhealthy Replacement Of A Healthy Container.

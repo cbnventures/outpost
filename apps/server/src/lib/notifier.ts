@@ -35,6 +35,7 @@ import type {
   Lib_Notifier_Runner_NotifyUpdateReport_Report,
   Lib_Notifier_Runner_NotifyUpdateReport_Results,
   Lib_Notifier_Runner_NotifyUpdateReport_Returns,
+  Lib_Notifier_Runner_NotifyUpdateReport_RollbackNote,
   Lib_Notifier_Runner_SendTest_Delivery,
   Lib_Notifier_Runner_SendTest_Id,
   Lib_Notifier_Runner_SendTest_Result,
@@ -78,7 +79,7 @@ export const notificationEvents: Lib_Notifier_NotificationEvents = [
   },
   {
     defaultEnabled: true,
-    description: 'Monitor-only containers have new images.',
+    description: 'A check found new container images.',
     key: 'updates-available',
     label: 'New images available',
     priority: 'default',
@@ -86,7 +87,7 @@ export const notificationEvents: Lib_Notifier_NotificationEvents = [
   },
   {
     defaultEnabled: true,
-    description: 'An update failed or was rolled back.',
+    description: 'An update failed, was rolled back, or was kept after failure.',
     key: 'update-failed',
     label: 'Update failed',
     priority: 'high',
@@ -261,10 +262,14 @@ export class Runner {
    * @since 1.0.0
    */
   public notifyUpdateReport(report: Lib_Notifier_Runner_NotifyUpdateReport_Report): Lib_Notifier_Runner_NotifyUpdateReport_Returns {
+    const rollbackNote: Lib_Notifier_Runner_NotifyUpdateReport_RollbackNote = (report['rollback'] === false) ? ' Rollback was disabled for this run.' : '';
+    const errorRollbackNote: Lib_Notifier_Runner_NotifyUpdateReport_RollbackNote = (rollbackNote === '') ? '' : `.${rollbackNote}`;
+
     if (report['error'] !== undefined) {
-      this.deliver(buildEventNotification(notificationEvents[4]!, `The update check couldn't run: ${report['error']}`, {
+      this.deliver(buildEventNotification(notificationEvents[4]!, `The update check couldn't run: ${report['error']}${errorRollbackNote}`, {
         error: report['error'],
         finishedAt: report['finishedAt'],
+        ...((report['rollback'] === false) ? { rollback: false } : {}),
         startedAt: report['startedAt'],
       }));
 
@@ -273,26 +278,34 @@ export class Runner {
 
     const updated: Lib_Notifier_Runner_NotifyUpdateReport_Results = report['results'].filter((result) => result['status'] === 'updated');
     const available: Lib_Notifier_Runner_NotifyUpdateReport_Results = report['results'].filter((result) => result['status'] === 'available');
-    const failed: Lib_Notifier_Runner_NotifyUpdateReport_Results = report['results'].filter((result) => result['status'] === 'failed' || result['status'] === 'rolled-back');
+    const failed: Lib_Notifier_Runner_NotifyUpdateReport_Results = report['results'].filter((result) => (
+      result['status'] === 'failed'
+      || result['status'] === 'rolled-back'
+      || result['status'] === 'kept-unhealthy'
+    ));
+    const failureRollbackNote: Lib_Notifier_Runner_NotifyUpdateReport_RollbackNote = (failed.some((result) => result['detail'].toLowerCase().includes('rollback was disabled')) === true) ? '' : rollbackNote;
 
     if (updated.length > 0) {
-      this.deliver(buildEventNotification(notificationEvents[2]!, `Updated ${this.describeContainers(updated, false)}.`, {
+      this.deliver(buildEventNotification(notificationEvents[2]!, `Updated ${this.describeContainers(updated, false)}.${rollbackNote}`, {
         containers: updated,
         finishedAt: report['finishedAt'],
+        ...((report['rollback'] === false) ? { rollback: false } : {}),
       }));
     }
 
     if (available.length > 0) {
-      this.deliver(buildEventNotification(notificationEvents[3]!, `New images are ready for ${this.describeContainers(available, false)}.`, {
+      this.deliver(buildEventNotification(notificationEvents[3]!, `New images are ready for ${this.describeContainers(available, false)}.${rollbackNote}`, {
         containers: available,
         finishedAt: report['finishedAt'],
+        ...((report['rollback'] === false) ? { rollback: false } : {}),
       }));
     }
 
     if (failed.length > 0) {
-      this.deliver(buildEventNotification(notificationEvents[4]!, `Couldn't update ${this.describeContainers(failed, true)}.`, {
+      this.deliver(buildEventNotification(notificationEvents[4]!, `Couldn't update ${this.describeContainers(failed, true)}.${failureRollbackNote}`, {
         containers: failed,
         finishedAt: report['finishedAt'],
+        ...((report['rollback'] === false) ? { rollback: false } : {}),
       }));
     }
 
@@ -392,7 +405,13 @@ export class Runner {
     }
 
     return `${String(results.length)} ${noun}: ${results.map((result) => {
-      const outcome: Lib_Notifier_Runner_DescribeContainers_Noun = (result['status'] === 'rolled-back') ? 'was rolled back' : 'failed';
+      let outcome: Lib_Notifier_Runner_DescribeContainers_Noun = 'failed';
+
+      if (result['status'] === 'rolled-back') {
+        outcome = 'was rolled back';
+      } else if (result['status'] === 'kept-unhealthy') {
+        outcome = 'was kept after the update failed';
+      }
       const detail: Lib_Notifier_Runner_DescribeContainers_Noun = (result['detail'].endsWith('.') === true) ? result['detail'].slice(0, -1) : result['detail'];
 
       return `${result['container']} (${result['image']}) ${outcome}: ${detail}`;

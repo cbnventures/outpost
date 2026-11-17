@@ -8,11 +8,6 @@ import type {
   Web_Format_Relative_Now,
   Web_Format_Relative_Returns,
   Web_Format_Relative_Value,
-  Web_Format_ShortDigests_Returns,
-  Web_Format_ShortDigests_Text,
-  Web_Format_Until_Now,
-  Web_Format_Until_Returns,
-  Web_Format_Until_Value,
 } from '@/types/web/format.d.ts';
 
 /**
@@ -151,70 +146,6 @@ export const formatRelative = (
 
   return formatDate(value);
 };
-
-// formatUntil says how long until something happens, in the largest whole unit.
-
-/**
- * Format - Format until.
- *
- * Stores this module-level value in one named location.
- * Related code reuses it instead of duplicating the definition.
- *
- * @since 1.0.0
- */
-export const formatUntil = (
-  value: Web_Format_Until_Value,
-  now: Web_Format_Until_Now = Date.now(),
-): Web_Format_Until_Returns => {
-  if (value === null || value === undefined || value === '') {
-    return 'not scheduled';
-  }
-
-  const timestamp: number = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) {
-    return 'unknown';
-  }
-
-  const seconds: number = Math.round((timestamp - now) / 1000);
-  if (seconds < 45) {
-    return 'in under a minute';
-  }
-
-  const formatter: Intl.RelativeTimeFormat = new Intl.RelativeTimeFormat(undefined, {
-    numeric: 'auto',
-  });
-  const minutes: number = Math.round(seconds / 60);
-  if (minutes < 60) {
-    return formatter.format(minutes, 'minute');
-  }
-
-  const hours: number = Math.round(minutes / 60);
-  if (hours < 24) {
-    return formatter.format(hours, 'hour');
-  }
-
-  const days: number = Math.round(hours / 24);
-  if (days < 30) {
-    return formatter.format(days, 'day');
-  }
-
-  return formatDate(value);
-};
-
-// shortDigests cuts each sha256 digest in a text to its first 12 characters, like Docker's
-// short IDs, so a digest never fills several lines.
-
-/**
- * Format - Short digests.
- *
- * Stores this module-level value in one named location.
- * Related code reuses it instead of duplicating the definition.
- *
- * @since 1.0.0
- */
-export const shortDigests = (
-  text: Web_Format_ShortDigests_Text,
-): Web_Format_ShortDigests_Returns => text.replace(/sha256:([0-9a-f]{12})[0-9a-f]{52}/gu, 'sha256:$1…');
 
 // keepTogether swaps a phrase's spaces for no-break spaces, so a wrapping line never splits it.
 

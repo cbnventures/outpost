@@ -13,15 +13,22 @@ import type {
   Recreate_RecreateContainer_HealthNote,
   Recreate_RecreateContainer_ImageConfig,
   Recreate_RecreateContainer_InitialRestartCount,
+  Recreate_RecreateContainer_KeepErrorMessage,
+  Recreate_RecreateContainer_KeptAt,
+  Recreate_RecreateContainer_KeptName,
+  Recreate_RecreateContainer_KeptTimestamp,
   Recreate_RecreateContainer_NewId,
   Recreate_RecreateContainer_Options,
   Recreate_RecreateContainer_Plan,
+  Recreate_RecreateContainer_PreviousContainer,
   Recreate_RecreateContainer_PreviousHealth,
+  Recreate_RecreateContainer_PreviousLookupErrorMessage,
   Recreate_RecreateContainer_PreviouslyUnhealthy,
   Recreate_RecreateContainer_PreviousName,
   Recreate_RecreateContainer_Reference,
   Recreate_RecreateContainer_Renamed,
   Recreate_RecreateContainer_Returns,
+  Recreate_RecreateContainer_Rollback,
   Recreate_RecreateContainer_RollbackErrorMessage,
   Recreate_RecreateContainer_RollbackMessage,
   Recreate_WaitUntilHealthy_Deadline,
@@ -52,16 +59,40 @@ import type {
  * @param {Recreate_RecreateContainer_Reference}    reference    - Reference.
  * @param {Recreate_RecreateContainer_Options}      options      - Options.
  * @param {Recreate_RecreateContainer_Dependencies} dependencies - Dependencies.
+ * @param {Recreate_RecreateContainer_Rollback}     [rollback]   - Rollback.
  *
  * @returns {Recreate_RecreateContainer_Returns}
  *
  * @since 0.0.1
  */
-export async function recreateContainer(container: Recreate_RecreateContainer_Container, imageConfig: Recreate_RecreateContainer_ImageConfig, reference: Recreate_RecreateContainer_Reference, options: Recreate_RecreateContainer_Options, dependencies: Recreate_RecreateContainer_Dependencies): Recreate_RecreateContainer_Returns {
+export async function recreateContainer(container: Recreate_RecreateContainer_Container, imageConfig: Recreate_RecreateContainer_ImageConfig, reference: Recreate_RecreateContainer_Reference, options: Recreate_RecreateContainer_Options, dependencies: Recreate_RecreateContainer_Dependencies, rollback: Recreate_RecreateContainer_Rollback = true): Recreate_RecreateContainer_Returns {
   const engine: Recreate_RecreateContainer_Engine = dependencies['engine'];
   const plan: Recreate_RecreateContainer_Plan = buildCreatePlan(container, imageConfig, reference);
   const previousName: Recreate_RecreateContainer_PreviousName = `${plan['name']}-outpost-previous`;
   const previousHealth: Recreate_RecreateContainer_PreviousHealth = container['State']['Health'] ?? undefined;
+  let previousContainer: Recreate_RecreateContainer_PreviousContainer = undefined;
+
+  // A crash can leave the reserved rollback name behind. Check before stopping anything so the operator can resolve it safely.
+  try {
+    previousContainer = await engine.inspectContainer(previousName);
+  } catch (error) {
+    const previousLookupErrorMessage: Recreate_RecreateContainer_PreviousLookupErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+    if (previousLookupErrorMessage.startsWith('Docker Engine API returned HTTP 404:') === false) {
+      return {
+        status: 'failed',
+        detail: `Could not check for a leftover container named ${previousName} before updating ${plan['name']}: ${previousLookupErrorMessage}. Outpost did not stop or remove any container`,
+      };
+    }
+  }
+
+  if (previousContainer !== undefined) {
+    return {
+      status: 'failed',
+      detail: `Cannot update ${plan['name']} because the leftover container ${previousName} (${previousContainer['Id']}) already uses Outpost's reserved rollback name. Remove or rename ${previousName}, then retry. Outpost did not stop or remove any container`,
+      summary: `Reserved rollback name ${previousName} is already in use; remove or rename it, then retry`,
+    };
+  }
 
   // Rolling back to a container that was already unhealthy gains nothing, so its replacement only has to keep running.
   const previouslyUnhealthy: Recreate_RecreateContainer_PreviouslyUnhealthy = previousHealth !== undefined && previousHealth['Status'] === 'unhealthy';
@@ -96,6 +127,31 @@ export async function recreateContainer(container: Recreate_RecreateContainer_Co
     };
   } catch (error) {
     const errorMessage: Recreate_RecreateContainer_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+    if (rollback === false && newId !== undefined) {
+      const keptAt: Recreate_RecreateContainer_KeptAt = dependencies.now().toISOString();
+      const keptTimestamp: Recreate_RecreateContainer_KeptTimestamp = `${keptAt.slice(0, 4)}${keptAt.slice(5, 7)}${keptAt.slice(8, 13)}${keptAt.slice(14, 16)}${keptAt.slice(17, 19)}Z`;
+      const keptName: Recreate_RecreateContainer_KeptName = `${plan['name']}-outpost-kept-${keptTimestamp}`;
+
+      try {
+        await engine.renameContainer(container['Id'], keptName);
+      } catch (keepError) {
+        const keepErrorMessage: Recreate_RecreateContainer_KeepErrorMessage = (keepError instanceof Error) ? keepError['message'] : String(keepError);
+
+        return {
+          status: 'failed',
+          detail: `${errorMessage}; rollback was disabled, but Outpost could not move previous container ${container['Id']} (image ${container['Image']}) from ${previousName} to ${keptName}: ${keepErrorMessage}. Remove or rename ${previousName} before retrying`,
+          summary: `Replacement failed and Outpost could not preserve the previous container as ${keptName}`,
+        };
+      }
+
+      return {
+        status: 'kept-unhealthy',
+        detail: `${errorMessage}; rollback was disabled, so replacement container ${newId} was kept as Docker left it. Previous container ${container['Id']} (image ${container['Image']}) was renamed to ${keptName} and remains stopped; start or remove ${keptName} when recovery is complete`,
+        summary: `Replacement failed its startup check; previous container kept as ${keptName}`,
+      };
+    }
+
     let rollbackMessage: Recreate_RecreateContainer_RollbackMessage = 'rolled back to the previous container';
 
     // Put the old container back exactly where it was.

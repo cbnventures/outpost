@@ -242,6 +242,18 @@ export const checkStart = z.strictObject({
 }, { error: 'Check the highlighted fields.' });
 
 /**
+ * Lib - Schema - Update Start.
+ *
+ * Validates one requested update and defaults to Outpost's normal rollback
+ * behavior when the caller does not make an explicit choice.
+ *
+ * @since 1.1.0
+ */
+export const updateStart = checkStart.extend({
+  rollback: z.boolean({ error: 'Choose whether Outpost should roll back a failed update.' }).default(true),
+});
+
+/**
  * Lib - Schema - Runtime Settings.
  *
  * Validates the behavior saved from the Settings page. The cron expression is
@@ -271,6 +283,18 @@ export const runtimeSettings = z.strictObject({
   healthTimeoutSeconds: z.number({ error: 'Enter a health timeout.' }).int('Use whole seconds.').positive('Use at least 1 second.'),
   settleSeconds: z.number({ error: 'Enter a settle period.' }).int('Use whole seconds.').positive('Use at least 1 second.'),
 }, { error: 'Check the highlighted fields.' });
+
+/**
+ * Lib - Schema - Diagnostics Update.
+ *
+ * Validates the Debug logging switch sent from the Settings page.
+ * Unknown fields are refused like every other console body.
+ *
+ * @since 1.1.0
+ */
+export const diagnosticsUpdate = z.strictObject({
+  debugLogging: z.boolean({ error: 'Choose on or off.' }),
+}, { error: 'Choose whether debug logging is on or off.' });
 
 /**
  * Lib - Schema - Legacy Account File.

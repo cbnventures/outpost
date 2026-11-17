@@ -6,13 +6,16 @@ import {
   formatDuration,
   formatRelative,
   keepTogether,
-  shortDigests,
 } from '@/web/format.ts';
-import { ImageName } from '@/web/image-name.tsx';
+import {
+  BreakableText,
+  ImageName,
+} from '@/web/image-name.tsx';
 import {
   checkDuration,
   countLabel,
   countResults,
+  cycleActionLabel,
   reportFailed,
   statusClasses,
   statusLabels,
@@ -32,6 +35,7 @@ import type {
 import type {
   Web_Components_HistoryView_Props,
   Web_Components_ResultCount,
+  Web_Components_ResultList_Detail,
   Web_Components_ResultList_Props,
 } from '@/types/web/components.d.ts';
 
@@ -83,19 +87,28 @@ export const ResultList = ({
 
   return (
     <ul className={(compact) ? 'activity-list activity-list-compact' : 'activity-list'}>
-      {results.map((result: Web_Api_Result, index: number): ReactElement => (
-        <li className="activity-row" key={`${result['container']}-${index}`}>
-          <span aria-label={statusLabels[result['status']]} className={statusClasses[result['status']]} role="img" />
-          <span className="activity-main">
-            <span>{result['container']}</span>
-            <small title={result['detail']}>
-              <ImageName image={result['image']} />
-              {(result['detail'] === '') ? null : ` · ${shortDigests(result['detail'])}`}
-            </small>
-          </span>
-          <span className="activity-time">{statusLabels[result['status']]}</span>
-        </li>
-      ))}
+      {results.map((result: Web_Api_Result, index: number): ReactElement => {
+        const detail: Web_Components_ResultList_Detail = (compact) ? (result['summary'] ?? result['detail']) : result['detail'];
+
+        return (
+          <li className="activity-row" key={`${result['container']}-${index}`}>
+            <span aria-label={statusLabels[result['status']]} className={statusClasses[result['status']]} role="img" />
+            <span className="activity-main">
+              <span>{result['container']}</span>
+              <small title={detail}>
+                <ImageName image={result['image']} />
+                {(detail === '') ? null : (
+                  <>
+                    {'\u00a0·\u00a0'}
+                    <BreakableText breakAtNameSeparators text={detail} />
+                  </>
+                )}
+              </small>
+            </span>
+            <span className="activity-time">{statusLabels[result['status']]}</span>
+          </li>
+        );
+      })}
     </ul>
   );
 };
@@ -177,6 +190,7 @@ export const HistoryView = ({
         {history.map((report: Web_Api_Report, index: number): ReactElement => {
           const key: string = reportKey(report);
           const open: boolean = expanded.includes(key);
+          const action: string = cycleActionLabel(report['action']);
           const started: string = triggerLabel(report['trigger']);
           const summary: string[] = [
             `took ${formatDuration(checkDuration(report))}`,
@@ -196,9 +210,11 @@ export const HistoryView = ({
                 <span className="history-main">
                   <span className="history-title">
                     <time dateTime={report['startedAt']}>{formatDate(report['startedAt'])}</time>
+                    <span className="tag">{action}</span>
                     {(started === '') ? null : <span className="tag">{started}</span>}
+                    {(report['rollback'] === false) ? <span className="tag tag-warning">Rollback disabled</span> : null}
                   </span>
-                  <small>{summary.map((part: string): string => keepTogether(part)).join(' · ')}</small>
+                  <small>{summary.map((part: string): string => keepTogether(part)).join('\u00a0· ')}</small>
                 </span>
                 <span className="activity-time">{formatRelative(report['startedAt'])}</span>
                 <Icon name={(open) ? 'chevron-down' : 'chevron'} size={16} />
@@ -208,7 +224,7 @@ export const HistoryView = ({
                   {(report['error'] === null || report['error'] === undefined || report['error'] === '') ? null : (
                     <div className="form-error" role="alert">
                       <Icon name="warning" size={16} />
-                      <span>{`The check failed: ${report['error']}`}</span>
+                      <span>{`The ${action.toLowerCase()} failed: ${report['error']}`}</span>
                     </div>
                   )}
                   <ResultList results={report['results']} />
@@ -226,7 +242,7 @@ export const HistoryView = ({
       <div className="workspace-heading workspace-heading-split">
         <div>
           <h1>History</h1>
-          <p>The last 50 checks, newest first.</p>
+          <p>The last 50 checks and updates, newest first.</p>
         </div>
         <Button
           disabled={refreshing}

@@ -1,14 +1,21 @@
+import { logDebug } from './lib/logger.js';
+
 import type {
+  Scheduler_Runner_Action,
   Scheduler_Runner_Constructor_GetNextRun,
   Scheduler_Runner_Constructor_History,
   Scheduler_Runner_Constructor_RunCycle,
+  Scheduler_Runner_Execute_Action,
   Scheduler_Runner_Execute_AlreadyRecorded,
+  Scheduler_Runner_Execute_CycleLabel,
   Scheduler_Runner_Execute_CycleReport,
+  Scheduler_Runner_Execute_CycleStartedAt,
   Scheduler_Runner_Execute_ErrorMessage,
   Scheduler_Runner_Execute_FinishedAt,
   Scheduler_Runner_Execute_RecordOnce,
   Scheduler_Runner_Execute_Report,
   Scheduler_Runner_Execute_Returns,
+  Scheduler_Runner_Execute_Rollback,
   Scheduler_Runner_Execute_Run,
   Scheduler_Runner_Execute_Source,
   Scheduler_Runner_GetNextRun,
@@ -30,10 +37,28 @@ import type {
   Scheduler_Runner_Subscribe_Listener,
   Scheduler_Runner_Subscribe_Returns,
   Scheduler_Runner_Totals,
+  Scheduler_Runner_Trigger_Action,
   Scheduler_Runner_Trigger_ContainerIds,
   Scheduler_Runner_Trigger_Returns,
+  Scheduler_Runner_Trigger_Rollback,
   Scheduler_Runner_Trigger_Source,
+  Scheduler_ScheduledCycleAction_MonitorOnly,
+  Scheduler_ScheduledCycleAction_Returns,
 } from './types/scheduler.d.ts';
+
+/**
+ * Scheduler - Scheduled Cycle Action.
+ *
+ * Scheduled monitor-only runs inspect registries without pulling. Other
+ * scheduled runs apply updates.
+ *
+ * @param {Scheduler_ScheduledCycleAction_MonitorOnly} monitorOnly - Monitor only.
+ *
+ * @returns {Scheduler_ScheduledCycleAction_Returns}
+ *
+ * @since 1.1.0
+ */
+export const scheduledCycleAction = (monitorOnly: Scheduler_ScheduledCycleAction_MonitorOnly): Scheduler_ScheduledCycleAction_Returns => (monitorOnly === true) ? 'check' : 'update';
 
 /**
  * Scheduler.
@@ -67,6 +92,18 @@ export class Runner {
    * @since 0.0.1
    */
   #running: Scheduler_Runner_Running = false;
+
+  /**
+   * Scheduler - Action.
+   *
+   * Names the running cycle as a registry-only check or an applying update.
+   * Status responses and live dashboard state use it while the lock is held.
+   *
+   * @private
+   *
+   * @since 1.1.0
+   */
+  #action: Scheduler_Runner_Action = undefined;
 
   /**
    * Scheduler - History.
@@ -172,22 +209,25 @@ export class Runner {
    *
    * @param {Scheduler_Runner_Trigger_Source}       source         - Source.
    * @param {Scheduler_Runner_Trigger_ContainerIds} [containerIds] - Container ids.
+   * @param {Scheduler_Runner_Trigger_Action}       [action]       - Action.
+   * @param {Scheduler_Runner_Trigger_Rollback}     [rollback]     - Rollback.
    *
    * @returns {Scheduler_Runner_Trigger_Returns}
    *
-   * @since 0.0.1
+   * @since 1.1.0
    */
-  public trigger(source: Scheduler_Runner_Trigger_Source, containerIds?: Scheduler_Runner_Trigger_ContainerIds): Scheduler_Runner_Trigger_Returns {
+  public trigger(source: Scheduler_Runner_Trigger_Source, containerIds?: Scheduler_Runner_Trigger_ContainerIds, action: Scheduler_Runner_Trigger_Action = 'update', rollback: Scheduler_Runner_Trigger_Rollback = true): Scheduler_Runner_Trigger_Returns {
     if (this.#running === true) {
       return false;
     }
 
     this.#running = true;
+    this.#action = action;
     this.#startedAt = new Date().toISOString();
 
     this.notify({ type: 'state' });
 
-    void this.execute(source, async () => this.#runCycle(containerIds, source), false);
+    void this.execute(source, action, rollback, async () => this.#runCycle(containerIds, source, action, rollback), false);
 
     return true;
   }
@@ -212,11 +252,12 @@ export class Runner {
     }
 
     this.#running = true;
+    this.#action = 'update';
     this.#startedAt = startedAt;
 
     this.notify({ type: 'state' });
 
-    void this.execute(source, finish, true);
+    void this.execute(source, 'update', true, finish, true);
 
     return true;
   }
@@ -235,6 +276,7 @@ export class Runner {
     const nextRun: Scheduler_Runner_GetState_NextRun = this.#getNextRun();
 
     return {
+      action: this.#action,
       running: this.#running,
       startedAt: this.#startedAt,
       nextRun: (nextRun !== undefined) ? nextRun.toISOString() : undefined,
@@ -289,6 +331,8 @@ export class Runner {
    * releases the lock, so a crashed cycle never blocks the next one.
    *
    * @param {Scheduler_Runner_Execute_Source}     source     - Source.
+   * @param {Scheduler_Runner_Execute_Action}     action     - Action.
+   * @param {Scheduler_Runner_Execute_Rollback}   rollback   - Rollback.
    * @param {Scheduler_Runner_Execute_Run}        run        - Run.
    * @param {Scheduler_Runner_Execute_RecordOnce} recordOnce - Record once.
    *
@@ -296,16 +340,22 @@ export class Runner {
    *
    * @returns {Scheduler_Runner_Execute_Returns}
    *
-   * @since 0.0.1
+   * @since 1.1.0
    */
-  private async execute(source: Scheduler_Runner_Execute_Source, run: Scheduler_Runner_Execute_Run, recordOnce: Scheduler_Runner_Execute_RecordOnce): Scheduler_Runner_Execute_Returns {
+  private async execute(source: Scheduler_Runner_Execute_Source, action: Scheduler_Runner_Execute_Action, rollback: Scheduler_Runner_Execute_Rollback, run: Scheduler_Runner_Execute_Run, recordOnce: Scheduler_Runner_Execute_RecordOnce): Scheduler_Runner_Execute_Returns {
+    const cycleLabel: Scheduler_Runner_Execute_CycleLabel = (action === 'check') ? 'Check cycle' : 'Update cycle';
+    const cycleStartedAt: Scheduler_Runner_Execute_CycleStartedAt = Date.now();
     let report: Scheduler_Runner_Execute_Report = undefined;
+
+    logDebug(`${cycleLabel} started by ${source}`);
 
     try {
       const cycleReport: Scheduler_Runner_Execute_CycleReport = await run();
 
       report = {
         ...cycleReport,
+        action,
+        ...((action === 'update' && rollback === false) ? { rollback: false } : {}),
         trigger: source,
       };
 
@@ -317,24 +367,32 @@ export class Runner {
       }
       this.#lastError = report['error'];
       Reflect.set(this.#totals, 'updated', this.#totals['updated'] + report['results'].filter((result) => result['status'] === 'updated').length);
-      Reflect.set(this.#totals, 'failed', this.#totals['failed'] + report['results'].filter((result) => result['status'] === 'failed' || result['status'] === 'rolled-back').length);
+      Reflect.set(this.#totals, 'failed', this.#totals['failed'] + report['results'].filter((result) => (
+        result['status'] === 'failed'
+        || result['status'] === 'rolled-back'
+        || result['status'] === 'kept-unhealthy'
+      )).length);
 
       for (const result of report['results']) {
         process.stdout.write(`${result['container']} (${result['image']}): ${result['status']} - ${result['detail']}\n`);
       }
+
+      logDebug(`${cycleLabel} finished after ${String(Date.now() - cycleStartedAt)} ms (results: ${String(report['results'].length)})`);
     } catch (error) {
       const errorMessage: Scheduler_Runner_Execute_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
       const finishedAt: Scheduler_Runner_Execute_FinishedAt = new Date().toISOString();
 
       report = {
+        action,
+        ...((action === 'update' && rollback === false) ? { rollback: false } : {}),
         startedAt: this.#startedAt ?? finishedAt,
         finishedAt,
         error: errorMessage,
         results: [{
           container: 'Outpost',
-          image: 'update cycle',
+          image: cycleLabel.toLowerCase(),
           status: 'failed',
-          detail: `Update cycle failed: ${errorMessage}`,
+          detail: `${cycleLabel} failed: ${errorMessage}`,
         }],
         trigger: source,
       };
@@ -344,10 +402,11 @@ export class Runner {
 
       Reflect.set(this.#totals, 'failed', this.#totals['failed'] + 1);
 
-      process.stderr.write(`Update cycle failed: ${errorMessage}\n`);
+      process.stderr.write(`${cycleLabel} failed: ${errorMessage}\n`);
     } finally {
       Reflect.set(this.#totals, 'cycles', this.#totals['cycles'] + 1);
       this.#running = false;
+      this.#action = undefined;
       this.#startedAt = undefined;
     }
 

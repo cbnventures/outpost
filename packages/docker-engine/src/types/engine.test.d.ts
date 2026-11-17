@@ -19,6 +19,13 @@ export type Engine_Engine_Server = Server;
 export type Engine_Engine_Engine = Runner;
 
 /**
+ * Engine - Engine - Lists All Containers When Requested.
+ *
+ * @since 1.1.0
+ */
+export type Engine_Engine_ListsAllContainersWhenRequested_Containers = Shared_ContainerSummary[];
+
+/**
  * Engine - Engine - Lists Stopped Containers By Label.
  *
  * @since 1.0.0

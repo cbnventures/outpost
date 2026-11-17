@@ -1,37 +1,32 @@
 import {
   BlogPreview,
+  BrowserFrame,
   Canvas,
   Features,
-  InstallStrip,
-  Stats,
+  Showcase,
+  Spotlight,
 } from '@cbnventures/docusaurus-preset-nova/blocks';
 import Head from '@docusaurus/Head';
 import Link from '@docusaurus/Link';
 import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
+import ThemedImage from '@theme/ThemedImage';
 
+import dashboardSixDark from '../../docs/features/_assets_/dashboard-6-dark.png';
+import dashboardSixLight from '../../docs/features/_assets_/dashboard-6-light.png';
+import dashboardEightDark from '../../docs/features/_assets_/dashboard-8-dark.png';
+import dashboardEightLight from '../../docs/features/_assets_/dashboard-8-light.png';
+import notificationsOneDark from '../../docs/features/_assets_/notifications-1-dark.png';
+import notificationsOneLight from '../../docs/features/_assets_/notifications-1-light.png';
 import styles from './index.module.css';
 
-import type {
-  Pages_Index_Home_BlogEnabled,
-  Pages_Index_Home_Returns,
-} from '../types/pages/index.d.ts';
-
-/**
- * Pages - Blog Enabled.
- *
- * Keeps the preset-native blog preview aligned with the content model selected
- * when Nova generated this documentation workspace.
- *
- * @since 0.0.0
- */
-const blogEnabled: Pages_Index_Home_BlogEnabled = Boolean({ routeBasePath: 'blog' });
+import type { Pages_Index_Home_Returns } from '../types/pages/index.d.ts';
 
 /**
  * Pages - Home.
  *
  * Composes the Outpost landing page: hero with a copy of the dashboard overview,
- * one-line install, feature grid, key numbers, and the latest blog posts.
+ * feature grid, dashboard spotlights, and the latest blog posts.
  *
  * @returns {Pages_Index_Home_Returns}
  *
@@ -54,8 +49,8 @@ function Home(): Pages_Index_Home_Returns {
               Outpost checks your registries on a schedule, recreates containers on new images with their settings, volumes, and networks intact, and restores the old container if the new one fails. A modern, non-root Watchtower replacement.
             </p>
             <div className={`nova-hero-actions ${styles['hero-actions']}`}>
-              <Link className="nova-cta-primary" to="/docs/overview/">Read the Docs</Link>
-              <Link className="nova-cta-secondary" to="/docs/getting-started/quick-start/">Quick Start</Link>
+              <Link className="nova-cta-primary" to="/docs/getting-started/quick-start/">Get Started</Link>
+              <Link className="nova-cta-secondary" to="/docs/overview/">Learn More</Link>
             </div>
           </div>
           <div className={styles['dashboard']} aria-hidden="true">
@@ -118,9 +113,7 @@ function Home(): Pages_Index_Home_Returns {
         </div>
       </Canvas>
       <main>
-        <InstallStrip command="docker pull cbnventures/outpost" copyTarget="block" />
         <Features
-          heading="Updates you can leave running"
           items={[
             {
               icon: 'lucide:undo-2',
@@ -154,41 +147,86 @@ function Home(): Pages_Index_Home_Returns {
             },
           ]}
         />
-        <Stats
-          heading="By the Numbers"
-          surface="alt"
-          items={[
-            {
-              value: '1',
-              label: 'Socket mount to get started',
-              color: 'primary',
-            },
-            {
-              value: '0',
-              label: 'Root privileges for the updater process',
-              color: 'accent',
-            },
-            {
-              value: '50',
-              label: 'Checks kept in the dashboard history',
-              color: 'primary',
-            },
-            {
-              value: '2',
-              label: 'Architectures: amd64 and arm64',
-              color: 'accent',
-            },
-          ]}
-        />
-        {(blogEnabled === true) && (
-          <BlogPreview
-            heading="From the Blog"
-            description="Release notes and upgrade guides."
-            auto={true}
-            limit={3}
-            sort="newest"
+        <Spotlight heading="Inside the dashboard" surface="alt" className={styles['shot-spotlight']}>
+          <Showcase
+            tabsLabel="Dashboard pages"
+            items={[
+              {
+                label: 'Overview',
+                heading: 'Every container on one page',
+                description: 'The Overview shows the next scheduled update, how many containers Outpost manages, and every result from the last run. Select Check now or Update all without waiting for the schedule.',
+                link: {
+                  label: 'Tour the Dashboard',
+                  to: '/docs/features/dashboard/',
+                },
+                content: (
+                  <BrowserFrame title="Outpost" url="localhost:22601" favicon="/favicon.svg">
+                    <ThemedImage
+                      sources={{
+                        light: dashboardSixLight,
+                        dark: dashboardSixDark,
+                      }}
+                      alt="Outpost Overview page with Update all and Check now, the next scheduled update, and each container's result from the last check"
+                      width={1280}
+                      height={1210}
+                    />
+                  </BrowserFrame>
+                ),
+              },
+              {
+                label: 'History',
+                heading: 'A record of every run',
+                description: 'History keeps the last 50 checks and updates. Expand a run to see what was updated, what is waiting, what was skipped, and why anything failed.',
+                link: {
+                  label: 'How Updates and Rollback Work',
+                  to: '/docs/features/updates-and-rollback/',
+                },
+                content: (
+                  <BrowserFrame title="Outpost" url="localhost:22601/history" favicon="/favicon.svg">
+                    <ThemedImage
+                      sources={{
+                        light: dashboardEightLight,
+                        dark: dashboardEightDark,
+                      }}
+                      alt="Outpost History page with a scheduled update expanded, listing each container as up to date, failed, update available, or skipped"
+                      width={1280}
+                      height={998}
+                    />
+                  </BrowserFrame>
+                ),
+              },
+              {
+                label: 'Notifications',
+                heading: 'Alerts where you already look',
+                description: 'Send alerts to ntfy, Telegram, Discord, email, and more when containers update, new images appear, or an update fails. Test each destination before you rely on it.',
+                link: {
+                  label: 'Set Up Notifications',
+                  to: '/docs/features/notifications/',
+                },
+                content: (
+                  <BrowserFrame title="Outpost" url="localhost:22601/notifications" favicon="/favicon.svg">
+                    <ThemedImage
+                      sources={{
+                        light: notificationsOneLight,
+                        dark: notificationsOneDark,
+                      }}
+                      alt="Outpost Notifications page listing three destinations with their services, event counts, and last sends"
+                      width={1280}
+                      height={423}
+                    />
+                  </BrowserFrame>
+                ),
+              },
+            ]}
           />
-        )}
+        </Spotlight>
+        <BlogPreview
+          heading="From the Blog"
+          description="Launches, milestones, and what's new in Outpost."
+          auto={true}
+          limit={3}
+          sort="newest"
+        />
       </main>
     </Layout>
   );

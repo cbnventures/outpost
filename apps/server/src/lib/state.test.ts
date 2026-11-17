@@ -108,6 +108,8 @@ import type {
   Lib_State_RegistrySignIns_SealsPasswordsAndFindsEveryDockerHubName_State,
   Lib_State_RejectedImages_RemembersRolledBackImages_Reopened,
   Lib_State_RejectedImages_RemembersRolledBackImages_State,
+  Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_Reopened,
+  Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_State,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Reopened,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Settings,
   Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_State,
@@ -1376,6 +1378,28 @@ describe('runtime settings', () => {
     });
 
     dataDirectory = undefined;
+
+    return;
+  });
+
+  it('keeps debug logging across restarts', () => {
+    const state: Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_State = new State(getDataDirectory());
+
+    expect(state.getDebugLogging()).toBe(false);
+
+    state.setDebugLogging(true);
+
+    state.close();
+
+    const reopened: Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_Reopened = new State(getDataDirectory());
+
+    expect(reopened.getDebugLogging()).toBe(true);
+
+    reopened.setDebugLogging(false);
+
+    expect(reopened.getDebugLogging()).toBe(false);
+
+    reopened.close();
 
     return;
   });

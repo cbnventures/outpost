@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
 } from 'react';
 
@@ -13,7 +14,9 @@ import {
 import { FieldLabel } from '@/web/field-label.tsx';
 import {
   findNotificationService,
+  notificationServiceIssue,
   notificationServices,
+  notificationServiceValues,
 } from '@/web/notification-services.ts';
 import {
   Button,
@@ -36,23 +39,6 @@ import type {
   Web_Notifications_ServiceDefinition,
   Web_Notifications_Target,
 } from '@/types/web/notifications.d.ts';
-
-// defaultValues gives a service's fields their starting values, like port 587 for email.
-
-/**
- * Notification Dialog - Default values.
- *
- * Centralizes this operation for the surrounding workflow.
- * Callers reuse one implementation instead of repeating the behavior.
- *
- * @since 1.0.0
- */
-const defaultValues = (service: Web_Notifications_Service): Record<string, string> => Object.fromEntries(
-  findNotificationService(service)['fields'].map((field: Web_Notifications_Field): [string, string] => [
-    field['key'],
-    field['defaultValue'] ?? '',
-  ]),
-);
 
 // fieldHint explains a field below it, unless a problem with it is shown instead.
 
@@ -105,6 +91,10 @@ export const NotificationDialog = ({
     setService,
   ] = useState<Web_Notifications_Service | ''>('');
   const [
+    serviceSubmissionAttempted,
+    setServiceSubmissionAttempted,
+  ] = useState<boolean>(false);
+  const [
     name,
     setName,
   ] = useState<string>('');
@@ -130,6 +120,7 @@ export const NotificationDialog = ({
   ] = useState<boolean>(false);
 
   const baseId: string = useId();
+  const serviceSelectRef = useRef<HTMLSelectElement | null>(null);
 
   useEscapeKey(onClose, open);
 
@@ -147,7 +138,7 @@ export const NotificationDialog = ({
       setService(target['service']);
       setName(target['name']);
       setValues({
-        ...defaultValues(target['service']),
+        ...notificationServiceValues(target['service']),
         ...target['settings'],
       });
       setSelectedEvents(target['events']);
@@ -155,6 +146,7 @@ export const NotificationDialog = ({
 
     setError(null);
     setClearSecrets([]);
+    setServiceSubmissionAttempted(false);
   }, [
     events,
     open,
@@ -195,9 +187,14 @@ export const NotificationDialog = ({
    */
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    setServiceSubmissionAttempted(true);
 
-    // The submit button stays disabled until a service is picked.
     if (service === '') {
+      const serviceSelect: HTMLSelectElement | null = serviceSelectRef.current;
+      if (serviceSelect !== null) {
+        serviceSelect.focus();
+      }
+
       return;
     }
 
@@ -239,7 +236,10 @@ export const NotificationDialog = ({
     }
   };
 
-  const serviceIssue: string = issueFor(error, 'service');
+  let serviceIssue: string = issueFor(error, 'service');
+  if (serviceIssue === '') {
+    serviceIssue = notificationServiceIssue(service, serviceSubmissionAttempted);
+  }
   const nameIssue: string = issueFor(error, 'name');
   const eventsIssue: string = issueFor(error, 'events');
   const summary: string = summaryFor(error, [
@@ -270,14 +270,16 @@ export const NotificationDialog = ({
               className="select-control"
               disabled={target !== null}
               onChange={(event): void => {
-                const nextService: Web_Notifications_Service = event.currentTarget.value as Web_Notifications_Service;
+                const nextService: Web_Notifications_Service | '' = event.currentTarget.value as Web_Notifications_Service | '';
 
                 setService(nextService);
-                setValues(defaultValues(nextService));
+                setValues(notificationServiceValues(nextService));
+                setServiceSubmissionAttempted(false);
               }}
+              ref={serviceSelectRef}
               value={service}
             >
-              <option className="select-placeholder" disabled value="">— Select one —</option>
+              <option className="select-placeholder" value="">— Select one —</option>
               {notificationServices.map((option: Web_Notifications_ServiceDefinition): ReactElement => <option key={option['key']} value={option['key']}>{option['label']}</option>)}
             </select>
             {(serviceIssue === '') ? null : <small className="field-error">{serviceIssue}</small>}
@@ -412,7 +414,7 @@ export const NotificationDialog = ({
 
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button disabled={busy || service === '' || selectedEvents.length === 0 || name.trim() === ''} type="submit" variant="primary">
+            <Button disabled={busy || selectedEvents.length === 0 || name.trim() === ''} type="submit" variant="primary">
               {(target === null) ? 'Add notification' : 'Save'}
             </Button>
           </div>

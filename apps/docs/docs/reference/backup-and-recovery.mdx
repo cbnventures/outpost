@@ -1,7 +1,7 @@
 ---
 id: backup-and-recovery
 title: Backup and Recovery
-description: Back up Outpost's data directory with its encryption key, restore it, and recover from a lost password, a lost authenticator, or a missing key.
+description: Export portable Outpost configuration or back up the full data directory, then restore it or recover from lost sign-in details and encryption keys.
 sidebar_position: 5
 keywords:
   - outpost
@@ -15,30 +15,105 @@ tags:
   - backup
 ---
 
-import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
+import ThemedImage from '@theme/ThemedImage';
+import { Frame, Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
-Back up Outpost's data directory, key file included, so you can restore the account, the <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, the notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the history after a move or a mistake.
+import backupAndRecoveryOneLight from './_assets_/backup-and-recovery-1-light.png';
+import backupAndRecoveryOneDark from './_assets_/backup-and-recovery-1-dark.png';
+import backupAndRecoveryTwoLight from './_assets_/backup-and-recovery-2-light.png';
+import backupAndRecoveryTwoDark from './_assets_/backup-and-recovery-2-dark.png';
+
+Back up Outpost's data directory, key file included, so you can restore the account, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the history after a move or a mistake.
+
+## Export and Import
+
+The **Backup** section near the end of **Settings**, just above **Diagnostics**, makes a portable <Terminology title="A JSON backup you can carry to another Outpost" to="/docs/reference/terminology#backup-and-encryption">export file</Terminology> or brings one into this Outpost. Use it to move selected configuration between installations without copying the source <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>.
+
+<Frame caption="The Backup panel on Settings">
+  <ThemedImage sources={{ light: backupAndRecoveryOneLight, dark: backupAndRecoveryOneDark }} alt="Backup panel with Export and import, Save this setup to a file, or bring one in, and the Export and Import buttons" width={960} height={133} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+### Export
+
+1. Open **Settings**, scroll to **Backup**, and select **Export…**.
+2. Keep every section selected, or clear anything that should stay out of the file.
+3. Select **Continue**.
+4. Complete <Terminology title="Prove it's you again before an export or import" to="/docs/reference/terminology#backup-and-encryption">**Confirm it’s you**</Terminology>, then select **Confirm**.
+
+The downloaded file is named `outpost-export-YYYY-MM-DD.json`. Its selected sections are:
+
+- **Settings** — Schedule, startup checks, container selection, monitor-only mode, cleanup, and replacement timing.
+- **Registries** — Every private registry sign-in, including its saved password.
+- **Notifications** — Every <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>, its events and settings, and its <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology>.
+- **Access tokens** — <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">Token</Terminology> names, scopes, expiry, timestamps, and stored hashes. Raw token values are never stored and cannot be put in the file.
+
+:::warning
+Registry passwords and notification secrets are plain text in the file. Keep it somewhere safe; an import encrypts them with the destination Outpost's key.
+:::
+
+### Confirm It's You
+
+<Terminology title="Prove it's you again before an export or import" to="/docs/reference/terminology#backup-and-encryption">Confirm it’s you</Terminology> asks for the current password and, when the authenticator app is on, its current 6-digit **Authenticator code**. Select **Use a passkey instead** to use a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>.
+
+The confirmation lasts five minutes, works once, is limited to export or import, and belongs only to that browser session. Using another browser, waiting longer, or switching operations requires another confirmation.
+
+### Import
+
+1. Open **Settings**, scroll to **Backup**, and select **Import…**.
+2. In **Source**, choose **An Outpost export**. The JSON file must be smaller than 10 MB.
+3. In **Settings**, compare **In the file** with **Here**.
+4. In **Review**, check the exact additions, replacements, and skips, then select **Import**.
+5. Complete <Terminology title="Prove it's you again before an export or import" to="/docs/reference/terminology#backup-and-encryption">**Confirm it’s you**</Terminology>, then select **Confirm**.
+
+<Frame caption="Review lists every change before anything is applied">
+  <ThemedImage sources={{ light: backupAndRecoveryTwoLight, dark: backupAndRecoveryTwoDark }} alt="Import dialog on Review with Ready to import and checked lines to replace 2 registry sign-ins for the same host, replace 3 notification targets with the same name, and skip 3 access tokens that are already here, above notes that everything is applied at once and that the administrator account, sign-in security, sessions, update history and Docker runtime data stay here" width={1064} height={590} style={{ maxWidth: '100%', height: 'auto' }} />
+</Frame>
+
+The wizard finishes with **Importing** and applies every selected section in one database transaction. If any section fails, none of its changes are kept.
+
+- **Settings** — Values in the file replace the current schedule, startup-check, selection, monitor-only, cleanup, and timing values.
+- **Registries** — A sign-in for the same host, without regard to letter case, is replaced, including its password. A new host is added.
+- **Notifications** — A <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> with the same name, without regard to letter case, is replaced. A new name is added.
+- **Access tokens** — A token with a new ID, name, and stored hash is added. A token whose ID, case-insensitive name, or hash already exists is skipped, so an import never creates a duplicate.
+- **Sections not in the file** — Existing values in those sections stay as they are.
+
+Imported settings take effect immediately, including rebuilding the active schedule. Imported token hashes keep their existing raw token values working, but the file cannot reveal or reissue those values.
+
+### What Stays Here
+
+An export never contains these, and an import never changes them. **Review** notes that they stay here.
+
+- **Administrator account, password and recovery codes** — They protect this Outpost.
+- **Authenticator and passkeys** — They stay bound to this account and hostname.
+- **Browser sessions** — Signed-in browsers remain local.
+- **Update history** — It describes work performed here.
+- **Docker runtime data** — Containers and discovered images are read live.
+
+### Choose an Export or Data Backup
+
+Use the portable <Terminology title="A JSON backup you can carry to another Outpost" to="/docs/reference/terminology#backup-and-encryption">export file</Terminology> for selected configuration. Use the complete data-directory backup below to restore the whole installation, including the account, sign-in security, browser sessions, update history, database, encryption key, and recovery state.
 
 ## What Outpost Saves
 
 Everything lives in the data directory, which is `/data` by default:
 
-| Path                                                     | What it holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/data/outpost.sqlite3`                                  | The dashboard account, its sign-ins, the <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, the authenticator app, the <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>, the <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, the notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the private registry sign-ins. |
-| `/data/outpost.sqlite3-wal`, `/data/outpost.sqlite3-shm` | Recent database changes that belong with `outpost.sqlite3`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `/data/keys/installation.key`                            | The <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> that seals the authenticator app's secret, the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the passwords of private registry sign-ins.                                                                                                                                                        |
-| `/data/history.json`                                     | The last 50 checks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `/data/self-update.json`                                 | An update of Outpost itself that's still in progress, and a new Outpost image that failed to start, which later checks skip. It's gone when there's nothing left to keep.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Path                                                     | What it holds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/data/outpost.sqlite3`                                  | The dashboard account, its sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the authenticator app, the <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the private registry sign-ins. |
+| `/data/outpost.sqlite3-wal`, `/data/outpost.sqlite3-shm` | Recent database changes that belong with `outpost.sqlite3`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `/data/keys/installation.key`                            | The <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> that seals the authenticator app's secret, the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the passwords of private registry sign-ins.                                                                                                                                                |
+| `/data/history.json`                                     | The last 50 checks and updates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `/data/image-config-cache.json`                          | Image defaults for images still used by managed containers, so recreation can preserve user overrides if Docker removes an old image record.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `/data/self-update.json`                                 | An update of Outpost itself that's still in progress, and a new Outpost image that failed to start, which later checks skip. It's gone when there's nothing left to keep.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 - If you set `OUTPOST_DATA_DIRECTORY`, these files are in that folder instead.
-- When a new Outpost image fails to start, the previous Outpost starts again on the same data directory. Each release keeps the database readable by the release before it, so the account, the <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, the notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the history carry over.
+- When a new Outpost image fails to start, the previous Outpost starts again on the same data directory. Each release keeps the database readable by the release before it, so the account, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the history carry over.
 - It is recommended to keep the data directory on a local disk, because the database isn't reliable on network shares such as NFS or SMB.
 
 ## The Encryption Key
 
-- Outpost creates the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> on its first start. It encrypts the authenticator app's secret, the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the passwords of private registry sign-ins, while the account password, tokens, and <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> are stored as hashes and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> as public keys.
-- If the key file goes missing, Outpost makes a new key on the next start, turns off the authenticator app, and removes those <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> and registry passwords, as described in [Lost Encryption Key](#lost-encryption-key). It is recommended to keep the key with every copy of the database so the authenticator app, the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology>, and the registry sign-ins keep working after a restore.
+- Outpost creates the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> on its first start. It encrypts the authenticator app's secret, the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the passwords of private registry sign-ins, while the account password, tokens, and <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> are stored as hashes and <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> as public keys.
+- If the key file goes missing, Outpost makes a new key on the next start, turns off the authenticator app, and removes those <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> and registry passwords, as described in [Lost Encryption Key](#lost-encryption-key). It is recommended to keep the key with every copy of the database so the authenticator app, the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology>, and the registry sign-ins keep working after a restore.
 
 ## Back Up
 
@@ -65,7 +140,7 @@ Everything lives in the data directory, which is `/data` by default:
    ```
 
 - With Docker Compose, use `docker compose stop outpost` and `docker compose start outpost`. Compose puts the project name in front of the volume name, such as `outpost_outpost-data`, and `docker volume ls` lists it.
-- The archive holds the password hash and the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, so it is recommended to store it encrypted.
+- The archive holds the password hash and the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>, so it is recommended to store it encrypted.
 
 ## Restore
 
@@ -89,30 +164,30 @@ Restored files keep their owner, which needs to match the `PUID` and `PGID` Outp
 
 There's no password reset, because Outpost keeps only a hash of the password.
 
-- A <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> still signs you in, but changing the password asks for the current one.
+- A <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> still signs you in, but changing the password asks for the current one.
 - Otherwise, restore a backup from a time you knew the password, or start over as described below.
 
 ## Lost Authenticator
 
-- With a <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery code</Terminology>, sign in with it in place of the authenticator code. Then open **Security**, turn off the authenticator app, and set it up again on your new device.
-- With a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>, sign in with it and do the same.
-- Without either, delete the <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> with `docker exec outpost rm /data/keys/installation.key` and run `docker restart outpost`. Outpost then turns off the authenticator app, so you can sign in with the password and set the app up again, but it also removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the passwords of private registry sign-ins, as described in [Lost Encryption Key](#lost-encryption-key).
+- With a <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery code</Terminology>, sign in with it in place of the authenticator code. Then open **Sign-in and security** from the account menu, turn off the authenticator app, and set it up again on your new device.
+- With a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>, sign in with it and do the same.
+- Without either, delete the <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> with `docker exec outpost rm /data/keys/installation.key` and run `docker restart outpost`. Outpost then turns off the authenticator app, so you can sign in with the password and set the app up again, but it also removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the passwords of private registry sign-ins, as described in [Lost Encryption Key](#lost-encryption-key).
 
 ## Lost Encryption Key
 
-If `keys/installation.key` is missing, Outpost makes a new <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> and starts. The new key can't open what the old one sealed, so Outpost turns the authenticator app off and deletes its <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>, the same as **Turn off** on the **Security** page, removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of every notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>, and clears the password of every private registry sign-in.
+If `keys/installation.key` is missing, Outpost makes a new <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> and starts. The new key can't open what the old one sealed, so Outpost turns the authenticator app off and deletes its <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, the same as **Turn off** on the **Sign-in and security** page, removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of every notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>, and clears the password of every private registry sign-in.
 
-The account, the password, the <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, the sign-ins, the <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology>, the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> with their other fields, the registry sign-ins' hosts and usernames, and the history stay. Outpost logs one warning on that start, naming what was removed:
+The account, the password, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, the sign-ins, the <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology>, the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> with their other fields, the registry sign-ins' hosts and usernames, and the history stay. Outpost logs one warning on that start, naming what was removed:
 
 ```text
 No encryption key was found at "/data/keys/installation.key", so Outpost made a new one. These saved secrets were locked with the old key and were removed: the authenticator app for <username>, the <name> notification, the <host> registry sign-in. Enter them again in the dashboard.
 ```
 
-- **Signing in** — Password sign-in asks only for the password until you set the authenticator app up again, and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> keep working.
+- **Signing in** — Password sign-in asks only for the password until you set the authenticator app up again, and <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> keep working.
 - **Setting the app up again** — The **Saved secrets were removed** notice at the top of the dashboard links to **Set up the authenticator app**, as described in [Web Dashboard](/docs/features/dashboard/#saved-secrets-notice).
-- **Destinations** — A <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> that lost <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> is paused until you enter them again with **Edit** on the **Notifications** page, which the notice links to. The others keep working and get the **Saved secrets were removed** alert if they chose it, as described in [Notifications](/docs/features/notifications/#lost-encryption-key).
+- **Destinations** — A <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> that lost <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> is paused until you enter them again with **Edit** on the **Notifications** page, which the notice links to. The others keep working and get the **Saved secrets were removed** alert if they chose it, as described in [Notifications](/docs/features/notifications/#lost-encryption-key).
 - **Registry sign-ins** — A private registry sign-in that lost its password keeps its host and username. Checks of private images from that registry fail until you enter the password again with **Edit** under **Private registries** on the **Settings** page, which the notice links to.
-- **Nothing to remove** — If no authenticator app was on, no registry sign-in had a password, and no <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> had <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology>, such as on a fresh install, there's no warning and no notice.
+- **Nothing to remove** — If no authenticator app was on, no registry sign-in had a password, and no <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> had <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology>, such as on a fresh install, there's no warning and no notice.
 
 After Outpost makes the new key, the database belongs to that key, so putting the old key file back stops startup, as described in [Encryption Key Doesn't Match](#encryption-key-doesnt-match).
 
@@ -145,10 +220,10 @@ docker run --rm \
 
 ## Start Over
 
-Starting over is for when the password is lost and no <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> or backup can get you back in.
+Starting over is for when the password is lost and no <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> or backup can get you back in.
 
 :::danger
-Starting over deletes the dashboard account, every <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>, the authenticator app, the <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology>, the <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, and every notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>. The history stays.
+Starting over deletes the dashboard account and its browser sessions, every <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access token</Terminology>, the authenticator app, the <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology>, the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, every notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>, every private registry sign-in, the **Settings** page's saved values, and the record of images held after a rollback. The history stays.
 :::
 
 1. It is recommended to back up the data directory first, as described above.
@@ -159,8 +234,9 @@ Starting over deletes the dashboard account, every <Terminology title="scoped ke
    docker restart outpost
    ```
 
-3. Read the new <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> with `docker logs outpost` and create the account again, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account).
-4. Create new <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology> and update every client that used the old ones.
-5. Add the notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> again on the **Notifications** page.
+3. Read the new <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology> with `docker logs outpost` and create the account again, as shown in [Web Dashboard](/docs/features/dashboard/#set-up-your-account).
+4. Create new <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology> and update every client that used the old ones.
+5. Add the notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> again on the **Notifications** page.
+6. Add the private registry sign-ins again and set the **Settings** page back the way you had it.
 
 If you changed `OUTPOST_DATA_DIRECTORY`, remove the files from that folder instead.

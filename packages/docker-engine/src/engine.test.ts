@@ -15,6 +15,7 @@ import { Runner } from './engine.js';
 
 import type {
   Engine_Engine_Engine,
+  Engine_Engine_ListsAllContainersWhenRequested_Containers,
   Engine_Engine_ListsStoppedContainersByLabel_Containers,
   Engine_Engine_ReadsTheExitCodeOfAStoppedContainer_Inspected,
   Engine_Engine_ReportsDaemonErrorMessages_Request,
@@ -53,6 +54,21 @@ const server: Engine_Engine_Server = createServer((request, response) => {
       ImageID: 'sha256:1',
       Labels: {},
       State: 'running',
+    }]));
+
+    return;
+  }
+
+  if (request.url === '/containers/json?all=true') {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+
+    response.end(JSON.stringify([{
+      Id: 'stopped',
+      Names: ['/web-outpost-kept-20261106T040413Z'],
+      Image: 'sha256:previous',
+      ImageID: 'sha256:previous',
+      Labels: {},
+      State: 'exited',
     }]));
 
     return;
@@ -167,6 +183,14 @@ describe('engine', () => {
     const containers: Engine_Engine_ValidatesContainerListResponses_Containers = await engine.listContainers();
 
     expect(containers.map((container) => container['Names'])).toStrictEqual([['/web']]);
+
+    return;
+  });
+
+  it('lists all containers when requested', async () => {
+    const containers: Engine_Engine_ListsAllContainersWhenRequested_Containers = await engine.listContainers(true);
+
+    expect(containers.map((container) => container['State'])).toStrictEqual(['exited']);
 
     return;
   });

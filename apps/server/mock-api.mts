@@ -33,7 +33,17 @@ type MockScope = 'metrics:read' | 'status:read' | 'updates:run';
  *
  * @since 1.0.0
  */
-type MockStatus = 'available' | 'failed' | 'rolled-back' | 'skipped' | 'up-to-date' | 'updated';
+type MockStatus = 'available' | 'failed' | 'held' | 'kept-unhealthy' | 'rolled-back' | 'skipped' | 'up-to-date' | 'updated';
+
+/**
+ * Mock API - Mock action.
+ *
+ * Names whether a simulated cycle only checks digests or applies updates.
+ * Reports expose the same action field as the production scheduler.
+ *
+ * @since 1.1.0
+ */
+type MockAction = 'check' | 'update';
 
 /**
  * Mock API - Mock trigger.
@@ -90,6 +100,7 @@ type MockResult = {
   detail: string
   image: string
   status: MockStatus
+  summary?: string
 };
 
 /**
@@ -101,8 +112,10 @@ type MockResult = {
  * @since 1.0.0
  */
 type MockReport = {
+  action: MockAction
   error?: string
   finishedAt: string
+  rollback?: boolean
   results: MockResult[]
   startedAt: string
   trigger: MockTrigger
@@ -117,7 +130,7 @@ type MockReport = {
  * @since 1.0.0
  */
 type MockContainer = {
-  history: Record<number, [MockStatus, string]>
+  history: Record<number, [MockStatus, string, string?]>
   id: string
   image: string
   managed: boolean
@@ -145,6 +158,69 @@ type MockRuntimeSettings = {
   schedule: string
   settleSeconds: number
   stopTimeoutSeconds: number
+};
+
+/**
+ * Mock API - Mock backup document.
+ *
+ * Mirrors the portable version-one shape needed by the interactive import wizard.
+ * Optional properties represent the sections selected during export.
+ *
+ * @since 1.1.0
+ */
+type MockBackupDocument = {
+  accessTokens?: {
+    createdAt: string
+    expiresAt: string | null
+    id: string
+    lastUsedAt: string | null
+    name: string
+    scopes: MockScope[]
+    tokenHash: string
+  }[]
+  appVersion: string
+  exportedAt: string
+  format: 'outpost-export'
+  notifications?: {
+    events: string[]
+    id: string
+    missingSecrets: string[]
+    name: string
+    secrets: Record<string, string>
+    service: MockNotificationService
+    settings: Record<string, string>
+  }[]
+  registries?: {
+    id: string
+    password: string | null
+    registry: string
+    username: string
+  }[]
+  settings?: MockRuntimeSettings
+  version: 1
+};
+
+/**
+ * Mock API - Mock backup purpose.
+ *
+ * Restricts mock grants to one portable operation.
+ * Export and import credentials cannot be exchanged.
+ *
+ * @since 1.1.0
+ */
+type MockBackupPurpose = 'export' | 'import';
+
+/**
+ * Mock API - Mock backup grant.
+ *
+ * Binds one mock credential to a browser session and purpose.
+ * Map deletion supplies the single-use behavior.
+ *
+ * @since 1.1.0
+ */
+type MockBackupGrant = {
+  purpose: MockBackupPurpose
+  sessionId: string
 };
 
 /**
@@ -512,13 +588,13 @@ const notificationEvents: {
   },
   {
     defaultEnabled: true,
-    description: 'Monitor-only containers have new images.',
+    description: 'A check found new container images.',
     key: 'updates-available',
     label: 'New images available',
   },
   {
     defaultEnabled: true,
-    description: 'An update failed or was rolled back.',
+    description: 'An update failed, was rolled back, or was kept after failure.',
     key: 'update-failed',
     label: 'Update failed',
   },
@@ -683,7 +759,12 @@ const nextRun = (): string => new Date(at(-1, 4)).toISOString();
  */
 const containers: MockContainer[] = [
   {
-    history: {},
+    history: {
+      0: [
+        'held',
+        'Rolled back last time; waiting for a newer image (0123456789ab). Update this container with rollback disabled to keep and inspect the rejected image',
+      ],
+    },
     id: '4f6c2a1e9b3d',
     image: 'traefik:v3.2',
     managed: true,
@@ -695,18 +776,48 @@ const containers: MockContainer[] = [
     history: {
       1: [
         'updated',
-        'Recreated with nextcloud:30-apache',
+        'Recreated with localhost:22690/e2e/uptodate-app:latest',
       ],
       7: [
         'updated',
-        'Recreated with nextcloud:30-apache',
+        'Recreated with localhost:22690/e2e/uptodate-app:latest',
       ],
     },
     id: '9a8e7d6c5b4a',
-    image: 'nextcloud:30-apache',
+    image: 'localhost:22690/e2e/uptodate-app:latest',
     managed: true,
     monitorOnly: false,
-    name: 'nextcloud',
+    name: 'discord-stonker-bot-fresh-app-1',
+    note: 'Managed',
+  },
+  {
+    history: {
+      0: [
+        'kept-unhealthy',
+        `New container unhealthy; rollback was disabled, so replacement container ${'d'.repeat(64)} was kept as Docker left it. Previous container ${'c'.repeat(64)} (image sha256:${'e'.repeat(64)}) was renamed to e2e-app-outpost-kept-20261106T040413Z and remains stopped; previous container config summary: ${JSON.stringify({
+          configuredImage: 'localhost:22690/e2e/a-very-long-repository-name/with-nested-path-segments/app:latest',
+          containerId: 'c'.repeat(64),
+          environmentVariables: [
+            'PATH',
+            'NODE_ENV',
+            'A_VERY_LONG_ENVIRONMENT_VARIABLE_NAME',
+          ],
+          exposedPorts: ['22601/tcp'],
+          mounts: [
+            '/data',
+            '/var/run/docker.sock',
+          ],
+          name: 'e2e-app',
+          networks: ['e2e_default'],
+        })}`,
+        'Replacement failed its startup check; previous container kept as e2e-app-outpost-kept-20261106T040413Z',
+      ],
+    },
+    id: 'c'.repeat(64),
+    image: 'localhost:22690/e2e/a-very-long-repository-name/with-nested-path-segments/app:latest',
+    managed: true,
+    monitorOnly: false,
+    name: 'e2e-app',
     note: 'Managed',
   },
   {
@@ -769,7 +880,7 @@ const containers: MockContainer[] = [
     image: 'ghcr.io/home-assistant/home-assistant:stable',
     managed: false,
     monitorOnly: false,
-    name: 'homeassistant',
+    name: 'container-name_with-exactly-fifty-characters-12345',
     note: 'Opted out by label',
   },
   {
@@ -842,6 +953,7 @@ const resultFor = (container: MockContainer, daysAgo: number): MockResult => {
   const [
     status,
     detail,
+    summary,
   ] = container.history[daysAgo] ?? [
     'up-to-date',
     fakeDigest(`${container.image}-current`),
@@ -852,6 +964,7 @@ const resultFor = (container: MockContainer, daysAgo: number): MockResult => {
     detail,
     image: container.image,
     status,
+    ...((summary === undefined) ? {} : { summary }),
   };
 };
 
@@ -876,6 +989,7 @@ const checkedContainers = (): MockContainer[] => containers.filter((container: M
  * @since 1.0.0
  */
 const seedReport = (daysAgo: number, startTime: number, seconds: number, trigger: MockTrigger): MockReport => ({
+  action: 'update',
   finishedAt: new Date(startTime + (seconds * 1000)).toISOString(),
   results: checkedContainers().map((container: MockContainer): MockResult => resultFor(container, daysAgo)),
   startedAt: new Date(startTime).toISOString(),
@@ -903,6 +1017,7 @@ for (let daysAgo = 10; daysAgo >= 0; daysAgo -= 1) {
 
   if (daysAgo === 8) {
     history.unshift({
+      action: 'update',
       error: 'connect ENOENT /var/run/docker.sock',
       finishedAt: new Date(startTime + 1200).toISOString(),
       results: [{
@@ -941,9 +1056,31 @@ const jellyfin: MockContainer | undefined = containers.find((container: MockCont
 
 if (jellyfin !== undefined) {
   history.unshift({
+    action: 'check',
     finishedAt: new Date(at(1, 18, 20) + 4000).toISOString(),
     results: [resultFor(jellyfin, 1)],
     startedAt: new Date(at(1, 18, 20)).toISOString(),
+    trigger: 'dashboard',
+  });
+}
+
+/**
+ * Mock API - Long container.
+ *
+ * Drives responsive dashboard checks with a real registry path, full Docker
+ * IDs, recovery detail, and a concise table summary.
+ *
+ * @since 1.1.0
+ */
+const longContainer: MockContainer | undefined = containers.find((container: MockContainer): boolean => container.name === 'e2e-app');
+
+if (longContainer !== undefined) {
+  history.unshift({
+    action: 'update',
+    finishedAt: new Date(at(0, 19, 20) + 4000).toISOString(),
+    rollback: false,
+    results: [resultFor(longContainer, 0)],
+    startedAt: new Date(at(0, 19, 20)).toISOString(),
     trigger: 'dashboard',
   });
 }
@@ -1043,6 +1180,26 @@ let passkeys: MockPasskey[] = [
  * @since 1.0.0
  */
 const passkeyCeremonies: Map<string, string> = new Map();
+
+/**
+ * Mock API - Backup grants and passkey ceremonies.
+ *
+ * Keeps mock confirmation credentials session- and purpose-bound and single-use.
+ * Separate maps mirror the grant and passkey ceremony lifecycles.
+ *
+ * @since 1.1.0
+ */
+const backupGrants: Map<string, MockBackupGrant> = new Map();
+
+/**
+ * Mock API - Backup passkey ceremonies.
+ *
+ * Stores temporary mock WebAuthn bindings until verification.
+ * Each ceremony is scoped to its initiating session and purpose.
+ *
+ * @since 1.1.0
+ */
+const backupPasskeyCeremonies: Map<string, MockBackupGrant> = new Map();
 // MOCK_KEY_REPLACED=true starts as if the encryption key had been lost, to show the notice.
 
 /**
@@ -1178,7 +1335,7 @@ const registries: MockRegistry[] = [
     passwordMissing: false,
     registry: 'ghcr.io',
     updatedAt: '2026-10-28T09:14:00.000Z',
-    username: 'cbnventures-bot',
+    username: 'example-bot',
   },
   {
     createdAt: '2026-11-01T16:42:00.000Z',
@@ -1214,6 +1371,26 @@ if (keyReplaced) {
 let running: boolean = false;
 
 /**
+ * Mock API - Debug logging.
+ *
+ * Whether the Settings page's Debug logging switch is on.
+ * It starts off, like a fresh installation.
+ *
+ * @since 1.1.0
+ */
+let debugLogging: boolean = false;
+
+/**
+ * Mock API - Run action.
+ *
+ * Names the simulated check or update while it is running.
+ * Live state uses the same field as the production scheduler.
+ *
+ * @since 1.1.0
+ */
+let runAction: MockAction | undefined = undefined;
+
+/**
  * Mock API - Run started at.
  *
  * Stores this module-level value in one named location.
@@ -1234,14 +1411,14 @@ let runStartedAt: string | undefined = undefined;
 let lastError: string | undefined = undefined;
 
 /**
- * Mock API - Live checks.
+ * Mock API - Live updates.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
- * @since 1.0.0
+ * @since 1.1.0
  */
-let liveChecks: number = 0;
+let liveUpdates: number = 0;
 
 /**
  * Mock API - Totals.
@@ -1621,6 +1798,7 @@ const newRecoveryCodes = (): string[] => Array.from({ length: 10 }, (): string =
  * @since 1.0.0
  */
 const schedulerState = (): Record<string, unknown> => ({
+  action: runAction,
   lastError,
   lastReport: history[0],
   nextRun: nextRun(),
@@ -1660,10 +1838,13 @@ const containerRows = (): Record<string, unknown>[] => containers.map((container
   const result: MockResult | undefined = report?.results.find((candidate: MockResult): boolean => candidate.container === container.name);
 
   return {
-    id: container.id,
+    fullId: container.id.padEnd(64, container.id[0] ?? '0'),
+    id: container.id.slice(0, 12),
     image: container.image,
+    lastAction: report?.action,
     lastCheckedAt: report?.finishedAt,
     lastDetail: result?.detail,
+    lastSummary: result?.summary,
     lastStatus: result?.status,
     managed: container.managed,
     monitorOnly: container.monitorOnly,
@@ -1690,7 +1871,7 @@ const metricsText = (): string => {
     '# HELP outpost_containers_updated_total Containers updated since start.',
     '# TYPE outpost_containers_updated_total counter',
     `outpost_containers_updated_total ${totals.updated}`,
-    '# HELP outpost_containers_failed_total Container updates that failed or rolled back since start.',
+    '# HELP outpost_containers_failed_total Container updates that failed, rolled back, or were kept after failure since start.',
     '# TYPE outpost_containers_failed_total counter',
     `outpost_containers_failed_total ${totals.failed}`,
     '# HELP outpost_cycle_running Whether an update cycle is running.',
@@ -1726,7 +1907,7 @@ const broadcast = (event: string, data: unknown): void => {
   }
 };
 
-// liveResult is what a check started now finds: the first one updates immich-server, jellyfin keeps waiting.
+// liveResult is what a run started now finds: checks expose availability, while updates apply it.
 
 /**
  * Mock API - Live result.
@@ -1736,18 +1917,26 @@ const broadcast = (event: string, data: unknown): void => {
  *
  * @since 1.0.0
  */
-const liveResult = (container: MockContainer): MockResult => {
+const liveResult = (container: MockContainer, action: MockAction): MockResult => {
   const result: MockResult = resultFor(container, 0);
 
   if (container.name === 'immich-server') {
+    if (action === 'check' || settings.runtime.monitorOnly) {
+      return {
+        ...result,
+        detail: `New digest ${fakeDigest(`${container.image}-new`)}`,
+        status: 'available',
+      };
+    }
+
     return {
       ...result,
-      detail: (liveChecks === 0) ? `Recreated with ${container.image}` : fakeDigest(`${container.image}-new`),
-      status: (liveChecks === 0) ? 'updated' : 'up-to-date',
+      detail: (liveUpdates === 0) ? `Recreated with ${container.image}` : fakeDigest(`${container.image}-new`),
+      status: (liveUpdates === 0) ? 'updated' : 'up-to-date',
     };
   }
 
-  if (result.status === 'updated' || result.status === 'failed' || result.status === 'rolled-back') {
+  if (result.status === 'updated' || result.status === 'failed' || result.status === 'rolled-back' || result.status === 'kept-unhealthy') {
     return {
       ...result,
       detail: fakeDigest(`${container.image}-current`),
@@ -1758,22 +1947,23 @@ const liveResult = (container: MockContainer): MockResult => {
   return result;
 };
 
-// startCheck runs a simulated check in the background, like the scheduler: one at a time.
+// startCycle runs a simulated check or update in the background, like the scheduler: one at a time.
 
 /**
- * Mock API - Starts check.
+ * Mock API - Starts cycle.
  *
- * Centralizes this operation for the surrounding workflow.
- * Callers reuse one implementation instead of repeating the behavior.
+ * Serializes simulated runs and records the requested action in history.
+ * Checks expose available images; updates can produce updated results.
  *
- * @since 1.0.0
+ * @since 1.1.0
  */
-const startCheck = (containerId: string | undefined, trigger: MockTrigger): boolean => {
+const startCycle = (containerId: string | undefined, trigger: MockTrigger, action: MockAction, rollback: boolean = true): boolean => {
   if (running) {
     return false;
   }
 
   running = true;
+  runAction = action;
   runStartedAt = new Date().toISOString();
   broadcast('state', overviewResource());
 
@@ -1783,20 +1973,26 @@ const startCheck = (containerId: string | undefined, trigger: MockTrigger): bool
 
   setTimeout((): void => {
     const report: MockReport = {
+      action,
       finishedAt: new Date().toISOString(),
-      results: targets.map(liveResult),
+      ...((action === 'update' && rollback === false) ? { rollback: false } : {}),
+      results: targets.map((container: MockContainer): MockResult => liveResult(container, action)),
       startedAt: runStartedAt ?? new Date().toISOString(),
       trigger,
     };
 
-    liveChecks += 1;
+    if (action === 'update') {
+      liveUpdates += 1;
+    }
+
     history.unshift(report);
     history.splice(50);
     totals.cycles += 1;
     totals.updated += report.results.filter((result: MockResult): boolean => result.status === 'updated').length;
-    totals.failed += report.results.filter((result: MockResult): boolean => result.status === 'failed' || result.status === 'rolled-back').length;
+    totals.failed += report.results.filter((result: MockResult): boolean => result.status === 'failed' || result.status === 'rolled-back' || result.status === 'kept-unhealthy').length;
     lastError = undefined;
     running = false;
+    runAction = undefined;
     runStartedAt = undefined;
     broadcast('check', report);
     broadcast('state', overviewResource());
@@ -1999,12 +2195,6 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
   const method: string = request.method ?? 'GET';
   const aliasRoute: boolean = path === '/v1/update' || path === '/v1/status' || path === '/metrics';
 
-  if (method === 'GET' && path === '/') {
-    response.writeHead(302, { Location: '/admin/' }).end();
-
-    return true;
-  }
-
   if (!path.startsWith('/api/v1/') && !aliasRoute) {
     return false;
   }
@@ -2063,7 +2253,7 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
     }
 
     if (path === '/v1/update') {
-      const started: boolean = startCheck(undefined, 'api');
+      const started: boolean = startCycle(undefined, 'api', 'update');
 
       sendJSON(response, (started) ? 202 : 409, { started });
 
@@ -2417,12 +2607,37 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
     return true;
   }
 
-  if (method === 'POST' && path === '/api/v1/checks') {
+  if ((method === 'GET' || method === 'PUT') && path === '/api/v1/diagnostics') {
+    if (principal.kind === 'token') {
+      sendError(response, 403, 'session_required', 'An administrator browser session is required.');
+
+      return true;
+    }
+
+    if (method === 'PUT') {
+      if (typeof body['debugLogging'] !== 'boolean') {
+        sendIssues(response, 422, 'invalid_request', [fieldIssue('debugLogging', 'Choose on or off.')]);
+
+        return true;
+      }
+
+      debugLogging = body['debugLogging'];
+    }
+    sendJSON(response, 200, { debugLogging });
+
+    return true;
+  }
+
+  if (method === 'POST' && (path === '/api/v1/checks' || path === '/api/v1/updates')) {
     if (!requireScope('updates:run')) {
       return true;
     }
 
-    const extra: MockIssue[] = unknownFields(body, ['containerId']);
+    const action: MockAction = (path === '/api/v1/checks') ? 'check' : 'update';
+    const extra: MockIssue[] = unknownFields(body, (action === 'update') ? [
+      'containerId',
+      'rollback',
+    ] : ['containerId']);
 
     if (extra.length > 0) {
       sendIssues(response, 422, 'invalid_request', extra);
@@ -2436,8 +2651,31 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
       return true;
     }
 
-    if (!startCheck((typeof body['containerId'] === 'string') ? body['containerId'] : undefined, (principal.kind === 'token') ? 'api' : 'dashboard')) {
-      sendError(response, 409, 'check_running', 'A check is already running.');
+    if (action === 'update' && body['rollback'] !== undefined && typeof body['rollback'] !== 'boolean') {
+      sendIssues(response, 422, 'invalid_request', [fieldIssue('rollback', 'Choose whether Outpost should roll back a failed update.')]);
+
+      return true;
+    }
+
+    const containerId: string | undefined = (typeof body['containerId'] === 'string') ? body['containerId'] : undefined;
+    const rollback: boolean = (action === 'update') ? body['rollback'] !== false : true;
+
+    if (rollback === false && containerId === undefined) {
+      sendError(response, 422, 'invalid_request', 'Rollback can only be disabled for one container at a time. Send containerId with rollback set to false.');
+
+      return true;
+    }
+
+    const target: MockContainer | undefined = (containerId === undefined) ? undefined : containers.find((container: MockContainer): boolean => container.id.startsWith(containerId) || containerId.startsWith(container.id));
+
+    if (rollback === false && target?.self === true) {
+      sendError(response, 422, 'invalid_request', 'Rollback cannot be disabled when updating Outpost itself.');
+
+      return true;
+    }
+
+    if (!startCycle(containerId, (principal.kind === 'token') ? 'api' : 'dashboard', action, rollback)) {
+      sendError(response, 409, 'check_running', 'A check or update is already running.');
 
       return true;
     }
@@ -2474,7 +2712,7 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
   }
 
   if (principal.kind === 'token') {
-    if (path.startsWith('/api/v1/auth/')) {
+    if (path.startsWith('/api/v1/auth/') || path.startsWith('/api/v1/backup/')) {
       sendError(response, 403, 'session_required', 'An administrator browser session is required.');
     } else {
       sendError(response, 404, 'not_found', 'No route matches this request.');
@@ -2553,6 +2791,375 @@ const handleRequest = async (request: IncomingMessage, response: ServerResponse)
       recoveryCodesRemaining: recoveryCodes.length,
       totpEnabled,
       username: administrator?.username ?? 'admin',
+    });
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/confirmation') {
+    const purpose: MockBackupPurpose | undefined = (body['purpose'] === 'export' || body['purpose'] === 'import') ? body['purpose'] : undefined;
+    const password: string = (typeof body['password'] === 'string') ? body['password'] : '';
+
+    if (purpose === undefined || password === '') {
+      sendIssues(response, 422, 'invalid_request', [fieldIssue((purpose === undefined) ? 'purpose' : 'password', (purpose === undefined) ? 'Choose what you are confirming.' : 'Enter your password.')]);
+
+      return true;
+    }
+
+    if (administrator === null || password !== administrator.password) {
+      sendIssues(response, 422, 'identity_not_confirmed', [fieldIssue('password', 'That password is incorrect.')]);
+
+      return true;
+    }
+
+    if (totpEnabled && body['code'] !== '123456') {
+      sendIssues(response, 422, 'identity_not_confirmed', [fieldIssue('code', 'That authenticator code is incorrect.')]);
+
+      return true;
+    }
+
+    const grant: string = `obg_${randomBytes(32).toString('base64url')}`;
+
+    backupGrants.set(grant, {
+      purpose,
+      sessionId: principal.sessionId,
+    });
+    sendJSON(response, 200, {
+      expiresAt: new Date(Date.now() + (5 * minute)).toISOString(),
+      grant,
+    });
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/confirmation/passkey/options') {
+    const purpose: MockBackupPurpose | undefined = (body['purpose'] === 'export' || body['purpose'] === 'import') ? body['purpose'] : undefined;
+
+    if (purpose === undefined) {
+      sendIssues(response, 422, 'invalid_request', [fieldIssue('purpose', 'Choose what you are confirming.')]);
+
+      return true;
+    }
+
+    const ceremonyId: string = randomBytes(32).toString('base64url');
+
+    backupPasskeyCeremonies.set(ceremonyId, {
+      purpose,
+      sessionId: principal.sessionId,
+    });
+    sendJSON(response, 200, {
+      ceremonyId,
+      options: {
+        allowCredentials: passkeys.map((passkey: MockPasskey): {
+          id: string
+          type: 'public-key'
+        } => ({
+          id: passkey.id,
+          type: 'public-key',
+        })),
+        challenge: randomBytes(32).toString('base64url'),
+        rpId: url.hostname,
+        timeout: 300000,
+        userVerification: 'required',
+      },
+    });
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/confirmation/passkey/verify') {
+    const ceremonyId: string = (typeof body['ceremonyId'] === 'string') ? body['ceremonyId'] : '';
+    const purpose: MockBackupPurpose | undefined = (body['purpose'] === 'export' || body['purpose'] === 'import') ? body['purpose'] : undefined;
+    const binding: MockBackupGrant | undefined = backupPasskeyCeremonies.get(ceremonyId);
+
+    backupPasskeyCeremonies.delete(ceremonyId);
+
+    if (binding === undefined || purpose === undefined || binding.purpose !== purpose || binding.sessionId !== principal.sessionId) {
+      sendError(response, 409, 'passkey_ceremony_invalid', 'That passkey request expired. Try again.');
+
+      return true;
+    }
+
+    const grant: string = `obg_${randomBytes(32).toString('base64url')}`;
+
+    backupGrants.set(grant, binding);
+    sendJSON(response, 200, {
+      expiresAt: new Date(Date.now() + (5 * minute)).toISOString(),
+      grant,
+    });
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/export') {
+    const grant: string = (typeof body['grant'] === 'string') ? body['grant'] : '';
+    const binding: MockBackupGrant | undefined = backupGrants.get(grant);
+    const sections: Record<string, unknown> = (typeof body['sections'] === 'object' && body['sections'] !== null) ? body['sections'] as Record<string, unknown> : {};
+
+    if (binding === undefined || binding.purpose !== 'export' || binding.sessionId !== principal.sessionId) {
+      sendError(response, 401, 'backup_confirmation_expired', 'Confirm it\'s you again.');
+
+      return true;
+    }
+
+    backupGrants.delete(grant);
+
+    const document: MockBackupDocument = {
+      appVersion: '1.0.4-mock',
+      exportedAt: new Date().toISOString(),
+      format: 'outpost-export',
+      version: 1,
+    };
+
+    if (sections['settings'] === true) {
+      document.settings = { ...settings.runtime };
+    }
+
+    if (sections['registries'] === true) {
+      document.registries = registries.map((registry: MockRegistry): NonNullable<MockBackupDocument['registries']>[number] => ({
+        id: registry.id,
+        password: (registry.passwordMissing) ? null : 'mock registry password',
+        registry: registry.registry,
+        username: registry.username,
+      }));
+    }
+
+    if (sections['notifications'] === true) {
+      document.notifications = notifications.map((notification: MockNotification): NonNullable<MockBackupDocument['notifications']>[number] => ({
+        events: [...notification.events],
+        id: notification.id,
+        missingSecrets: [...notification.secretsMissing],
+        name: notification.name,
+        secrets: Object.fromEntries(Object.keys(notification.secrets).map((key: string): [string, string] => [
+          key,
+          'mock notification secret',
+        ])),
+        service: notification.service,
+        settings: { ...notification.settings },
+      }));
+    }
+
+    if (sections['accessTokens'] === true) {
+      document.accessTokens = tokens.map((token: MockToken): NonNullable<MockBackupDocument['accessTokens']>[number] => ({
+        createdAt: token.createdAt,
+        expiresAt: token.expiresAt,
+        id: token.id,
+        lastUsedAt: token.lastUsedAt,
+        name: token.name,
+        scopes: [...token.scopes],
+        tokenHash: token.hash,
+      }));
+    }
+
+    response.setHeader('Content-Disposition', `attachment; filename="outpost-export-${document.exportedAt.slice(0, 10)}.json"`);
+    sendJSON(response, 200, document);
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/imports/preview') {
+    const document: MockBackupDocument | null = (typeof body['document'] === 'object' && body['document'] !== null) ? body['document'] as MockBackupDocument : null;
+
+    if (document === null || document.format !== 'outpost-export' || document.version !== 1) {
+      sendError(response, 422, 'invalid_request', 'Choose a valid Outpost export file.');
+
+      return true;
+    }
+
+    const registryHosts: Set<string> = new Set(registries.map((registry: MockRegistry): string => registry.registry.toLowerCase()));
+    const targetNames: Set<string> = new Set(notifications.map((notification: MockNotification): string => notification.name.toLowerCase()));
+    const tokenIds: Set<string> = new Set(tokens.map((token: MockToken): string => token.id));
+    const tokenNames: Set<string> = new Set(tokens.map((token: MockToken): string => token.name.toLowerCase()));
+    const tokenHashes: Set<string> = new Set(tokens.map((token: MockToken): string => token.hash));
+    const fileRegistries: NonNullable<MockBackupDocument['registries']> = document.registries ?? [];
+    const fileTargets: NonNullable<MockBackupDocument['notifications']> = document.notifications ?? [];
+    const fileTokens: NonNullable<MockBackupDocument['accessTokens']> = document.accessTokens ?? [];
+    const settingsChanged: number = (document.settings === undefined) ? 0 : Object.keys(document.settings).filter((key: string): boolean => document.settings?.[key as keyof MockRuntimeSettings] !== settings.runtime[key as keyof MockRuntimeSettings]).length;
+    const sections = [];
+
+    if (document.settings !== undefined) {
+      sections.push({
+        file: '8 settings',
+        here: 'Current settings',
+        id: 'settings',
+        label: 'Settings',
+        willImport: true,
+      });
+    }
+    if (document.registries !== undefined) {
+      sections.push({
+        file: `${String(fileRegistries.length)} registry sign-ins`,
+        here: `${String(registries.length)} registry sign-ins`,
+        id: 'registries',
+        label: 'Registries',
+        willImport: true,
+      });
+    }
+    if (document.notifications !== undefined) {
+      sections.push({
+        file: `${String(fileTargets.length)} targets`,
+        here: `${String(notifications.length)} targets`,
+        id: 'notifications',
+        label: 'Notifications',
+        willImport: true,
+      });
+    }
+    if (document.accessTokens !== undefined) {
+      sections.push({
+        file: `${String(fileTokens.length)} tokens`,
+        here: `${String(tokens.length)} tokens`,
+        id: 'accessTokens',
+        label: 'Access tokens',
+        willImport: true,
+      });
+    }
+
+    sendJSON(response, 200, {
+      appVersion: document.appVersion,
+      exportedAt: document.exportedAt,
+      sections,
+      summary: {
+        accessTokens: {
+          added: fileTokens.filter((token): boolean => !tokenIds.has(token.id) && !tokenNames.has(token.name.toLowerCase()) && !tokenHashes.has(token.tokenHash)).length,
+          skipped: fileTokens.filter((token): boolean => tokenIds.has(token.id) || tokenNames.has(token.name.toLowerCase()) || tokenHashes.has(token.tokenHash)).length,
+        },
+        notifications: {
+          added: fileTargets.filter((target): boolean => !targetNames.has(target.name.toLowerCase())).length,
+          replaced: fileTargets.filter((target): boolean => targetNames.has(target.name.toLowerCase())).length,
+        },
+        registries: {
+          added: fileRegistries.filter((registry): boolean => !registryHosts.has(registry.registry.toLowerCase())).length,
+          replaced: fileRegistries.filter((registry): boolean => registryHosts.has(registry.registry.toLowerCase())).length,
+        },
+        settings: { changed: settingsChanged },
+      },
+    });
+
+    return true;
+  }
+
+  if (method === 'POST' && path === '/api/v1/backup/imports') {
+    const document: MockBackupDocument | null = (typeof body['document'] === 'object' && body['document'] !== null) ? body['document'] as MockBackupDocument : null;
+    const grant: string = (typeof body['grant'] === 'string') ? body['grant'] : '';
+    const binding: MockBackupGrant | undefined = backupGrants.get(grant);
+
+    if (document === null || document.format !== 'outpost-export' || document.version !== 1) {
+      sendError(response, 422, 'invalid_request', 'Choose a valid Outpost export file.');
+
+      return true;
+    }
+
+    if (binding === undefined || binding.purpose !== 'import' || binding.sessionId !== principal.sessionId) {
+      sendError(response, 401, 'backup_confirmation_expired', 'Confirm it\'s you again.');
+
+      return true;
+    }
+
+    backupGrants.delete(grant);
+
+    const summary = {
+      accessTokens: {
+        added: 0,
+        skipped: 0,
+      },
+      notifications: {
+        added: 0,
+        replaced: 0,
+      },
+      registries: {
+        added: 0,
+        replaced: 0,
+      },
+      settings: { changed: 0 },
+    };
+    const importedSections: string[] = [];
+
+    if (document.settings !== undefined) {
+      summary.settings.changed = Object.keys(document.settings).filter((key: string): boolean => document.settings?.[key as keyof MockRuntimeSettings] !== settings.runtime[key as keyof MockRuntimeSettings]).length;
+      settings.runtime = { ...document.settings };
+      importedSections.push('settings');
+    }
+
+    if (document.registries !== undefined) {
+      for (const incoming of document.registries) {
+        const existing: MockRegistry | undefined = registries.find((registry: MockRegistry): boolean => registry.registry.toLowerCase() === incoming.registry.toLowerCase());
+
+        if (existing === undefined) {
+          registries.push({
+            createdAt: new Date().toISOString(),
+            id: incoming.id,
+            passwordMissing: incoming.password === null,
+            registry: incoming.registry,
+            updatedAt: new Date().toISOString(),
+            username: incoming.username,
+          });
+          summary.registries.added += 1;
+        } else {
+          existing.passwordMissing = incoming.password === null;
+          existing.registry = incoming.registry;
+          existing.updatedAt = new Date().toISOString();
+          existing.username = incoming.username;
+          summary.registries.replaced += 1;
+        }
+      }
+      importedSections.push('registries');
+    }
+
+    if (document.notifications !== undefined) {
+      for (const incoming of document.notifications) {
+        const existing: MockNotification | undefined = notifications.find((notification: MockNotification): boolean => notification.name.toLowerCase() === incoming.name.toLowerCase());
+        const target: MockNotification = {
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          events: [...incoming.events],
+          id: existing?.id ?? incoming.id,
+          lastAttemptAt: null,
+          lastError: null,
+          name: incoming.name,
+          secrets: Object.fromEntries(Object.keys(incoming.secrets).map((key: string): [string, true] => [
+            key,
+            true,
+          ])),
+          secretsMissing: [...incoming.missingSecrets],
+          service: incoming.service,
+          settings: { ...incoming.settings },
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (existing === undefined) {
+          notifications.push(target);
+          summary.notifications.added += 1;
+        } else {
+          notifications.splice(notifications.indexOf(existing), 1, target);
+          summary.notifications.replaced += 1;
+        }
+      }
+      importedSections.push('notifications');
+    }
+
+    if (document.accessTokens !== undefined) {
+      for (const incoming of document.accessTokens) {
+        if (tokens.some((token: MockToken): boolean => token.id === incoming.id || token.name.toLowerCase() === incoming.name.toLowerCase() || token.hash === incoming.tokenHash)) {
+          summary.accessTokens.skipped += 1;
+          continue;
+        }
+
+        tokens.push({
+          createdAt: incoming.createdAt,
+          expiresAt: incoming.expiresAt,
+          hash: incoming.tokenHash,
+          id: incoming.id,
+          lastUsedAt: incoming.lastUsedAt,
+          name: incoming.name,
+          scopes: [...incoming.scopes],
+        });
+        summary.accessTokens.added += 1;
+      }
+      importedSections.push('accessTokens');
+    }
+
+    sendJSON(response, 200, {
+      ...summary,
+      importedSections,
     });
 
     return true;

@@ -1,4 +1,7 @@
-import type { UpdateReport } from 'outpost-package-updater';
+import type {
+  CycleAction,
+  UpdateReport,
+} from 'outpost-package-updater';
 
 import type {
   Lib_Notifications_Service,
@@ -183,9 +186,17 @@ export type Shared_BrowserSession = {
  */
 export type Shared_CheckTrigger = 'api' | 'dashboard' | 'schedule' | 'startup';
 
+export type Shared_CycleAction = CycleAction;
+
+export type Shared_CheckReport_Action = Shared_CycleAction | undefined;
+
+export type Shared_CheckReport_Rollback = boolean | undefined;
+
 export type Shared_CheckReport_Trigger = Shared_CheckTrigger | undefined;
 
 export type Shared_CheckReport = UpdateReport & {
+  action?: Shared_CheckReport_Action;
+  rollback?: Shared_CheckReport_Rollback;
   trigger?: Shared_CheckReport_Trigger;
 };
 

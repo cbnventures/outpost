@@ -26,17 +26,21 @@ import {
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { Runner as History } from './history.js';
+import { isDebugLogging, setDebugLogging } from './lib/logger.js';
 import { Runner as State } from './lib/state.js';
 import {
   generateCode,
   generateTotpSecret,
 } from './lib/totp.js';
 import {
+  backupContentDispositionPattern,
+  backupGrantPattern,
   csrfTokenPattern,
   personalAccessTokenIdPattern,
   personalAccessTokenPattern,
   registryIdPattern,
   sessionTokenPattern,
+  sha256HashPattern,
 } from './regex.js';
 import { Runner as Scheduler } from './scheduler.js';
 
@@ -47,6 +51,19 @@ import type {
   App_AccountSecurity_ListsWhatALostKeyRemovedUntilItIsDismissed_Client,
   App_AccountSecurity_ListsWhatALostKeyRemovedUntilItIsDismissed_RestartedClient,
   App_AccountSecurity_ListsWhatALostKeyRemovedUntilItIsDismissed_Stderr,
+  App_Backup_Administrator,
+  App_Backup_ApiClient,
+  App_Backup_Client,
+  App_Backup_CreatedToken,
+  App_Backup_Document,
+  App_Backup_Grant,
+  App_Backup_OtherClient,
+  App_Backup_Response,
+  App_Backup_Sections,
+  App_Backup_Serialized,
+  App_Backup_TotpCode,
+  App_Backup_TotpSecret,
+  App_Backup_TotpStep,
   App_BaseDirectory,
   App_Claim_Client,
   App_Claim_Returns,
@@ -105,6 +122,9 @@ import type {
   App_DashboardApi_EndsStreamsForRevokedCallers_Reader,
   App_DashboardApi_EndsStreamsForRevokedCallers_SessionEvents,
   App_DashboardApi_EndsStreamsForRevokedCallers_TokenEvents,
+  App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Client,
+  App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Events,
+  App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Write,
   App_DashboardApi_ReportsDockerFailures_Client,
   App_DashboardApi_RunsOneCheckAtATime_Automation,
   App_DashboardApi_RunsOneCheckAtATime_Client,
@@ -121,6 +141,8 @@ import type {
   App_DashboardApi_StreamsTheStateAndEachFinishedCheck_Finished,
   App_DashboardApi_StreamsTheStateAndEachFinishedCheck_NamedEvents,
   App_DashboardApi_StreamsTheStateAndEachFinishedCheck_Opened,
+  App_DashboardApi_TurnsDebugLoggingOnAndOff_Client,
+  App_DashboardApi_TurnsDebugLoggingOnAndOff_Reader,
   App_EncodeCbor_Bytes,
   App_EncodeCbor_Entries,
   App_EncodeCbor_Returns,
@@ -393,8 +415,13 @@ async function startHarness(options: App_StartHarness_Options = {}): App_StartHa
     calls: [],
     pending: [],
   };
-  const scheduler: App_StartHarness_Scheduler = new Scheduler(async (containerIds) => {
-    cycle['calls'].push(containerIds);
+  const scheduler: App_StartHarness_Scheduler = new Scheduler(async (containerIds, source, action, rollback) => {
+    cycle['calls'].push({
+      action,
+      containerIds,
+      rollback,
+      source,
+    });
 
     return new Promise((resolve) => {
       cycle['pending'].push(() => {
@@ -416,7 +443,10 @@ async function startHarness(options: App_StartHarness_Options = {}): App_StartHa
     });
   }, history, () => undefined);
   const httpServer: App_StartHarness_HttpServer = createServer(createApp({
-    config: loadConfig({ OUTPOST_DATA_DIRECTORY: dataDirectory }),
+    config: loadConfig({
+      OUTPOST_DATA_DIRECTORY: dataDirectory,
+      ...((options['selfId'] === undefined) ? {} : { HOSTNAME: options['selfId'] }),
+    }),
     eventHeartbeatMilliseconds: 50,
     history,
     inspectContainer: async (id) => {
@@ -2389,6 +2419,7 @@ describe('dashboard API', () => {
       body: {
         items: [
           {
+            fullId: `bbbbbbbbbbbb${'2'.repeat(52)}`,
             id: 'bbbbbbbbbbbb',
             image: 'postgres:17',
             managed: false,
@@ -2399,6 +2430,7 @@ describe('dashboard API', () => {
             state: 'running',
           },
           {
+            fullId: `aaaaaaaaaaaa${'1'.repeat(52)}`,
             id: 'aaaaaaaaaaaa',
             image: 'nginx:1',
             managed: true,
@@ -2544,8 +2576,8 @@ describe('dashboard API', () => {
     return;
   });
 
-  it('runs one check at a time', async () => {
-    harness = await startHarness();
+  it('runs one check or update at a time', async () => {
+    harness = await startHarness({ selfId: 'aaaaaaaaaaaa' });
 
     const client: App_DashboardApi_RunsOneCheckAtATime_Client = createClient(harness['baseUrl']);
     const reader: App_DashboardApi_RunsOneCheckAtATime_Reader = createToken(harness, 'Home Assistant', ['status:read']);
@@ -2593,9 +2625,59 @@ describe('dashboard API', () => {
       status: 422,
     }));
 
+    expect(await client.request('POST', '/api/v1/updates', {
+      rollback: false,
+    })).toEqual(expect.objectContaining({
+      body: {
+        error: {
+          code: 'invalid_request',
+          message: 'Rollback can only be disabled for one container at a time. Send containerId with rollback set to false.',
+        },
+      },
+      status: 422,
+    }));
+
+    expect(await client.request('POST', '/api/v1/updates', {
+      containerId: 'bbbbbbbbbbbb',
+      rollback: 'false',
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'invalid_request',
+          message: 'Choose whether Outpost should roll back a failed update.',
+        }),
+      }),
+      status: 422,
+    }));
+
+    expect(await client.request('POST', '/api/v1/updates', {
+      containerId: 'aaaaaaaaaaaa',
+      rollback: false,
+    })).toEqual(expect.objectContaining({
+      body: {
+        error: {
+          code: 'invalid_request',
+          message: 'Rollback cannot be disabled when updating Outpost itself.',
+        },
+      },
+      status: 422,
+    }));
+
     expect(await createClient(harness['baseUrl'], {
       Authorization: `Bearer ${reader['personalAccessToken']}`,
     }).request('POST', '/api/v1/checks')).toEqual(expect.objectContaining({
+      body: {
+        error: {
+          code: 'scope_required',
+          message: 'This token doesn\'t have the updates:run scope.',
+        },
+      },
+      status: 403,
+    }));
+
+    expect(await createClient(harness['baseUrl'], {
+      Authorization: `Bearer ${reader['personalAccessToken']}`,
+    }).request('POST', '/api/v1/updates')).toEqual(expect.objectContaining({
       body: {
         error: {
           code: 'scope_required',
@@ -2616,20 +2698,33 @@ describe('dashboard API', () => {
       status: 202,
     }));
 
-    expect(harness['cycle']['calls']).toEqual([['aaaaaaaaaaaa']]);
+    expect(harness['cycle']['calls']).toEqual([{
+      action: 'check',
+      containerIds: ['aaaaaaaaaaaa'],
+      rollback: true,
+      source: 'dashboard',
+    }]);
 
     expect(await client.request('GET', '/api/v1/overview')).toEqual(expect.objectContaining({
       body: expect.objectContaining({
+        action: 'check',
         running: true,
         startedAt: expect.any(String),
       }),
     }));
 
-    expect(await automation.request('POST', '/api/v1/checks')).toEqual(expect.objectContaining({
+    expect(await client.request('GET', '/api/v1/status')).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        action: 'check',
+        running: true,
+      }),
+    }));
+
+    expect(await automation.request('POST', '/api/v1/updates')).toEqual(expect.objectContaining({
       body: {
         error: {
           code: 'check_running',
-          message: 'A check is already running.',
+          message: 'A check or update is already running.',
         },
       },
       status: 409,
@@ -2647,9 +2742,65 @@ describe('dashboard API', () => {
     }));
 
     expect(harness['cycle']['calls']).toEqual([
-      ['aaaaaaaaaaaa'],
-      undefined,
+      {
+        action: 'check',
+        containerIds: ['aaaaaaaaaaaa'],
+        rollback: true,
+        source: 'dashboard',
+      },
+      {
+        action: 'check',
+        containerIds: undefined,
+        rollback: true,
+        source: 'api',
+      },
     ]);
+
+    releaseCycle(harness);
+
+    await waitForIdle(harness);
+
+    expect(await client.request('POST', '/api/v1/updates', {
+      containerId: 'bbbbbbbbbbbb',
+      rollback: false,
+    })).toEqual(expect.objectContaining({
+      body: {
+        started: true,
+      },
+      status: 202,
+    }));
+
+    expect(harness['cycle']['calls'].at(-1)).toEqual({
+      action: 'update',
+      containerIds: ['bbbbbbbbbbbb'],
+      rollback: false,
+      source: 'dashboard',
+    });
+
+    expect(await client.request('GET', '/api/v1/status')).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        action: 'update',
+        running: true,
+      }),
+    }));
+
+    releaseCycle(harness);
+
+    await waitForIdle(harness);
+
+    expect(await automation.request('POST', '/api/v1/updates')).toEqual(expect.objectContaining({
+      body: {
+        started: true,
+      },
+      status: 202,
+    }));
+
+    expect(harness['cycle']['calls'].at(-1)).toEqual({
+      action: 'update',
+      containerIds: undefined,
+      rollback: true,
+      source: 'api',
+    });
 
     releaseCycle(harness);
 
@@ -2659,6 +2810,7 @@ describe('dashboard API', () => {
       body: {
         items: [
           {
+            action: 'update',
             finishedAt: '2026-10-25T04:00:05.000Z',
             results: [{
               container: 'web',
@@ -2670,6 +2822,16 @@ describe('dashboard API', () => {
             trigger: 'api',
           },
           expect.objectContaining({
+            action: 'update',
+            rollback: false,
+            trigger: 'dashboard',
+          }),
+          expect.objectContaining({
+            action: 'check',
+            trigger: 'api',
+          }),
+          expect.objectContaining({
+            action: 'check',
             trigger: 'dashboard',
           }),
         ],
@@ -2710,6 +2872,94 @@ describe('dashboard API', () => {
       },
       status: 502,
     }));
+
+    return;
+  });
+
+  it('turns debug logging on and off for a signed-in browser only', async () => {
+    harness = await startHarness();
+
+    const client: App_DashboardApi_TurnsDebugLoggingOnAndOff_Client = createClient(harness['baseUrl']);
+
+    await claim(client, harness);
+
+    const reader: App_DashboardApi_TurnsDebugLoggingOnAndOff_Reader = createToken(harness, 'Home Assistant', ['status:read']);
+
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    expect((await createClient(harness['baseUrl']).request('GET', '/api/v1/diagnostics'))['status']).toBe(401);
+
+    expect((await createClient(harness['baseUrl'], {
+      Authorization: `Bearer ${reader['personalAccessToken']}`,
+    }).request('GET', '/api/v1/diagnostics'))['status']).toBe(403);
+
+    expect(await client.request('GET', '/api/v1/diagnostics')).toEqual(expect.objectContaining({
+      body: {
+        debugLogging: false,
+      },
+      status: 200,
+    }));
+
+    expect((await client.request('PUT', '/api/v1/diagnostics', {
+      debugLogging: 'yes',
+    }))['status']).toBe(422);
+
+    expect(await client.request('PUT', '/api/v1/diagnostics', {
+      debugLogging: true,
+    })).toEqual(expect.objectContaining({
+      body: {
+        debugLogging: true,
+      },
+      status: 200,
+    }));
+
+    expect(isDebugLogging()).toBe(true);
+
+    expect(harness['state'].getDebugLogging()).toBe(true);
+
+    expect(await client.request('PUT', '/api/v1/diagnostics', {
+      debugLogging: false,
+    })).toEqual(expect.objectContaining({
+      body: {
+        debugLogging: false,
+      },
+      status: 200,
+    }));
+
+    expect(isDebugLogging()).toBe(false);
+
+    return;
+  });
+
+  it('leaves the live event stream out of the request timing lines', async () => {
+    harness = await startHarness();
+
+    const client: App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Client = createClient(harness['baseUrl']);
+
+    await claim(client, harness);
+
+    const write: App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    setDebugLogging(true);
+
+    const events: App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Events = await openEvents(harness['baseUrl'], {
+      Cookie: [...client['cookies'].entries()].map((cookie) => `${cookie[0]}=${cookie[1]}`).join('; '),
+    });
+
+    await events.readUntil((received) => received.length >= 2);
+
+    events.close();
+
+    // Several 50 ms heartbeats pass, so the server has seen the stream end.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 300);
+
+      return;
+    });
+
+    setDebugLogging(false);
+
+    expect(write.mock.calls.map((call) => String(call[0])).filter((line) => line.startsWith('DEBUG'))).toEqual([]);
 
     return;
   });
@@ -2768,7 +3018,16 @@ describe('dashboard API', () => {
 
     expect((await client.request('POST', '/api/v1/checks'))['status']).toBe(202);
 
-    expect((await events.readUntil((received) => received.some((event) => Reflect.get(Object(event['data']), 'running') === true)))['closed']).toBe(false);
+    expect((await events.readUntil((received) => received.some((event) => Reflect.get(Object(event['data']), 'running') === true)))).toEqual(expect.objectContaining({
+      closed: false,
+      events: expect.arrayContaining([{
+        data: expect.objectContaining({
+          action: 'check',
+          running: true,
+        }),
+        event: 'state',
+      }]),
+    }));
 
     releaseCycle(harness);
 
@@ -2778,6 +3037,7 @@ describe('dashboard API', () => {
     expect(namedEvents.slice(-2)).toEqual([
       {
         data: {
+          action: 'check',
           finishedAt: '2026-10-25T04:00:05.000Z',
           results: [{
             container: 'web',
@@ -2793,6 +3053,7 @@ describe('dashboard API', () => {
       {
         data: expect.objectContaining({
           lastReport: expect.objectContaining({
+            action: 'check',
             trigger: 'dashboard',
           }),
           running: false,
@@ -2876,7 +3137,7 @@ describe('notifications', () => {
         label: 'Containers updated',
       }),
       expect.objectContaining({
-        description: 'Monitor-only containers have new images.',
+        description: 'A check found new container images.',
         key: 'updates-available',
       }),
       expect.objectContaining({ key: 'update-failed' }),
@@ -3598,7 +3859,7 @@ describe('proxy trust', () => {
  * App - Errors And The Dashboard Page.
  *
  * Checks the shared error envelope for malformed requests and unknown paths,
- * then the dashboard page, its headers, caching, and the root redirect.
+ * then the dashboard page, its headers, caching, and root-level addresses.
  *
  * @since 1.0.0
  */
@@ -3751,9 +4012,9 @@ describe('errors and the dashboard page', () => {
 
     expect(asset['headers'].get('Cache-Control')).toBe('public, max-age=31536000, immutable');
 
-    expect(root['status']).toBe(302);
+    expect(root['status']).toBe(200);
 
-    expect(root['headers'].get('Location')).toBe('/admin/');
+    expect(root['body']).toContain('<title>Outpost</title>');
 
     expect(await client.request('GET', '/', undefined, {
       Accept: 'application/json',
@@ -3777,6 +4038,31 @@ describe('errors and the dashboard page', () => {
     return;
   });
 
+  it('serves the page for every console address', async () => {
+    harness = await startHarness();
+
+    for (const path of [
+      '/',
+      '/overview',
+      '/containers',
+      '/history',
+      '/settings',
+      '/access-tokens',
+      '/notifications',
+      '/account',
+      '/not-a-console-page',
+    ]) {
+      expect(await createClient(harness['baseUrl']).request('GET', path, undefined, {
+        Accept: 'text/html',
+      })).toEqual(expect.objectContaining({
+        body: expect.stringContaining('<title>Outpost</title>'),
+        status: 200,
+      }));
+    }
+
+    return;
+  });
+
   it('reports a missing dashboard build', async () => {
     harness = await startHarness({
       webRoot: join(baseDirectory, 'missing'),
@@ -3790,6 +4076,238 @@ describe('errors and the dashboard page', () => {
         },
       },
       status: 404,
+    }));
+
+    return;
+  });
+
+  return;
+});
+
+/**
+ * App - Backup.
+ *
+ * Covers session-only identity grants, selected export contents, TOTP proof,
+ * purpose and session binding, and single use through the real HTTP stack.
+ *
+ * @since 1.1.0
+ */
+describe('backup', () => {
+  it('exports selected secrets with a session-bound single-use password grant', async () => {
+    harness = await startHarness();
+
+    const client: App_Backup_Client = createClient(harness['baseUrl']);
+    const otherClient: App_Backup_OtherClient = createClient(harness['baseUrl']);
+
+    await claim(client, harness);
+
+    await otherClient.request('POST', '/api/v1/auth/login', {
+      password: 'fixture admin password',
+      username: 'admin',
+    });
+
+    harness['state'].createRegistry({
+      password: 'registry export secret',
+      registry: 'registry.example.net',
+      username: 'registry-user',
+    });
+
+    harness['state'].createNotificationTarget({
+      events: ['update-failed'],
+      name: 'Ops alerts',
+      secrets: { url: 'https://hooks.example.net/outpost' },
+      service: 'webhook',
+      settings: {},
+    });
+    const storedToken: App_Backup_CreatedToken = createToken(harness, 'Backup automation', ['status:read']);
+
+    expect(await client.request('POST', '/api/v1/backup/confirmation', {
+      password: 'wrong password',
+      purpose: 'export',
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'identity_not_confirmed',
+          issues: [expect.objectContaining({ field: 'password' })],
+        }),
+      }),
+      status: 422,
+    }));
+
+    const confirmation: App_Backup_Response = await client.request('POST', '/api/v1/backup/confirmation', {
+      password: 'fixture admin password',
+      purpose: 'export',
+    });
+    const grant: App_Backup_Grant = String(Reflect.get(Object(confirmation['body']), 'grant'));
+    const sections: App_Backup_Sections = {
+      accessTokens: true,
+      notifications: true,
+      registries: true,
+      settings: true,
+    };
+    const minimalImport: App_Backup_Document = {
+      appVersion: '1.0.4-test',
+      exportedAt: '2026-11-09T12:00:00.000Z',
+      format: 'outpost-export',
+      settings: {
+        cleanup: true,
+        healthTimeoutSeconds: 120,
+        labelMode: 'opt-out',
+        monitorOnly: false,
+        runOnStart: false,
+        schedule: '0 0 4 * * *',
+        settleSeconds: 10,
+        stopTimeoutSeconds: 30,
+      },
+      version: 1,
+    };
+
+    expect(confirmation).toEqual(expect.objectContaining({
+      body: expect.objectContaining({ grant: expect.stringMatching(backupGrantPattern) }),
+      status: 200,
+    }));
+
+    expect(await otherClient.request('POST', '/api/v1/backup/export', {
+      grant,
+      sections,
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({ error: expect.objectContaining({ code: 'backup_confirmation_expired' }) }),
+      status: 401,
+    }));
+
+    expect(await client.request('POST', '/api/v1/backup/imports', {
+      document: minimalImport,
+      grant,
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({ error: expect.objectContaining({ code: 'backup_confirmation_expired' }) }),
+      status: 401,
+    }));
+
+    const exported: App_Backup_Response = await client.request('POST', '/api/v1/backup/export', {
+      grant,
+      sections,
+    });
+    const document: App_Backup_Document = exported['body'] as App_Backup_Document;
+    const serialized: App_Backup_Serialized = JSON.stringify(document);
+
+    expect(exported['status']).toBe(200);
+
+    expect(exported['headers'].get('Content-Disposition')).toMatch(backupContentDispositionPattern);
+
+    expect(document['settings']).toEqual(expect.objectContaining({ schedule: expect.any(String) }));
+
+    expect(document['registries']).toEqual([expect.objectContaining({
+      password: 'registry export secret',
+      registry: 'registry.example.net',
+    })]);
+
+    expect(document['notifications']).toEqual([expect.objectContaining({
+      name: 'Ops alerts',
+      secrets: { url: 'https://hooks.example.net/outpost' },
+    })]);
+
+    expect(document['accessTokens']).toEqual([expect.objectContaining({
+      name: 'Backup automation',
+      tokenHash: expect.stringMatching(sha256HashPattern),
+    })]);
+
+    expect(serialized).not.toContain('fixture admin password');
+
+    expect(serialized).not.toContain('admin');
+
+    expect(serialized).not.toContain(storedToken['personalAccessToken']);
+
+    expect(await client.request('POST', '/api/v1/backup/export', {
+      grant,
+      sections,
+    })).toEqual(expect.objectContaining({ status: 401 }));
+
+    const settingsConfirmation: App_Backup_Response = await client.request('POST', '/api/v1/backup/confirmation', {
+      password: 'fixture admin password',
+      purpose: 'export',
+    });
+    const settingsGrant: App_Backup_Grant = String(Reflect.get(Object(settingsConfirmation['body']), 'grant'));
+    const settingsOnly: App_Backup_Response = await client.request('POST', '/api/v1/backup/export', {
+      grant: settingsGrant,
+      sections: {
+        accessTokens: false,
+        notifications: false,
+        registries: false,
+        settings: true,
+      },
+    });
+    const settingsDocument: App_Backup_Document = settingsOnly['body'] as App_Backup_Document;
+
+    expect(Object.hasOwn(settingsDocument, 'settings')).toBe(true);
+
+    expect(Object.hasOwn(settingsDocument, 'registries')).toBe(false);
+
+    expect(Object.hasOwn(settingsDocument, 'notifications')).toBe(false);
+
+    expect(Object.hasOwn(settingsDocument, 'accessTokens')).toBe(false);
+
+    const apiToken: App_Backup_CreatedToken = createToken(harness, 'Backup API rejection', ['status:read']);
+    const apiClient: App_Backup_ApiClient = createClient(harness['baseUrl'], { Authorization: `Bearer ${apiToken['personalAccessToken']}` });
+
+    expect(await apiClient.request('POST', '/api/v1/backup/confirmation', {
+      password: 'fixture admin password',
+      purpose: 'export',
+    })).toEqual(expect.objectContaining({
+      body: {
+        error: {
+          code: 'session_required',
+          message: 'An administrator browser session is required.',
+        },
+      },
+      status: 403,
+    }));
+
+    return;
+  });
+
+  it('requires the current authenticator code when TOTP is enabled', async () => {
+    harness = await startHarness();
+
+    const client: App_Backup_Client = createClient(harness['baseUrl']);
+
+    await claim(client, harness);
+
+    const administrator: App_Backup_Administrator = harness['state'].getAdministrator();
+
+    if (administrator === undefined) {
+      throw new Error('The administrator was not created.');
+    }
+
+    const secret: App_Backup_TotpSecret = generateTotpSecret();
+    const step: App_Backup_TotpStep = Math.floor(Date.now() / 30000);
+    const code: App_Backup_TotpCode = generateCode(secret, step);
+    const wrongCode: App_Backup_TotpCode = (code === '000000') ? '111111' : '000000';
+
+    harness['state'].startTotpEnrollment(administrator['id'], secret);
+
+    harness['state'].enableTotp(administrator['id'], secret, step - 1);
+
+    expect(await client.request('POST', '/api/v1/backup/confirmation', {
+      code: wrongCode,
+      password: 'fixture admin password',
+      purpose: 'import',
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'identity_not_confirmed',
+          issues: [expect.objectContaining({ field: 'code' })],
+        }),
+      }),
+      status: 422,
+    }));
+
+    expect(await client.request('POST', '/api/v1/backup/confirmation', {
+      code,
+      password: 'fixture admin password',
+      purpose: 'import',
+    })).toEqual(expect.objectContaining({
+      body: expect.objectContaining({ grant: expect.stringMatching(backupGrantPattern) }),
+      status: 200,
     }));
 
     return;

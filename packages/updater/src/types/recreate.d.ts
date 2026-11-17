@@ -23,13 +23,18 @@ export type Recreate_RecreateContainer_Options = Pick<Shared_Options, 'stopTimeo
 
 export type Recreate_RecreateContainer_Dependencies = Pick<Shared_Dependencies, 'engine' | 'sleep' | 'now'>;
 
+export type Recreate_RecreateContainer_Rollback = boolean;
+
 export type Recreate_RecreateContainer_Outcome_Status = Shared_ResultStatus;
 
 export type Recreate_RecreateContainer_Outcome_Detail = string;
 
+export type Recreate_RecreateContainer_Outcome_Summary = string | undefined;
+
 export type Recreate_RecreateContainer_Outcome = {
   status: Recreate_RecreateContainer_Outcome_Status;
   detail: Recreate_RecreateContainer_Outcome_Detail;
+  summary?: Recreate_RecreateContainer_Outcome_Summary;
 };
 
 export type Recreate_RecreateContainer_Returns = Promise<Recreate_RecreateContainer_Outcome>;
@@ -39,6 +44,10 @@ export type Recreate_RecreateContainer_Engine = Shared_Engine;
 export type Recreate_RecreateContainer_Plan = Shared_CreatePlan;
 
 export type Recreate_RecreateContainer_PreviousName = string;
+
+export type Recreate_RecreateContainer_PreviousContainer = Shared_ContainerInspect | undefined;
+
+export type Recreate_RecreateContainer_PreviousLookupErrorMessage = string;
 
 export type Recreate_RecreateContainer_PreviousHealth = NonNullable<Shared_ContainerInspect['State']['Health']> | undefined;
 
@@ -55,6 +64,14 @@ export type Recreate_RecreateContainer_InitialRestartCount = number;
 export type Recreate_RecreateContainer_HealthNote = string;
 
 export type Recreate_RecreateContainer_ErrorMessage = string;
+
+export type Recreate_RecreateContainer_KeptAt = string;
+
+export type Recreate_RecreateContainer_KeptTimestamp = string;
+
+export type Recreate_RecreateContainer_KeptName = string;
+
+export type Recreate_RecreateContainer_KeepErrorMessage = string;
 
 export type Recreate_RecreateContainer_RollbackMessage = string;
 

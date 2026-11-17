@@ -9,6 +9,7 @@ export {
 } from './select.js';
 
 export type {
+  Shared_CycleAction as CycleAction,
   Shared_Dependencies as UpdaterDependencies,
   Shared_LabelMode as LabelMode,
   Shared_RejectedImage as RejectedImage,

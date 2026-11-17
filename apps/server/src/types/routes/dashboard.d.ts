@@ -9,7 +9,12 @@ import type { z } from 'zod';
 
 import type { Runner as History } from '../../history.js';
 import type { Runner as Access } from '../../lib/access.js';
-import type { checkStart, runtimeSettings } from '../../lib/schema.js';
+import type {
+  checkStart,
+  diagnosticsUpdate,
+  runtimeSettings,
+  updateStart,
+} from '../../lib/schema.js';
 import type { Runner as State } from '../../lib/state.js';
 import type { Runner as Scheduler } from '../../scheduler.js';
 import type { Config_LoadConfig_Settings } from '../config.d.ts';
@@ -18,6 +23,7 @@ import type {
   Shared_CheckReport,
   Shared_CheckReports,
   Shared_CheckTrigger,
+  Shared_CycleAction,
   Shared_RuntimeSettings,
 } from '../shared.d.ts';
 
@@ -36,6 +42,8 @@ export type Routes_Dashboard_BuildContainerRows_InspectedContainers = DockerCont
 
 export type Routes_Dashboard_BuildContainerRows_Row_Id = string;
 
+export type Routes_Dashboard_BuildContainerRows_Row_FullId = string;
+
 export type Routes_Dashboard_BuildContainerRows_Row_Name = string;
 
 export type Routes_Dashboard_BuildContainerRows_Row_Image = string;
@@ -50,14 +58,19 @@ export type Routes_Dashboard_BuildContainerRows_Row_MonitorOnly = boolean;
 
 export type Routes_Dashboard_BuildContainerRows_Row_Self = boolean;
 
+export type Routes_Dashboard_BuildContainerRows_Row_LastAction = Shared_CycleAction | undefined;
+
 export type Routes_Dashboard_BuildContainerRows_Row_LastStatus = UpdateResult['status'] | undefined;
 
 export type Routes_Dashboard_BuildContainerRows_Row_LastDetail = string | undefined;
+
+export type Routes_Dashboard_BuildContainerRows_Row_LastSummary = string | undefined;
 
 export type Routes_Dashboard_BuildContainerRows_Row_LastCheckedAt = string | undefined;
 
 export type Routes_Dashboard_BuildContainerRows_Row = {
   id: Routes_Dashboard_BuildContainerRows_Row_Id;
+  fullId: Routes_Dashboard_BuildContainerRows_Row_FullId;
   name: Routes_Dashboard_BuildContainerRows_Row_Name;
   image: Routes_Dashboard_BuildContainerRows_Row_Image;
   state: Routes_Dashboard_BuildContainerRows_Row_State;
@@ -65,8 +78,10 @@ export type Routes_Dashboard_BuildContainerRows_Row = {
   note: Routes_Dashboard_BuildContainerRows_Row_Note;
   self: Routes_Dashboard_BuildContainerRows_Row_Self;
   monitorOnly: Routes_Dashboard_BuildContainerRows_Row_MonitorOnly;
+  lastAction: Routes_Dashboard_BuildContainerRows_Row_LastAction;
   lastStatus: Routes_Dashboard_BuildContainerRows_Row_LastStatus;
   lastDetail: Routes_Dashboard_BuildContainerRows_Row_LastDetail;
+  lastSummary: Routes_Dashboard_BuildContainerRows_Row_LastSummary;
   lastCheckedAt: Routes_Dashboard_BuildContainerRows_Row_LastCheckedAt;
 };
 
@@ -187,7 +202,7 @@ export type Routes_Dashboard_Runner_Constructor_Dependencies_OnRuntimeSettingsCh
 
 export type Routes_Dashboard_Runner_Constructor_Dependencies_Scheduler = Pick<Scheduler, 'getState' | 'subscribe' | 'trigger'>;
 
-export type Routes_Dashboard_Runner_Constructor_Dependencies_State = Pick<State, 'setRuntimeSettings'>;
+export type Routes_Dashboard_Runner_Constructor_Dependencies_State = Pick<State, 'getDebugLogging' | 'setDebugLogging' | 'setRuntimeSettings'>;
 
 export type Routes_Dashboard_Runner_Constructor_Dependencies = {
   access: Routes_Dashboard_Runner_Constructor_Dependencies_Access;
@@ -254,7 +269,7 @@ export type Routes_Dashboard_Runner_ListContainers = () => Promise<DockerContain
  *
  * @since 1.0.0
  */
-export type Routes_Dashboard_Runner_State = Pick<State, 'setRuntimeSettings'>;
+export type Routes_Dashboard_Runner_State = Pick<State, 'getDebugLogging' | 'setDebugLogging' | 'setRuntimeSettings'>;
 
 /**
  * Routes - Dashboard - Runner - Register.
@@ -283,6 +298,29 @@ export type Routes_Dashboard_Runner_RouteChecks_ContainerId = string | undefined
 export type Routes_Dashboard_Runner_RouteChecks_Trigger = Shared_CheckTrigger;
 
 export type Routes_Dashboard_Runner_RouteChecks_Started = boolean;
+
+/**
+ * Routes - Dashboard - Runner - Route Updates.
+ *
+ * @since 1.1.0
+ */
+export type Routes_Dashboard_Runner_RouteUpdates_Request = Request;
+
+export type Routes_Dashboard_Runner_RouteUpdates_Response = Response;
+
+export type Routes_Dashboard_Runner_RouteUpdates_Returns = void;
+
+export type Routes_Dashboard_Runner_RouteUpdates_RequestBody = z.ZodSafeParseResult<z.infer<typeof updateStart>>;
+
+export type Routes_Dashboard_Runner_RouteUpdates_ContainerId = string | undefined;
+
+export type Routes_Dashboard_Runner_RouteUpdates_Rollback = boolean;
+
+export type Routes_Dashboard_Runner_RouteUpdates_IsSelf = boolean;
+
+export type Routes_Dashboard_Runner_RouteUpdates_Trigger = Shared_CheckTrigger;
+
+export type Routes_Dashboard_Runner_RouteUpdates_Started = boolean;
 
 /**
  * Routes - Dashboard - Runner - Route Containers.
@@ -361,6 +399,32 @@ export type Routes_Dashboard_Runner_RouteUpdateSettings_Response = Response;
 export type Routes_Dashboard_Runner_RouteUpdateSettings_Returns = void;
 
 export type Routes_Dashboard_Runner_RouteUpdateSettings_RequestBody = z.ZodSafeParseResult<z.infer<typeof runtimeSettings>>;
+
+/**
+ * Routes - Dashboard - Runner - Route Diagnostics.
+ *
+ * @since 1.1.0
+ */
+export type Routes_Dashboard_Runner_RouteDiagnostics_Request = Request;
+
+export type Routes_Dashboard_Runner_RouteDiagnostics_Response = Response;
+
+export type Routes_Dashboard_Runner_RouteDiagnostics_Returns = void;
+
+/**
+ * Routes - Dashboard - Runner - Route Update Diagnostics.
+ *
+ * @since 1.1.0
+ */
+export type Routes_Dashboard_Runner_RouteUpdateDiagnostics_Request = Request;
+
+export type Routes_Dashboard_Runner_RouteUpdateDiagnostics_Response = Response;
+
+export type Routes_Dashboard_Runner_RouteUpdateDiagnostics_Returns = void;
+
+export type Routes_Dashboard_Runner_RouteUpdateDiagnostics_RequestBody = z.ZodSafeParseResult<z.infer<typeof diagnosticsUpdate>>;
+
+export type Routes_Dashboard_Runner_RouteUpdateDiagnostics_Enabled = boolean;
 
 /**
  * Routes - Dashboard - Runner - Route Status.

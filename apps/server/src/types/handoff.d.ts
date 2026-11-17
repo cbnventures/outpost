@@ -11,11 +11,14 @@ export type Handoff_Outcome_Detail = string;
 
 export type Handoff_Outcome_FinishedAt = string;
 
+export type Handoff_Outcome_PreviousImageMetadataAvailable = boolean | undefined;
+
 export type Handoff_Outcome_Status = 'failed' | 'rolled-back' | 'updated';
 
 export type Handoff_Outcome = {
   detail: Handoff_Outcome_Detail;
   finishedAt: Handoff_Outcome_FinishedAt;
+  previousImageMetadataAvailable?: Handoff_Outcome_PreviousImageMetadataAvailable;
   status: Handoff_Outcome_Status;
 };
 

@@ -51,6 +51,23 @@ import {
 import { verifyTotpCode } from './totp.js';
 
 import type {
+  Lib_State_Runner_ApplyBackupImport_Apply,
+  Lib_State_Runner_ApplyBackupImport_CurrentSettings,
+  Lib_State_Runner_ApplyBackupImport_Document,
+  Lib_State_Runner_ApplyBackupImport_ExistingRegistry,
+  Lib_State_Runner_ApplyBackupImport_ExistingTarget,
+  Lib_State_Runner_ApplyBackupImport_Id,
+  Lib_State_Runner_ApplyBackupImport_ImportedSections,
+  Lib_State_Runner_ApplyBackupImport_Now,
+  Lib_State_Runner_ApplyBackupImport_Preview,
+  Lib_State_Runner_ApplyBackupImport_RegistryIds,
+  Lib_State_Runner_ApplyBackupImport_Returns,
+  Lib_State_Runner_ApplyBackupImport_SealedValue,
+  Lib_State_Runner_ApplyBackupImport_SecretFields,
+  Lib_State_Runner_ApplyBackupImport_TargetIds,
+  Lib_State_Runner_ApplyBackupImport_TokenHashes,
+  Lib_State_Runner_ApplyBackupImport_TokenIds,
+  Lib_State_Runner_ApplyBackupImport_TokenNames,
   Lib_State_Runner_AuthenticateAdministrator_Administrator,
   Lib_State_Runner_AuthenticateAdministrator_IsValid,
   Lib_State_Runner_AuthenticateAdministrator_Password,
@@ -102,6 +119,16 @@ import type {
   Lib_State_Runner_CountRows_Returns,
   Lib_State_Runner_CountRows_Row,
   Lib_State_Runner_CountRows_Table,
+  Lib_State_Runner_CreateBackupDocument_AppVersion,
+  Lib_State_Runner_CreateBackupDocument_Document,
+  Lib_State_Runner_CreateBackupDocument_NotificationMapper,
+  Lib_State_Runner_CreateBackupDocument_Password,
+  Lib_State_Runner_CreateBackupDocument_RegistryMapper,
+  Lib_State_Runner_CreateBackupDocument_Returns,
+  Lib_State_Runner_CreateBackupDocument_Sections,
+  Lib_State_Runner_CreateBackupDocument_Settings,
+  Lib_State_Runner_CreateBackupDocument_TokenMapper,
+  Lib_State_Runner_CreateBackupDocument_TokenTimes,
   Lib_State_Runner_CreateNotificationTarget_ExistingTarget,
   Lib_State_Runner_CreateNotificationTarget_Id,
   Lib_State_Runner_CreateNotificationTarget_Input,
@@ -195,6 +222,7 @@ import type {
   Lib_State_Runner_GetAdministratorSecurity_Passkeys,
   Lib_State_Runner_GetAdministratorSecurity_RecoveryCodeRow,
   Lib_State_Runner_GetAdministratorSecurity_Returns,
+  Lib_State_Runner_GetDebugLogging_Returns,
   Lib_State_Runner_GetKeyReplacement_Returns,
   Lib_State_Runner_GetMetadata_Key,
   Lib_State_Runner_GetMetadata_Returns,
@@ -280,6 +308,23 @@ import type {
   Lib_State_Runner_PrepareSetupClaim_Code,
   Lib_State_Runner_PrepareSetupClaim_ExpiresAt,
   Lib_State_Runner_PrepareSetupClaim_Returns,
+  Lib_State_Runner_PreviewBackupImport_CurrentSettings,
+  Lib_State_Runner_PreviewBackupImport_Document,
+  Lib_State_Runner_PreviewBackupImport_FileRegistries,
+  Lib_State_Runner_PreviewBackupImport_FileTargets,
+  Lib_State_Runner_PreviewBackupImport_FileTokens,
+  Lib_State_Runner_PreviewBackupImport_NotificationPredicate,
+  Lib_State_Runner_PreviewBackupImport_PluralSuffix,
+  Lib_State_Runner_PreviewBackupImport_Registries,
+  Lib_State_Runner_PreviewBackupImport_RegistryPredicate,
+  Lib_State_Runner_PreviewBackupImport_Returns,
+  Lib_State_Runner_PreviewBackupImport_Sections,
+  Lib_State_Runner_PreviewBackupImport_SettingKeys,
+  Lib_State_Runner_PreviewBackupImport_SettingsChanged,
+  Lib_State_Runner_PreviewBackupImport_StringSet,
+  Lib_State_Runner_PreviewBackupImport_Targets,
+  Lib_State_Runner_PreviewBackupImport_TokenPredicate,
+  Lib_State_Runner_PreviewBackupImport_TokenRows,
   Lib_State_Runner_PruneExpired_Now,
   Lib_State_Runner_PruneExpired_Returns,
   Lib_State_Runner_RecordNotificationAttempt_ErrorMessage,
@@ -323,6 +368,8 @@ import type {
   Lib_State_Runner_SealNotificationSecrets_Secrets,
   Lib_State_Runner_SessionDurationMilliseconds,
   Lib_State_Runner_SessionSeenIntervalMilliseconds,
+  Lib_State_Runner_SetDebugLogging_Enabled,
+  Lib_State_Runner_SetDebugLogging_Returns,
   Lib_State_Runner_SetMetadata_Key,
   Lib_State_Runner_SetMetadata_Returns,
   Lib_State_Runner_SetMetadata_Value,
@@ -690,6 +737,126 @@ export class Runner {
   }
 
   /**
+   * Lib - State - Apply Backup Import.
+   *
+   * Replaces matching configuration and adds new records in one SQLite transaction.
+   * Account, security, session, update-history, and Docker runtime state are untouched.
+   *
+   * @param {Lib_State_Runner_ApplyBackupImport_Document}        document        - Document.
+   * @param {Lib_State_Runner_ApplyBackupImport_CurrentSettings} currentSettings - Current settings.
+   *
+   * @returns {Lib_State_Runner_ApplyBackupImport_Returns}
+   *
+   * @since 1.1.0
+   */
+  public applyBackupImport(document: Lib_State_Runner_ApplyBackupImport_Document, currentSettings: Lib_State_Runner_ApplyBackupImport_CurrentSettings): Lib_State_Runner_ApplyBackupImport_Returns {
+    const preview: Lib_State_Runner_ApplyBackupImport_Preview = this.previewBackupImport(document, currentSettings);
+    const importedSections: Lib_State_Runner_ApplyBackupImport_ImportedSections = preview['sections'].filter((section) => section['willImport']).map((section) => section['id']);
+    const now: Lib_State_Runner_ApplyBackupImport_Now = this.timestamp(0);
+
+    /**
+     * Lib - State - Apply Backup Import - Apply.
+     *
+     * Performs the complete reviewed plan inside the surrounding transaction.
+     * Any thrown database error rolls every configuration section back together.
+     *
+     * @returns {void}
+     *
+     * @since 1.1.0
+     */
+    const apply: Lib_State_Runner_ApplyBackupImport_Apply = () => {
+      if (document['settings'] !== undefined) {
+        this.setMetadata('runtime_settings', JSON.stringify(document['settings']));
+      }
+
+      if (document['registries'] !== undefined) {
+        const registryIds: Lib_State_Runner_ApplyBackupImport_RegistryIds = new Set(this.getStoredRegistryCredentials().map((registry) => registry['id']));
+
+        for (const registry of document['registries']) {
+          const existingRegistry: Lib_State_Runner_ApplyBackupImport_ExistingRegistry = this.getStoredRegistryCredentials().find((candidate) => candidate['registry'].toLocaleLowerCase() === registry['registry'].toLocaleLowerCase());
+          let id: Lib_State_Runner_ApplyBackupImport_Id = (existingRegistry === undefined) ? registry['id'] : existingRegistry['id'];
+
+          while (existingRegistry === undefined && registryIds.has(id) === true) {
+            id = `reg-${randomBytes(8).toString('hex')}`;
+          }
+
+          registryIds.add(id);
+
+          const sealedPassword: Lib_State_Runner_ApplyBackupImport_SealedValue = (registry['password'] === null) ? undefined : encryptCredential(registry['password'], this.#encryptionKey);
+
+          if (existingRegistry === undefined) {
+            this.#database.prepare('INSERT INTO registry_credentials (id, registry, username, password_ciphertext, password_iv, password_auth_tag, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, registry['registry'], registry['username'], (sealedPassword === undefined) ? null : sealedPassword['ciphertext'], (sealedPassword === undefined) ? null : sealedPassword['iv'], (sealedPassword === undefined) ? null : sealedPassword['authTag'], now, now);
+          } else {
+            this.#database.prepare('UPDATE registry_credentials SET registry = ?, username = ?, password_ciphertext = ?, password_iv = ?, password_auth_tag = ?, updated_at = ? WHERE id = ?').run(registry['registry'], registry['username'], (sealedPassword === undefined) ? null : sealedPassword['ciphertext'], (sealedPassword === undefined) ? null : sealedPassword['iv'], (sealedPassword === undefined) ? null : sealedPassword['authTag'], now, existingRegistry['id']);
+          }
+        }
+      }
+
+      if (document['notifications'] !== undefined) {
+        const targetIds: Lib_State_Runner_ApplyBackupImport_TargetIds = new Set(this.getStoredNotificationTargets().map((target) => target['id']));
+
+        for (const target of document['notifications']) {
+          const existingTarget: Lib_State_Runner_ApplyBackupImport_ExistingTarget = this.getStoredNotificationTargets().find((candidate) => candidate['name'].toLocaleLowerCase() === target['name'].toLocaleLowerCase());
+          let id: Lib_State_Runner_ApplyBackupImport_Id = (existingTarget === undefined) ? target['id'] : existingTarget['id'];
+
+          while (existingTarget === undefined && targetIds.has(id) === true) {
+            id = `ntf-${randomBytes(8).toString('hex')}`;
+          }
+
+          targetIds.add(id);
+
+          const sealedSecrets: Lib_State_Runner_ApplyBackupImport_SealedValue = this.sealNotificationSecrets(target['secrets']);
+          const secretFields: Lib_State_Runner_ApplyBackupImport_SecretFields = Object.keys(target['secrets']).sort();
+
+          if (existingTarget === undefined) {
+            this.#database.prepare('INSERT INTO notification_targets (id, name, service, events, settings, secret_fields, missing_secrets, secrets_ciphertext, secrets_iv, secrets_auth_tag, created_at, updated_at, last_attempt_at, last_error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)').run(id, target['name'], target['service'], JSON.stringify(target['events']), JSON.stringify(target['settings']), JSON.stringify(secretFields), JSON.stringify(target['missingSecrets']), (sealedSecrets === undefined) ? null : sealedSecrets['ciphertext'], (sealedSecrets === undefined) ? null : sealedSecrets['iv'], (sealedSecrets === undefined) ? null : sealedSecrets['authTag'], now, now);
+          } else {
+            this.#database.prepare('UPDATE notification_targets SET name = ?, service = ?, events = ?, settings = ?, secret_fields = ?, missing_secrets = ?, secrets_ciphertext = ?, secrets_iv = ?, secrets_auth_tag = ?, updated_at = ?, last_attempt_at = NULL, last_error = NULL WHERE id = ?').run(target['name'], target['service'], JSON.stringify(target['events']), JSON.stringify(target['settings']), JSON.stringify(secretFields), JSON.stringify(target['missingSecrets']), (sealedSecrets === undefined) ? null : sealedSecrets['ciphertext'], (sealedSecrets === undefined) ? null : sealedSecrets['iv'], (sealedSecrets === undefined) ? null : sealedSecrets['authTag'], now, existingTarget['id']);
+          }
+        }
+      }
+
+      if (document['accessTokens'] !== undefined) {
+        const tokenRows: Lib_State_Runner_PreviewBackupImport_TokenRows = this.#database.prepare('SELECT id, name, token_hash AS tokenHash FROM api_tokens').all() as Lib_State_Runner_PreviewBackupImport_TokenRows;
+        const tokenIds: Lib_State_Runner_ApplyBackupImport_TokenIds = new Set(tokenRows.map((token) => token['id']));
+        const tokenNames: Lib_State_Runner_ApplyBackupImport_TokenNames = new Set(tokenRows.map((token) => token['name'].toLocaleLowerCase()));
+        const tokenHashes: Lib_State_Runner_ApplyBackupImport_TokenHashes = new Set(tokenRows.map((token) => token['tokenHash']));
+
+        for (const token of document['accessTokens']) {
+          if (
+            tokenIds.has(token['id']) === true
+            || tokenNames.has(token['name'].toLocaleLowerCase()) === true
+            || tokenHashes.has(token['tokenHash']) === true
+          ) {
+            continue;
+          }
+
+          this.#database.prepare('INSERT INTO api_tokens (id, name, token_hash, created_at, expires_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)').run(token['id'], token['name'], token['tokenHash'], token['createdAt'], token['expiresAt'], token['lastUsedAt']);
+
+          for (const scope of token['scopes']) {
+            this.#database.prepare('INSERT INTO api_token_scopes (token_id, scope) VALUES (?, ?)').run(token['id'], scope);
+          }
+
+          tokenIds.add(token['id']);
+
+          tokenNames.add(token['name'].toLocaleLowerCase());
+
+          tokenHashes.add(token['tokenHash']);
+        }
+      }
+
+      return;
+    };
+
+    this.transaction(apply);
+
+    return {
+      ...preview['summary'],
+      importedSections,
+    };
+  }
+
+  /**
    * Lib - State - Authenticate Administrator.
    *
    * Verifies a username and slow password hash without consulting access tokens.
@@ -926,6 +1093,122 @@ export class Runner {
     const result: Lib_State_Runner_ConsumeRecoveryCode_Result = this.#database.prepare('DELETE FROM recovery_codes WHERE administrator_id = ? AND code_hash = ?').run(administratorId, digestValue(normalizedCode));
 
     return Number(result['changes']) === 1;
+  }
+
+  /**
+   * Lib - State - Create Backup Document.
+   *
+   * Opens only the selected configuration secrets for the immediate response.
+   * Administrator, security, session, history, and runtime-discovery data never enter it.
+   *
+   * @param {Lib_State_Runner_CreateBackupDocument_Sections}   sections   - Sections.
+   * @param {Lib_State_Runner_CreateBackupDocument_AppVersion} appVersion - App version.
+   * @param {Lib_State_Runner_CreateBackupDocument_Settings}   settings   - Settings.
+   *
+   * @returns {Lib_State_Runner_CreateBackupDocument_Returns}
+   *
+   * @since 1.1.0
+   */
+  public createBackupDocument(sections: Lib_State_Runner_CreateBackupDocument_Sections, appVersion: Lib_State_Runner_CreateBackupDocument_AppVersion, settings: Lib_State_Runner_CreateBackupDocument_Settings): Lib_State_Runner_CreateBackupDocument_Returns {
+    const document: Lib_State_Runner_CreateBackupDocument_Document = {
+      appVersion,
+      exportedAt: this.timestamp(0),
+      format: 'outpost-export',
+      version: 1,
+    };
+
+    if (sections['settings'] === true) {
+      Reflect.set(document, 'settings', { ...settings });
+    }
+
+    if (sections['registries'] === true) {
+      /**
+       * Lib - State - Create Backup Document - Registry.
+       *
+       * Opens one saved password into its portable registry record.
+       * Missing passwords remain explicitly unavailable in the export.
+       *
+       * @returns {Lib_Backup_Registry}
+       *
+       * @since 1.1.0
+       */
+      const registryDocument: Lib_State_Runner_CreateBackupDocument_RegistryMapper = (registry) => {
+        let password: Lib_State_Runner_CreateBackupDocument_Password = null;
+
+        if (
+          registry['passwordAuthTag'] !== null
+          && registry['passwordCiphertext'] !== null
+          && registry['passwordIv'] !== null
+        ) {
+          password = decryptCredential({
+            authTag: registry['passwordAuthTag'],
+            ciphertext: registry['passwordCiphertext'],
+            iv: registry['passwordIv'],
+          }, this.#encryptionKey);
+        }
+
+        return {
+          id: registry['id'],
+          password,
+          registry: registry['registry'],
+          username: registry['username'],
+        };
+      };
+
+      Reflect.set(document, 'registries', this.getStoredRegistryCredentials().map(registryDocument));
+    }
+
+    if (sections['notifications'] === true) {
+      /**
+       * Lib - State - Create Backup Document - Notification.
+       *
+       * Opens one destination's available secret values into its portable record.
+       * Missing keys remain identified without fabricating a value.
+       *
+       * @returns {Lib_Backup_Notification}
+       *
+       * @since 1.1.0
+       */
+      const notificationDocument: Lib_State_Runner_CreateBackupDocument_NotificationMapper = (target) => ({
+        events: [...target['events']],
+        id: target['id'],
+        missingSecrets: [...target['missingSecrets']],
+        name: target['name'],
+        secrets: this.openNotificationSecrets(target),
+        service: target['service'],
+        settings: { ...target['settings'] },
+      });
+
+      Reflect.set(document, 'notifications', this.getStoredNotificationTargets().map(notificationDocument));
+    }
+
+    if (sections['accessTokens'] === true) {
+      const tokenTimes: Lib_State_Runner_CreateBackupDocument_TokenTimes = this.getStoredTokenLastUsedTimes();
+
+      /**
+       * Lib - State - Create Backup Document - Access Token.
+       *
+       * Includes the stored hash and metadata without reconstructing a raw token.
+       * This preserves credential usability without exposing the original token.
+       *
+       * @returns {Lib_Backup_AccessToken}
+       *
+       * @since 1.1.0
+       */
+      const tokenDocument: Lib_State_Runner_CreateBackupDocument_TokenMapper = (token) => ({
+        createdAt: token['createdAt'],
+        expiresAt: token['expiresAt'] ?? null,
+        id: token['id'],
+        lastUsedAt: tokenTimes.get(token['id']) ?? null,
+        name: token['name'],
+        scopes: [...token['scopes']],
+        tokenHash: token['tokenHash'],
+      });
+
+      Reflect.set(document, 'accessTokens', this.getStoredTokens().map(tokenDocument));
+    }
+
+    return document;
   }
 
   /**
@@ -1472,6 +1755,20 @@ export class Runner {
   }
 
   /**
+   * Lib - State - Get Debug Logging.
+   *
+   * Reads whether Debug logging is on, which is off until someone turns it on.
+   * The setting lives in the metadata table, so it survives restarts.
+   *
+   * @returns {Lib_State_Runner_GetDebugLogging_Returns}
+   *
+   * @since 1.1.0
+   */
+  public getDebugLogging(): Lib_State_Runner_GetDebugLogging_Returns {
+    return this.getMetadata('debug_logging') === 'true';
+  }
+
+  /**
    * Lib - State - Get Key Replacement.
    *
    * Names what this start removed because the encryption key file was missing.
@@ -1948,6 +2245,192 @@ export class Runner {
   }
 
   /**
+   * Lib - State - Preview Backup Import.
+   *
+   * Compares portable sections with this installation without changing state.
+   * Hosts and target names determine replacement; any matching token identity is skipped.
+   *
+   * @param {Lib_State_Runner_PreviewBackupImport_Document}        document        - Document.
+   * @param {Lib_State_Runner_PreviewBackupImport_CurrentSettings} currentSettings - Current settings.
+   *
+   * @returns {Lib_State_Runner_PreviewBackupImport_Returns}
+   *
+   * @since 1.1.0
+   */
+  public previewBackupImport(document: Lib_State_Runner_PreviewBackupImport_Document, currentSettings: Lib_State_Runner_PreviewBackupImport_CurrentSettings): Lib_State_Runner_PreviewBackupImport_Returns {
+    const registries: Lib_State_Runner_PreviewBackupImport_Registries = this.getStoredRegistryCredentials();
+    const targets: Lib_State_Runner_PreviewBackupImport_Targets = this.getStoredNotificationTargets();
+    const tokenRows: Lib_State_Runner_PreviewBackupImport_TokenRows = this.#database.prepare('SELECT id, name, token_hash AS tokenHash FROM api_tokens').all() as Lib_State_Runner_PreviewBackupImport_TokenRows;
+    const registryHosts: Lib_State_Runner_PreviewBackupImport_StringSet = new Set(registries.map((registry) => registry['registry'].toLocaleLowerCase()));
+    const targetNames: Lib_State_Runner_PreviewBackupImport_StringSet = new Set(targets.map((target) => target['name'].toLocaleLowerCase()));
+    const tokenIds: Lib_State_Runner_PreviewBackupImport_StringSet = new Set(tokenRows.map((token) => token['id']));
+    const tokenNames: Lib_State_Runner_PreviewBackupImport_StringSet = new Set(tokenRows.map((token) => token['name'].toLocaleLowerCase()));
+    const tokenHashes: Lib_State_Runner_PreviewBackupImport_StringSet = new Set(tokenRows.map((token) => token['tokenHash']));
+    /**
+     * Lib - State - Preview Backup Import - Add Registry.
+     *
+     * Identifies registry hosts not yet stored on this installation.
+     * Host comparison is case-insensitive, matching import replacement.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const addRegistry: Lib_State_Runner_PreviewBackupImport_RegistryPredicate = (registry) => registryHosts.has(registry['registry'].toLocaleLowerCase()) === false;
+
+    /**
+     * Lib - State - Preview Backup Import - Replace Registry.
+     *
+     * Identifies registry hosts already stored on this installation.
+     * Matching records are replaced in place during import.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const replaceRegistry: Lib_State_Runner_PreviewBackupImport_RegistryPredicate = (registry) => registryHosts.has(registry['registry'].toLocaleLowerCase()) === true;
+
+    /**
+     * Lib - State - Preview Backup Import - Add Notification.
+     *
+     * Identifies target names not yet stored on this installation.
+     * Name comparison is case-insensitive, matching import replacement.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const addNotification: Lib_State_Runner_PreviewBackupImport_NotificationPredicate = (target) => targetNames.has(target['name'].toLocaleLowerCase()) === false;
+
+    /**
+     * Lib - State - Preview Backup Import - Replace Notification.
+     *
+     * Identifies target names already stored on this installation.
+     * Matching records are replaced in place during import.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const replaceNotification: Lib_State_Runner_PreviewBackupImport_NotificationPredicate = (target) => targetNames.has(target['name'].toLocaleLowerCase()) === true;
+
+    /**
+     * Lib - State - Preview Backup Import - Add Token.
+     *
+     * Accepts a token only when its id, name, and stored hash are all new.
+     * Any matching identity is treated as an intentional duplicate.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const addToken: Lib_State_Runner_PreviewBackupImport_TokenPredicate = (token) => (
+      tokenIds.has(token['id']) === false
+      && tokenNames.has(token['name'].toLocaleLowerCase()) === false
+      && tokenHashes.has(token['tokenHash']) === false
+    );
+
+    /**
+     * Lib - State - Preview Backup Import - Skip Token.
+     *
+     * Identifies token records that conflict with one stored identity.
+     * Those duplicates are left unchanged by the transaction.
+     *
+     * @returns {boolean}
+     *
+     * @since 1.1.0
+     */
+    const skipToken: Lib_State_Runner_PreviewBackupImport_TokenPredicate = (token) => addToken(token) === false;
+    const fileRegistries: Lib_State_Runner_PreviewBackupImport_FileRegistries = document['registries'] ?? [];
+    const fileTargets: Lib_State_Runner_PreviewBackupImport_FileTargets = document['notifications'] ?? [];
+    const fileTokens: Lib_State_Runner_PreviewBackupImport_FileTokens = document['accessTokens'] ?? [];
+    const settingKeys: Lib_State_Runner_PreviewBackupImport_SettingKeys = [
+      'schedule',
+      'runOnStart',
+      'labelMode',
+      'monitorOnly',
+      'cleanup',
+      'stopTimeoutSeconds',
+      'healthTimeoutSeconds',
+      'settleSeconds',
+    ];
+    const settingsChanged: Lib_State_Runner_PreviewBackupImport_SettingsChanged = (document['settings'] === undefined) ? 0 : settingKeys.filter((key) => document['settings'] !== undefined && document['settings'][key] !== currentSettings[key]).length;
+    const sections: Lib_State_Runner_PreviewBackupImport_Sections = [];
+
+    if (document['settings'] !== undefined) {
+      sections.push({
+        file: '8 settings',
+        here: 'Current settings',
+        id: 'settings',
+        label: 'Settings',
+        willImport: true,
+      });
+    }
+
+    if (document['registries'] !== undefined) {
+      const fileSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (fileRegistries.length === 1) ? '' : 's';
+      const hereSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (registries.length === 1) ? '' : 's';
+
+      sections.push({
+        file: `${String(fileRegistries.length)} registry sign-in${fileSuffix}`,
+        here: `${String(registries.length)} registry sign-in${hereSuffix}`,
+        id: 'registries',
+        label: 'Registries',
+        willImport: true,
+      });
+    }
+
+    if (document['notifications'] !== undefined) {
+      const fileSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (fileTargets.length === 1) ? '' : 's';
+      const hereSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (targets.length === 1) ? '' : 's';
+
+      sections.push({
+        file: `${String(fileTargets.length)} target${fileSuffix}`,
+        here: `${String(targets.length)} target${hereSuffix}`,
+        id: 'notifications',
+        label: 'Notifications',
+        willImport: true,
+      });
+    }
+
+    if (document['accessTokens'] !== undefined) {
+      const fileSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (fileTokens.length === 1) ? '' : 's';
+      const hereSuffix: Lib_State_Runner_PreviewBackupImport_PluralSuffix = (tokenRows.length === 1) ? '' : 's';
+
+      sections.push({
+        file: `${String(fileTokens.length)} token${fileSuffix}`,
+        here: `${String(tokenRows.length)} token${hereSuffix}`,
+        id: 'accessTokens',
+        label: 'Access tokens',
+        willImport: true,
+      });
+    }
+
+    return {
+      appVersion: document['appVersion'],
+      exportedAt: document['exportedAt'],
+      sections,
+      summary: {
+        accessTokens: {
+          added: fileTokens.filter(addToken).length,
+          skipped: fileTokens.filter(skipToken).length,
+        },
+        notifications: {
+          added: fileTargets.filter(addNotification).length,
+          replaced: fileTargets.filter(replaceNotification).length,
+        },
+        registries: {
+          added: fileRegistries.filter(addRegistry).length,
+          replaced: fileRegistries.filter(replaceRegistry).length,
+        },
+        settings: {
+          changed: settingsChanged,
+        },
+      },
+    };
+  }
+
+  /**
    * Lib - State - Prepare Setup Claim.
    *
    * Issues a fresh setup code while no account exists, or clears the old one once it does.
@@ -2174,6 +2657,24 @@ export class Runner {
     });
 
     return recoveryCodes;
+  }
+
+  /**
+   * Lib - State - Set Debug Logging.
+   *
+   * Saves whether Debug logging is on.
+   * The caller applies it to the running logger.
+   *
+   * @param {Lib_State_Runner_SetDebugLogging_Enabled} enabled - Enabled.
+   *
+   * @returns {Lib_State_Runner_SetDebugLogging_Returns}
+   *
+   * @since 1.1.0
+   */
+  public setDebugLogging(enabled: Lib_State_Runner_SetDebugLogging_Enabled): Lib_State_Runner_SetDebugLogging_Returns {
+    this.setMetadata('debug_logging', (enabled === true) ? 'true' : 'false');
+
+    return;
   }
 
   /**

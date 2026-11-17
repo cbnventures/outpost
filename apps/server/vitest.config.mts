@@ -9,6 +9,11 @@ import { defineConfig } from 'vitest/config';
  * @since 0.0.0
  */
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': new URL('./src', import.meta.url).pathname,
+    },
+  },
   test: {
     include: [
       'src/**/*.test.ts',

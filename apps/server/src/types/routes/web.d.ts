@@ -39,21 +39,6 @@ export type Routes_Web_Runner_DashboardHeaders_Next = NextFunction;
 export type Routes_Web_Runner_DashboardHeaders_Returns = void;
 
 /**
- * Routes - Web - Runner - Redirect Browsers.
- *
- * @since 1.0.0
- */
-export type Routes_Web_Runner_RedirectBrowsers_Request = Request;
-
-export type Routes_Web_Runner_RedirectBrowsers_Response = Response;
-
-export type Routes_Web_Runner_RedirectBrowsers_Next = NextFunction;
-
-export type Routes_Web_Runner_RedirectBrowsers_Returns = void;
-
-export type Routes_Web_Runner_RedirectBrowsers_Preferred = string | false;
-
-/**
  * Routes - Web - Runner - Register.
  *
  * @since 1.0.0
@@ -61,6 +46,15 @@ export type Routes_Web_Runner_RedirectBrowsers_Preferred = string | false;
 export type Routes_Web_Runner_Register_App = Express;
 
 export type Routes_Web_Runner_Register_Returns = void;
+
+/**
+ * Routes - Web - Runner - Register Fallback.
+ *
+ * @since 1.1.0
+ */
+export type Routes_Web_Runner_RegisterFallback_App = Express;
+
+export type Routes_Web_Runner_RegisterFallback_Returns = void;
 
 /**
  * Routes - Web - Runner - Root.
@@ -79,3 +73,18 @@ export type Routes_Web_Runner_SendApplication_Request = Request;
 export type Routes_Web_Runner_SendApplication_Response = Response;
 
 export type Routes_Web_Runner_SendApplication_Returns = void;
+
+/**
+ * Routes - Web - Runner - Send Browser Application.
+ *
+ * @since 1.1.0
+ */
+export type Routes_Web_Runner_SendBrowserApplication_Request = Request;
+
+export type Routes_Web_Runner_SendBrowserApplication_Response = Response;
+
+export type Routes_Web_Runner_SendBrowserApplication_Next = NextFunction;
+
+export type Routes_Web_Runner_SendBrowserApplication_Returns = void;
+
+export type Routes_Web_Runner_SendBrowserApplication_Preferred = string | false;

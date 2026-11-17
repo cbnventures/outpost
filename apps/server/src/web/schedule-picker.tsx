@@ -36,6 +36,7 @@ import type {
  */
 export const SchedulePicker = ({
   issue,
+  monitorOnly,
   onChange,
   timeZone,
   value,
@@ -45,6 +46,7 @@ export const SchedulePicker = ({
     setSimple,
   ] = useState<Web_Schedule_Simple>(parseSchedule(value));
   const emitted: MutableRefObject<string> = useRef<string>(value);
+  const scheduledAction: string = (monitorOnly) ? 'check' : 'update';
 
   // A value from outside, like Discard, picks the matching choice again; the picker's own edits don't.
   useEffect((): void => {
@@ -199,9 +201,9 @@ export const SchedulePicker = ({
       <div className="schedule-next" role="status">
         <span>
           <Icon name="clock" size={16} />
-          {(next === null) ? 'Enter a valid cron schedule to see the next check.' : (
+          {(next === null) ? `Enter a valid cron schedule to see the next ${scheduledAction}.` : (
             <>
-              {'Next check: '}
+              {`Next ${scheduledAction}: `}
               <strong>{next}</strong>
               {` (${timeZone})`}
             </>

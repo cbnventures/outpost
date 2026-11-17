@@ -5,14 +5,19 @@ import { recreateContainer } from 'outpost-package-updater';
 
 import { loadConfig } from './config.js';
 import { Runner as Handoff } from './handoff.js';
+import {
+  resolveImageConfig,
+  Runner as ImageConfigCache,
+} from './image-config-cache.js';
 
 import type {
   SelfUpdateHelper_Config,
   SelfUpdateHelper_ContainerId,
-  SelfUpdateHelper_CurrentImage,
   SelfUpdateHelper_Engine,
   SelfUpdateHelper_ErrorMessage,
   SelfUpdateHelper_Handoff,
+  SelfUpdateHelper_ImageConfig,
+  SelfUpdateHelper_ImageConfigCache,
   SelfUpdateHelper_Inspected,
   SelfUpdateHelper_Outcome,
   SelfUpdateHelper_Reference,
@@ -70,6 +75,17 @@ const engine: SelfUpdateHelper_Engine = new DockerEngine(config['dockerHost']);
 const handoff: SelfUpdateHelper_Handoff = new Handoff(join(config['dataDirectory'], 'self-update.json'));
 
 /**
+ * Self Update Helper - Image Config Cache.
+ *
+ * The outgoing Outpost saves its image defaults here before starting this
+ * helper, so recreation still distinguishes defaults after Docker removes the
+ * old image record.
+ *
+ * @since 1.1.0
+ */
+const imageConfigCache: SelfUpdateHelper_ImageConfigCache = new ImageConfigCache(join(config['dataDirectory'], 'image-config-cache.json'));
+
+/**
  * Self Update Helper - Outcome.
  *
  * How the swap ended. It stays "failed" unless the swap finishes,
@@ -88,10 +104,10 @@ try {
   }
 
   const inspected: SelfUpdateHelper_Inspected = await engine.inspectContainer(containerId);
-  const currentImage: SelfUpdateHelper_CurrentImage = await engine.inspectImage(inspected['Image']);
+  const imageConfig: SelfUpdateHelper_ImageConfig = await resolveImageConfig(inspected['Image'], engine, imageConfigCache);
 
   // The same swap every other container gets: stop, rename, start the new one, wait, or roll back.
-  const result: SelfUpdateHelper_Result = await recreateContainer(inspected, (currentImage !== undefined) ? (currentImage['Config'] ?? undefined) : undefined, reference, config['updater'], {
+  const result: SelfUpdateHelper_Result = await recreateContainer(inspected, imageConfig, reference, config['updater'], {
     engine,
     sleep: async (milliseconds) => {
       await new Promise((resolve) => {
@@ -108,6 +124,7 @@ try {
   outcome = {
     status: (result['status'] === 'updated' || result['status'] === 'rolled-back') ? result['status'] : 'failed',
     detail: result['detail'],
+    previousImageMetadataAvailable: imageConfig !== undefined,
   };
 } catch (error) {
   const errorMessage: SelfUpdateHelper_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);

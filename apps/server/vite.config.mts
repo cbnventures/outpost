@@ -6,20 +6,20 @@ import { mockApi } from './mock-api.mjs';
 /**
  * Vite Configuration.
  *
- * Builds the dashboard into build/admin, served at /admin. Development proxies API calls
- * to the running server or answers them from the mock API. The server's .env files
- * aren't loaded, so their NODE_ENV can't turn a build into a development build.
+ * Builds the dashboard into build/admin while development serves root-level
+ * page addresses. API calls use the running server or the in-memory mock.
  *
  * @since 1.0.0
  */
-export default defineConfig(({ mode }) => ({
-  base: '/admin/',
+export default defineConfig((configurationEnvironment) => ({
+  appType: 'spa',
+  base: (configurationEnvironment.command === 'serve') ? '/' : '/admin/',
   build: {
     emptyOutDir: true,
     outDir: 'build/admin',
   },
   envDir: false,
-  plugins: (mode === 'mock') ? [
+  plugins: (configurationEnvironment.mode === 'mock') ? [
     react(),
     mockApi(),
   ] : [react()],
@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 5176,
-    proxy: (mode === 'mock') ? {} : {
+    proxy: (configurationEnvironment.mode === 'mock') ? {} : {
       '/api': 'http://127.0.0.1:22601',
       '/metrics': 'http://127.0.0.1:22601',
       '/v1': 'http://127.0.0.1:22601',

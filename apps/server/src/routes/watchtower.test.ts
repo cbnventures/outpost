@@ -22,6 +22,7 @@ import type {
 describe('formatMetrics', () => {
   it('renders counters and the last cycle', () => {
     const metrics: Routes_Watchtower_FormatMetrics_RendersCountersAndTheLastCycle_Metrics = formatMetrics({
+      action: 'update',
       running: true,
       startedAt: '2026-10-24T04:00:00.000Z',
       nextRun: undefined,
@@ -56,6 +57,7 @@ describe('formatMetrics', () => {
 
   it('leaves the last cycle out before the first check', () => {
     const metrics: Routes_Watchtower_FormatMetrics_LeavesTheLastCycleOutBeforeTheFirstCheck_Metrics = formatMetrics({
+      action: undefined,
       running: false,
       startedAt: undefined,
       nextRun: undefined,

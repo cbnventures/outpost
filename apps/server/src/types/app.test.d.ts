@@ -11,13 +11,22 @@ import type { Runner as History } from '../history.js';
 import type { Runner as State } from '../lib/state.js';
 import type { Runner as Scheduler } from '../scheduler.js';
 import type {
+  Lib_Backup_Document,
+  Lib_Backup_ExportSections,
+} from './lib/backup.d.ts';
+import type {
   Lib_Notifications_App,
   Lib_Notifications_Notification,
   Lib_Notifications_Result,
   Lib_Notifications_Target,
 } from './lib/notifications.d.ts';
 import type { Lib_State_Runner_GetAdministrator_Returns } from './lib/state.d.ts';
-import type { Shared_PersonalAccessTokenScopes, Shared_PersonalAccessTokenSummary } from './shared.d.ts';
+import type {
+  Shared_CheckTrigger,
+  Shared_CycleAction,
+  Shared_PersonalAccessTokenScopes,
+  Shared_PersonalAccessTokenSummary,
+} from './shared.d.ts';
 
 /**
  * App.
@@ -47,8 +56,11 @@ export type App_StartHarness_Options_Now = () => number;
 
 export type App_StartHarness_Options_WebRoot = string;
 
+export type App_StartHarness_Options_SelfId = string;
+
 export type App_StartHarness_Options = {
   now?: App_StartHarness_Options_Now;
+  selfId?: App_StartHarness_Options_SelfId;
   webRoot?: App_StartHarness_Options_WebRoot;
 };
 
@@ -78,7 +90,12 @@ export type App_StartHarness_Docker = {
   failing: App_StartHarness_Docker_Failing;
 };
 
-export type App_StartHarness_Cycle_Call = string[] | undefined;
+export type App_StartHarness_Cycle_Call = {
+  action: Shared_CycleAction;
+  containerIds: string[] | undefined;
+  rollback: boolean;
+  source: Shared_CheckTrigger;
+};
 
 export type App_StartHarness_Cycle_Calls = App_StartHarness_Cycle_Call[];
 
@@ -208,6 +225,25 @@ export type App_Claim_SetupClaim = {
   code: App_Claim_SetupClaim_Code;
   expiresAt: App_Claim_SetupClaim_ExpiresAt;
 } | undefined;
+
+/**
+ * App - Backup.
+ *
+ * @since 1.1.0
+ */
+export type App_Backup_Client = App_CreateClient_Returns_Client;
+export type App_Backup_OtherClient = App_CreateClient_Returns_Client;
+export type App_Backup_ApiClient = App_CreateClient_Returns_Client;
+export type App_Backup_Response = App_CreateClient_Request_Returns_Response;
+export type App_Backup_Grant = string;
+export type App_Backup_Sections = Lib_Backup_ExportSections;
+export type App_Backup_Serialized = string;
+export type App_Backup_Document = Lib_Backup_Document;
+export type App_Backup_CreatedToken = App_CreateToken_Returns_Created;
+export type App_Backup_Administrator = Lib_State_Runner_GetAdministrator_Returns;
+export type App_Backup_TotpSecret = string;
+export type App_Backup_TotpStep = number;
+export type App_Backup_TotpCode = string;
 
 /**
  * App - Create Token.
@@ -671,6 +707,26 @@ export type App_DashboardApi_RunsOneCheckAtATime_Automation = App_CreateClient_R
  * @since 1.0.0
  */
 export type App_DashboardApi_ReportsDockerFailures_Client = App_CreateClient_Returns_Client;
+
+/**
+ * App - Dashboard API - Turns Debug Logging On And Off.
+ *
+ * @since 1.1.0
+ */
+export type App_DashboardApi_TurnsDebugLoggingOnAndOff_Client = App_CreateClient_Returns_Client;
+
+export type App_DashboardApi_TurnsDebugLoggingOnAndOff_Reader = App_CreateToken_Returns_Created;
+
+/**
+ * App - Dashboard API - Leaves The Event Stream Out Of Request Timing.
+ *
+ * @since 1.1.0
+ */
+export type App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Client = App_CreateClient_Returns_Client;
+
+export type App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Write = MockInstance<typeof process.stdout.write>;
+
+export type App_DashboardApi_LeavesTheEventStreamOutOfRequestTiming_Events = App_OpenEvents_Returns_Stream;
 
 /**
  * App - Dashboard API - Streams The State And Each Finished Check.

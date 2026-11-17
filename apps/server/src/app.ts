@@ -4,8 +4,10 @@ import rateLimit from 'express-rate-limit';
 import { Runner as Access } from './lib/access.js';
 import { Runner as Attempts } from './lib/attempts.js';
 import { getClientLimitKey, isTrustedProxyAddress, sendError } from './lib/http.js';
+import { isDebugLogging, logDebug } from './lib/logger.js';
 import { Runner as Notifier } from './lib/notifier.js';
 import { Runner as Auth } from './routes/auth.js';
+import { Runner as Backup } from './routes/backup.js';
 import { Runner as Dashboard } from './routes/dashboard.js';
 import { Runner as Notifications } from './routes/notifications.js';
 import { Runner as Registries } from './routes/registries.js';
@@ -22,6 +24,7 @@ import type {
   App_CreateApp_Dependencies,
   App_CreateApp_Notifier,
   App_CreateApp_Returns,
+  App_CreateApp_Web,
   App_HandleError_Error,
   App_HandleError_ErrorMessage,
   App_HandleError_Next,
@@ -33,17 +36,36 @@ import type {
   App_HandleNotFound_Request,
   App_HandleNotFound_Response,
   App_HandleNotFound_Returns,
+  App_LogRequestTiming_Elapsed,
+  App_LogRequestTiming_EventStream,
+  App_LogRequestTiming_Next,
+  App_LogRequestTiming_Path,
+  App_LogRequestTiming_Request,
+  App_LogRequestTiming_Response,
+  App_LogRequestTiming_Returns,
+  App_LogRequestTiming_StartedAt,
   App_SetBaseHeaders_Next,
   App_SetBaseHeaders_Request,
   App_SetBaseHeaders_Response,
   App_SetBaseHeaders_Returns,
+  App_SlowRequestMilliseconds,
 } from './types/app.d.ts';
+
+/**
+ * App - Slow Request Milliseconds.
+ *
+ * How long a request has to take before Debug logging notes it as slow.
+ * Quick requests stay out of the log so the slow ones stand out.
+ *
+ * @since 1.1.0
+ */
+const slowRequestMilliseconds: App_SlowRequestMilliseconds = 1000;
 
 /**
  * App - Create App.
  *
- * Builds the HTTP server: the dashboard at /admin, its /api/v1 API, a public health
- * check, and the Watchtower-style update, status, and metrics endpoints.
+ * Builds the root-level console, its /admin static files, the /api/v1 API, a
+ * public health check, and Watchtower-compatible machine endpoints.
  *
  * @param {App_CreateApp_Dependencies} dependencies - Dependencies.
  *
@@ -56,6 +78,7 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
   const access: App_CreateApp_Access = new Access(dependencies['state']);
   const notifier: App_CreateApp_Notifier = dependencies['notifier'] ?? new Notifier(dependencies['state']);
   const attempts: App_CreateApp_Attempts = new Attempts(dependencies['now'], (key) => notifier.notifySignInLimit(key));
+  const web: App_CreateApp_Web = new Web(dependencies['webRoot']);
   const apiLimiter: App_CreateApp_ApiLimiter = rateLimit({
     handler: (_request, response) => {
       sendError(response, 429, 'rate_limited', 'Too many requests. Wait a minute and try again.');
@@ -76,6 +99,12 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
 
   app.use(setBaseHeaders);
 
+  app.use(logRequestTiming);
+
+  app.use('/api/v1/backup', express.json({
+    limit: '10mb',
+  }));
+
   app.use(express.json({
     limit: '64kb',
   }));
@@ -86,7 +115,7 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
     '/v1',
   ], apiLimiter);
 
-  new Web(dependencies['webRoot']).register(app);
+  web.register(app);
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok' });
@@ -97,6 +126,8 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
   new Auth(dependencies['state'], access, attempts).register(app);
 
   new Security(dependencies['state'], access, attempts).register(app);
+
+  new Backup(dependencies['state'], access, attempts, dependencies['config'], dependencies['onRuntimeSettingsChanged']).register(app);
 
   new Tokens(dependencies['state'], access).register(app);
 
@@ -117,6 +148,8 @@ export function createApp(dependencies: App_CreateApp_Dependencies): App_CreateA
   }).register(app);
 
   new Watchtower(dependencies['scheduler'], access).register(app);
+
+  web.registerFallback(app);
 
   app.use(handleNotFound);
 
@@ -199,6 +232,57 @@ function handleError(error: App_HandleError_Error, _request: App_HandleError_Req
  */
 function handleNotFound(_request: App_HandleNotFound_Request, response: App_HandleNotFound_Response): App_HandleNotFound_Returns {
   sendError(response, 404, 'not_found', 'No route matches this request.');
+
+  return;
+}
+
+/**
+ * App - Log Request Timing.
+ *
+ * While Debug logging is on, notes requests that take a second or more and requests
+ * the browser cancels before the answer is sent, leaving out the query string. Live
+ * event streams are skipped, because they stay open until the page closes.
+ *
+ * @param {App_LogRequestTiming_Request}  request  - Request.
+ * @param {App_LogRequestTiming_Response} response - Response.
+ * @param {App_LogRequestTiming_Next}     next     - Next.
+ *
+ * @returns {App_LogRequestTiming_Returns}
+ *
+ * @since 1.1.0
+ */
+function logRequestTiming(request: App_LogRequestTiming_Request, response: App_LogRequestTiming_Response, next: App_LogRequestTiming_Next): App_LogRequestTiming_Returns {
+  if (isDebugLogging() === false) {
+    next();
+
+    return;
+  }
+
+  const startedAt: App_LogRequestTiming_StartedAt = Date.now();
+  const path: App_LogRequestTiming_Path = request.originalUrl.split('?')[0] ?? '/';
+
+  response.on('finish', () => {
+    const elapsed: App_LogRequestTiming_Elapsed = Date.now() - startedAt;
+    const eventStream: App_LogRequestTiming_EventStream = String(response.getHeader('Content-Type')).startsWith('text/event-stream');
+
+    if (elapsed >= slowRequestMilliseconds && eventStream === false) {
+      logDebug(`Slow request: ${request.method} ${path} answered ${String(response.statusCode)} after ${String(elapsed)} ms`);
+    }
+
+    return;
+  });
+
+  response.on('close', () => {
+    const eventStream: App_LogRequestTiming_EventStream = String(response.getHeader('Content-Type')).startsWith('text/event-stream');
+
+    if (response.writableFinished === false && eventStream === false) {
+      logDebug(`The browser canceled ${request.method} ${path} after ${String(Date.now() - startedAt)} ms`);
+    }
+
+    return;
+  });
+
+  next();
 
   return;
 }

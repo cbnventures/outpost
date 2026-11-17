@@ -1,5 +1,9 @@
 # outpost-package-registry
 
+## 1.1.0 - 2026-11-17
+
+No changes.
+
 ## 1.0.4 - 2026-11-06
 
 No changes.
@@ -19,5 +23,5 @@ No changes.
 ## 1.0.0 - 2026-11-03
 
 ### ADDED
-- Added authenticated remote digest lookup with Docker credential encoding, Bearer challenges, and distinct missing-image or access-denied results.
-- Added canonical image-reference parsing with Docker Hub defaults and registry-host normalization.
+- Authenticated remote digest lookup with Docker credential encoding, Bearer challenges, and distinct missing-image or access-denied results.
+- Canonical image-reference parsing with Docker Hub defaults and registry-host normalization.

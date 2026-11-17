@@ -3,6 +3,13 @@ import type { UpdaterOptions } from 'outpost-package-updater';
 import type { Shared_RuntimeSettings } from './shared.d.ts';
 
 /**
+ * Config - Console Port.
+ *
+ * @since 1.1.0
+ */
+export type Config_ConsolePort = number;
+
+/**
  * Config - Default Runtime Settings.
  *
  * @since 1.0.0
@@ -58,21 +65,6 @@ export type Config_ApplyRuntimeSettings_Returns = void;
 export type Config_RuntimeSettingsFromConfig_Config = Config_LoadConfig_Settings;
 
 export type Config_RuntimeSettingsFromConfig_Returns = Shared_RuntimeSettings;
-
-/**
- * Config - Read Number.
- *
- * @since 0.0.1
- */
-export type Config_ReadNumber_Name = string;
-
-export type Config_ReadNumber_Value = string | undefined;
-
-export type Config_ReadNumber_Fallback = number;
-
-export type Config_ReadNumber_Returns = number;
-
-export type Config_ReadNumber_Parsed = number;
 
 /**
  * Config - Read Self ID.

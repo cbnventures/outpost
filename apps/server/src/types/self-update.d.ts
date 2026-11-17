@@ -98,7 +98,11 @@ export type SelfUpdate_FinishSelfUpdate_Returns = Promise<UpdateReport>;
 
 export type SelfUpdate_FinishSelfUpdate_Current = Handoff_File | undefined;
 
+export type SelfUpdate_FinishSelfUpdate_WaitStartedAt = number;
+
 export type SelfUpdate_FinishSelfUpdate_Outcome = Handoff_Outcome | undefined;
+
+export type SelfUpdate_FinishSelfUpdate_Waited = number;
 
 export type SelfUpdate_FinishSelfUpdate_FailedImageId = string | undefined;
 
@@ -107,6 +111,8 @@ export type SelfUpdate_FinishSelfUpdate_Status = UpdateStatus;
 export type SelfUpdate_FinishSelfUpdate_Detail = string;
 
 export type SelfUpdate_FinishSelfUpdate_CleanupNote = string;
+
+export type SelfUpdate_FinishSelfUpdate_ImageNote = string;
 
 export type SelfUpdate_FinishSelfUpdate_CleanupErrorMessage = string;
 
@@ -137,9 +143,15 @@ export type SelfUpdate_HandOver_HelperId = string | undefined;
 
 export type SelfUpdate_HandOver_ErrorMessage = string;
 
+export type SelfUpdate_HandOver_HelperStartedAt = number;
+
 export type SelfUpdate_HandOver_ExitCode = number | undefined;
 
 export type SelfUpdate_HandOver_Outcome = Handoff_Outcome | undefined;
+
+export type SelfUpdate_HandOver_HelperRan = number;
+
+export type SelfUpdate_HandOver_HelperEnding = string;
 
 /**
  * Self Update - Mount Bind.
@@ -158,6 +170,8 @@ export type SelfUpdate_MountBind_Source = string;
  * @since 1.0.0
  */
 export type SelfUpdate_PlanHelper_Container = DockerContainerInspect;
+
+export type SelfUpdate_PlanHelper_HelperImage = string;
 
 export type SelfUpdate_PlanHelper_Reference = string;
 
@@ -200,6 +214,8 @@ export type SelfUpdate_RemoveExitedHelpers_Engine = Pick<DockerEngine, 'listCont
 export type SelfUpdate_RemoveExitedHelpers_Returns = Promise<void>;
 
 export type SelfUpdate_RemoveExitedHelpers_Helpers = DockerContainerSummary[];
+
+export type SelfUpdate_RemoveExitedHelpers_HelperName = string;
 
 /**
  * Self Update - Short Image ID.

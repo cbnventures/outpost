@@ -14,7 +14,7 @@
       "writablePaths": [
         "/data"
       ],
-      "healthCommand": "node -e \"fetch('http://127.0.0.1:' + (process.env.PORT ?? '22601') + '/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))\"",
+      "healthCommand": "node -e \"fetch('http://127.0.0.1:22601/health').then((response) => process.exit(response.ok ? 0 : 1), () => process.exit(1))\"",
       "port": 22601
     }
   ],

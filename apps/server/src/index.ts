@@ -2,7 +2,10 @@ import { join } from 'node:path';
 
 import { Cron } from 'croner';
 import { DockerEngine } from 'outpost-package-docker-engine';
-import { runUpdateCycle } from 'outpost-package-updater';
+import {
+  runUpdateCycle,
+  selectContainers,
+} from 'outpost-package-updater';
 
 import { createApp } from './app.js';
 import {
@@ -12,9 +15,19 @@ import {
 } from './config.js';
 import { Runner as Handoff } from './handoff.js';
 import { Runner as History } from './history.js';
+import {
+  pruneImageConfigs,
+  resolveImageConfig,
+  Runner as ImageConfigCache,
+} from './image-config-cache.js';
+import { timedEngine, timedFetch } from './lib/debug-timing.js';
+import { isDebugLogging, setDebugLogging } from './lib/logger.js';
 import { Runner as Notifier } from './lib/notifier.js';
 import { Runner as State } from './lib/state.js';
-import { Runner as Scheduler } from './scheduler.js';
+import {
+  Runner as Scheduler,
+  scheduledCycleAction,
+} from './scheduler.js';
 import {
   finishSelfUpdate,
   handOver,
@@ -23,11 +36,14 @@ import {
 
 import type {
   Index_App,
+  Index_CheckReport,
   Index_Config,
   Index_Engine,
   Index_Handoff,
   Index_History,
+  Index_ImageConfigCache,
   Index_Job,
+  Index_ManagedContainers,
   Index_ModeSuffix,
   Index_NextRun,
   Index_NextRunAt,
@@ -36,8 +52,10 @@ import type {
   Index_PendingSelfUpdate,
   Index_Report,
   Index_Scheduler,
+  Index_SelfContainer,
   Index_SelfUpdateContext,
   Index_SetupClaim,
+  Index_StartupContainers,
   Index_State,
 } from './types/index.d.ts';
 
@@ -59,9 +77,43 @@ const config: Index_Config = loadConfig(process.env);
  *
  * @since 0.0.1
  */
-const engine: Index_Engine = new DockerEngine(config['dockerHost']);
+const engine: Index_Engine = timedEngine(new DockerEngine(config['dockerHost']));
 
 await engine.ping();
+
+/**
+ * Index - Handoff.
+ *
+ * The self-update file on the data volume. It holds a check that an earlier
+ * Outpost handed to the helper, and a new image that failed to start.
+ *
+ * @since 1.0.0
+ */
+const handoff: Index_Handoff = new Handoff(join(config['dataDirectory'], 'self-update.json'));
+
+/**
+ * Index - Image Config Cache.
+ *
+ * Image defaults saved on the data volume let recreation distinguish image
+ * defaults from user settings after Docker removes an old image record.
+ *
+ * @since 1.1.0
+ */
+const imageConfigCache: Index_ImageConfigCache = new ImageConfigCache(join(config['dataDirectory'], 'image-config-cache.json'));
+
+try {
+  await pruneImageConfigs(imageConfigCache, engine, handoff);
+
+  const startupContainers: Index_StartupContainers = await engine.listContainers();
+  const managedContainers: Index_ManagedContainers = selectContainers(startupContainers, config['updater'])['candidates'];
+  const selfContainer: Index_SelfContainer = (config['updater']['selfId'] === undefined) ? undefined : managedContainers.find((container) => container['Id'].startsWith(config['updater']['selfId'] ?? ''));
+
+  if (selfContainer !== undefined) {
+    await resolveImageConfig(selfContainer['ImageID'], engine, imageConfigCache);
+  }
+} catch {
+  // A check retries cache maintenance without preventing the dashboard from starting.
+}
 
 /**
  * Index - History.
@@ -85,6 +137,8 @@ const state: Index_State = new State(config['dataDirectory']);
 
 applyRuntimeSettings(config, state.getRuntimeSettings(defaultRuntimeSettings));
 
+setDebugLogging(state.getDebugLogging());
+
 /**
  * Index - Notifier.
  *
@@ -106,16 +160,6 @@ notifier.notifySecretsRemoved(state.getKeyReplacement());
  * @since 1.0.0
  */
 const setupClaim: Index_SetupClaim = state.prepareSetupClaim();
-
-/**
- * Index - Handoff.
- *
- * The self-update file on the data volume. It holds a check that an earlier
- * Outpost handed to the helper, and a new image that failed to start.
- *
- * @since 1.0.0
- */
-const handoff: Index_Handoff = new Handoff(join(config['dataDirectory'], 'self-update.json'));
 
 /**
  * Index - Self Update Context.
@@ -160,20 +204,38 @@ const selfUpdateContext: Index_SelfUpdateContext = {
  *
  * @since 0.0.1
  */
-const scheduler: Index_Scheduler = new Scheduler(async (containerIds, source) => {
+const scheduler: Index_Scheduler = new Scheduler(async (containerIds, source, action, rollback) => {
   const report: Index_Report = await runUpdateCycle(config['updater'], {
     engine,
-    fetchFunction: fetch,
+    fetchFunction: timedFetch(fetch),
     sleep: selfUpdateContext['sleep'],
     now: () => new Date(),
     findCredentials: (registry) => state.findRegistryCredentials(registry),
     findRejectedImage: (container) => state.findRejectedImage(container),
+    findImageConfig: (imageId) => imageConfigCache.find(imageId),
     rememberRejectedImage: (container, imageId) => state.rememberRejectedImage(container, imageId),
+    rememberImageConfig: (imageId, imageConfig) => imageConfigCache.remember(imageId, imageConfig),
     forgetRejectedImage: (container) => state.forgetRejectedImage(container),
-    updateSelf: async (request) => handOver(request, source, selfUpdateContext),
-  }, containerIds);
+    pruneImageConfigs: async () => {
+      try {
+        await pruneImageConfigs(imageConfigCache, engine, handoff);
+      } catch {
+        // Cache maintenance never prevents a container check or update.
+      }
 
-  notifier.notifyUpdateReport(report);
+      return;
+    },
+    updateSelf: async (request) => handOver(request, source, selfUpdateContext),
+  }, containerIds, action, rollback);
+
+  const checkReport: Index_CheckReport = {
+    ...report,
+    action,
+    ...((action === 'update' && rollback === false) ? { rollback: false } : {}),
+    trigger: source,
+  };
+
+  notifier.notifyUpdateReport(checkReport);
 
   return report;
 }, history, () => {
@@ -214,7 +276,7 @@ if (pendingSelfUpdate !== undefined) {
  * @since 0.0.1
  */
 let job: Index_Job = new Cron(config['schedule'], () => {
-  scheduler.trigger('schedule');
+  scheduler.trigger('schedule', undefined, scheduledCycleAction(config['updater']['monitorOnly']));
 
   return;
 });
@@ -223,7 +285,7 @@ let job: Index_Job = new Cron(config['schedule'], () => {
  * Index - App.
  *
  * HTTP server for the dashboard, its API, first-run setup, health checks,
- * and the Watchtower-style endpoints. Listens on PORT (22601 by default).
+ * and the Watchtower-style endpoints. Listens on 22601 inside the container.
  *
  * @since 0.0.1
  */
@@ -241,7 +303,7 @@ const app: Index_App = createApp({
     job.stop();
 
     job = new Cron(config['schedule'], () => {
-      scheduler.trigger('schedule');
+      scheduler.trigger('schedule', undefined, scheduledCycleAction(config['updater']['monitorOnly']));
 
       return;
     });
@@ -271,6 +333,10 @@ app.listen(config['port'], (error) => {
     '',
   ].join('\n'));
 
+  if (isDebugLogging() === true) {
+    process.stdout.write('debug logging is on\n');
+  }
+
   if (setupClaim !== undefined) {
     process.stdout.write([
       'No account exists yet. Open the dashboard to create it with the setup code.',
@@ -282,7 +348,7 @@ app.listen(config['port'], (error) => {
 
   // A check finished after a self-update counts as this start's check.
   if (config['runOnStart'] === true && pendingSelfUpdate === undefined) {
-    scheduler.trigger('startup');
+    scheduler.trigger('startup', undefined, scheduledCycleAction(config['updater']['monitorOnly']));
   }
 
   return;

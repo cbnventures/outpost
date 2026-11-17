@@ -3,35 +3,32 @@ import { NovaIdentity } from '@cbnventures/nova/toolkit';
 import type { DocusaurusNovaConfig } from '@cbnventures/docusaurus-preset-nova/types/config';
 
 /**
- * Docusaurus - Identity.
- *
- * Reads the documentation identity from the generated Nova configuration.
- * Fallbacks keep the site runnable while consumers finish project metadata.
+ * Identity.
  *
  * @since 0.0.0
  */
 const identity = new NovaIdentity().forDocs();
 
 /**
- * Docusaurus - Config.
- *
- * Configures the Outpost documentation site with Nova's signal preset, the
- * docs and blog plugins, local search, and Outpost-specific navigation.
+ * Docusaurus Configuration.
  *
  * @since 0.0.0
  */
 const config: DocusaurusNovaConfig = {
   // Site Metadata.
-  title: identity['title'] ?? 'Outpost',
+  title: identity['title'] ?? '',
   titleDelimiter: '-',
-  tagline: identity['tagline'] ?? 'Self-hosted container auto-updater for Docker, a modern Watchtower replacement',
+  tagline: identity['tagline'],
   favicon: './favicon.ico',
 
   // Deployment.
-  url: identity['url'] ?? 'https://outpost.cbnventures.io',
+  url: identity['url'] ?? '',
   baseUrl: identity['baseUrl'] ?? '/',
-  organizationName: identity['organizationName'] ?? 'cbnventures',
-  projectName: identity['projectName'] ?? 'outpost',
+  organizationName: identity['organizationName'],
+  projectName: identity['projectName'],
+  deploymentBranch: undefined,
+  githubHost: undefined,
+  githubPort: undefined,
   trailingSlash: true,
   noIndex: false,
 
@@ -39,6 +36,17 @@ const config: DocusaurusNovaConfig = {
   onBrokenLinks: 'throw',
   onBrokenAnchors: 'throw',
   onDuplicateRoutes: 'throw',
+
+  // Static Assets.
+  staticDirectories: ['static'],
+  baseUrlIssueBanner: true,
+  scripts: [],
+  stylesheets: [],
+  clientModules: [],
+  themes: [],
+
+  // Custom Fields.
+  customFields: {},
 
   // Head Tags.
   headTags: [
@@ -83,19 +91,39 @@ const config: DocusaurusNovaConfig = {
     },
   ],
 
-  // Markdown.
-  markdown: {
-    mermaid: true,
-    hooks: {
-      onBrokenMarkdownLinks: 'warn',
-      onBrokenMarkdownImages: 'throw',
-    },
-  },
-
   // Internationalization.
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
+    path: 'i18n',
+    localeConfigs: {
+      en: {
+        label: 'English',
+        direction: 'ltr',
+        htmlLang: 'en-US',
+        calendar: 'gregory',
+        path: 'en',
+      },
+    },
+  },
+
+  // Markdown.
+  markdown: {
+    format: 'mdx',
+    mermaid: true,
+    emoji: true,
+    mdx1Compat: {
+      comments: true,
+      admonitions: true,
+      headingIds: true,
+    },
+    anchors: {
+      maintainCase: false,
+    },
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownImages: 'throw',
+    },
   },
 
   // Presets (Nova).
@@ -135,11 +163,19 @@ const config: DocusaurusNovaConfig = {
         docs: {
           routeBasePath: 'docs',
           sidebarPath: './sidebars.ts',
+          editUrl: 'https://github.com/cbnventures/outpost/tree/main/apps/docs/',
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
+          lastVersion: 'current',
+          versions: {
+            current: {
+              label: 'Current',
+              badge: false,
+              banner: 'none',
+            },
+          },
         },
         blog: {
-          routeBasePath: 'blog',
           showReadingTime: true,
           blogTitle: 'Blog',
           blogDescription: 'Release notes, upgrade guides, and notes on keeping Docker containers current without breaking them.',
@@ -151,11 +187,16 @@ const config: DocusaurusNovaConfig = {
               'rss',
               'atom',
             ],
-            copyright: identity['copyright'] ?? '',
+            copyright: identity['copyright'],
             limit: 20,
             title: 'Outpost Blog',
             description: 'Release notes, upgrade guides, and notes on keeping Docker containers current without breaking them.',
           },
+        },
+        pages: {
+          editUrl: 'https://github.com/cbnventures/outpost/tree/main/apps/docs/',
+          showLastUpdateTime: true,
+          showLastUpdateAuthor: true,
         },
         sitemap: {
           lastmod: 'date',
@@ -163,6 +204,13 @@ const config: DocusaurusNovaConfig = {
           priority: 0.5,
           ignorePatterns: ['/docs/tags/**'],
           filename: 'sitemap.xml',
+        },
+      },
+
+      // Analytics.
+      analytics: {
+        gtm: {
+          containerId: 'GTM-T74GGDFD',
         },
       },
 
@@ -177,12 +225,17 @@ const config: DocusaurusNovaConfig = {
         highlightSearchTermsOnTargetPage: true,
         searchBarShortcutKeymap: 'mod+k',
         searchResultLimits: 8,
+        fuzzyMatchingDistance: 1,
+        ignorePatterns: [],
       },
 
       // Progress Bar.
       progressBar: true,
     },
   ]],
+
+  // Plugins.
+  plugins: [],
 
   // Theme Config.
   themeConfig: {
@@ -195,12 +248,19 @@ const config: DocusaurusNovaConfig = {
           dark: undefined,
         },
         href: '/',
+        target: undefined,
+        rel: undefined,
+        ariaLabel: undefined,
+        wordmark: {
+          light: undefined,
+          dark: undefined,
+        },
       },
       image: '/thumbnails/brand.png',
       metadata: [
         {
           name: 'description',
-          content: identity['metaDescription'] ?? 'Self-hosted container auto-updater for Docker, a modern Watchtower replacement',
+          content: identity['metaDescription'] ?? '',
         },
         {
           name: 'twitter:card',
@@ -217,46 +277,82 @@ const config: DocusaurusNovaConfig = {
 
     // Navbar.
     navbar: {
-      title: 'Outpost',
       hideOnScroll: false,
       items: [
         {
           label: 'Docs',
           position: 'left',
-          to: '/docs/overview/',
+          type: 'dropdown',
           icon: 'lucide:book-open',
-          activeBaseRegex: '^/docs/(?!features)',
+          items: [
+            {
+              label: 'Overview',
+              to: '/docs/overview/',
+              icon: 'lucide:rocket',
+              activeBaseRegex: '^/docs/(overview/|getting-started/|category/getting-started/|tags/)',
+            },
+            {
+              label: 'Features',
+              to: '/docs/features/labels-and-modes/',
+              icon: 'lucide:container',
+              activeBaseRegex: '^/docs/(features/|category/features/)',
+            },
+            {
+              label: 'Reference',
+              to: '/docs/reference/architecture/',
+              icon: 'lucide:library',
+              activeBaseRegex: '^/docs/(reference/|category/reference/)',
+            },
+          ],
         },
         {
-          label: 'Features',
+          label: 'Quick Start',
           position: 'left',
-          to: '/docs/features/labels-and-modes/',
-          icon: 'lucide:container',
-          activeBasePath: '/docs/features',
+          type: undefined,
+          to: '/docs/getting-started/quick-start/',
+          icon: 'lucide:play',
         },
         {
           label: 'Blog',
           position: 'left',
+          type: undefined,
           to: '/blog/',
           icon: 'lucide:pen-line',
         },
         {
-          label: 'Docker Hub',
-          position: 'right',
-          href: 'https://hub.docker.com/r/cbnventures/outpost',
-          icon: 'lucide:package',
-        },
-        {
-          label: 'GitHub',
-          position: 'right',
-          href: 'https://github.com/cbnventures/outpost',
-          icon: 'lucide:github',
+          label: 'Resources',
+          position: 'left',
+          type: 'dropdown',
+          icon: 'lucide:life-buoy',
+          items: [
+            {
+              label: 'Troubleshooting',
+              to: '/docs/reference/troubleshooting/',
+              icon: 'lucide:wrench',
+            },
+            {
+              label: 'Changelog',
+              href: 'https://github.com/cbnventures/outpost/releases',
+              icon: 'lucide:history',
+            },
+            {
+              label: 'Report an Issue',
+              href: 'https://github.com/cbnventures/outpost/issues',
+              icon: 'lucide:bug',
+            },
+            {
+              label: 'Docker Hub',
+              href: 'https://hub.docker.com/r/cbnventures/outpost',
+              icon: 'lucide:package',
+            },
+          ],
         },
       ],
     },
 
     // Docs.
     docs: {
+      versionPersistence: 'localStorage',
       sidebar: {
         hideable: false,
         autoCollapseCategories: false,
@@ -289,15 +385,20 @@ const config: DocusaurusNovaConfig = {
       maxHeadingLevel: 3,
     },
 
+    // Announcement Bar.
+    announcementBar: undefined,
+
     // Back to Top Button.
     backToTopButton: true,
 
     // Error Pages - overrides Nova's randomized defaults with consumer copy.
+    // Any unset field falls through to the Nova-flavored randomized pool.
     errorPages: {
       notFound: {
         title: 'No container by that name.',
         description: 'This page was never pulled. Head back to the docs index to find what you were looking for.',
         backHomeLabel: 'Back to the docs',
+        backHomeHref: '/docs/overview/',
       },
       errorPageContent: {
         title: 'This page turned unhealthy.',
@@ -313,20 +414,16 @@ const config: DocusaurusNovaConfig = {
       sections: {
         docs: [
           {
-            label: 'Quick Start',
-            href: '/docs/getting-started/quick-start/',
+            label: 'Overview',
+            href: '/docs/overview/',
           },
           {
-            label: 'Configuration',
-            href: '/docs/getting-started/configuration/',
+            label: 'Features',
+            href: '/docs/features/labels-and-modes/',
           },
           {
-            label: 'Migrating from Watchtower',
-            href: '/docs/reference/migrating-from-watchtower/',
-          },
-          {
-            label: 'Troubleshooting',
-            href: '/docs/reference/troubleshooting/',
+            label: 'Reference',
+            href: '/docs/reference/architecture/',
           },
         ],
         resources: [
@@ -335,12 +432,24 @@ const config: DocusaurusNovaConfig = {
             href: '/blog/',
           },
           {
-            label: 'Docker Hub',
-            href: 'https://hub.docker.com/r/cbnventures/outpost',
+            label: 'Troubleshooting',
+            href: '/docs/reference/troubleshooting/',
           },
           {
-            label: 'GitHub',
+            label: 'Changelog',
+            href: 'https://github.com/cbnventures/outpost/releases',
+          },
+          {
+            label: 'Report an Issue',
+            href: 'https://github.com/cbnventures/outpost/issues',
+          },
+          {
+            label: 'Source Code',
             href: 'https://github.com/cbnventures/outpost',
+          },
+          {
+            label: 'Docker Hub',
+            href: 'https://hub.docker.com/r/cbnventures/outpost',
           },
         ],
         company: [
@@ -349,7 +458,19 @@ const config: DocusaurusNovaConfig = {
             href: 'https://www.cbnventures.io/',
           },
           {
-            label: 'Get In Touch',
+            label: 'Other Apps',
+            href: 'https://www.cbnventures.io/apps/',
+          },
+          {
+            label: 'Open Source',
+            href: 'https://www.cbnventures.io/open-source/',
+          },
+          {
+            label: 'Sponsor',
+            href: 'https://github.com/sponsors/cbnventures',
+          },
+          {
+            label: 'Get in Touch',
             href: 'https://www.cbnventures.io/get-in-touch/',
           },
         ],
@@ -422,7 +543,7 @@ const config: DocusaurusNovaConfig = {
       copyright: identity['copyright'],
       credit: true,
       cta: {
-        label: 'Start with the Quick Start',
+        label: 'Ready to keep containers current?',
         href: '/docs/getting-started/quick-start/',
       },
     },

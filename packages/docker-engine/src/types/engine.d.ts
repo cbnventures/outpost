@@ -99,7 +99,11 @@ export type Engine_Runner_InspectImage_Response = Shared_EngineResponse;
  *
  * @since 0.0.1
  */
+export type Engine_Runner_ListContainers_All = boolean;
+
 export type Engine_Runner_ListContainers_Returns = Promise<Shared_ContainerSummary[]>;
+
+export type Engine_Runner_ListContainers_Endpoint = string;
 
 export type Engine_Runner_ListContainers_Response = Shared_EngineResponse;
 

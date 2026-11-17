@@ -12,6 +12,7 @@ import type { Runner as Access } from '../lib/access.js';
 import type { Runner as Attempts } from '../lib/attempts.js';
 import type { Runner as Notifier } from '../lib/notifier.js';
 import type { Runner as State } from '../lib/state.js';
+import type { Runner as Web } from '../routes/web.js';
 import type { Runner as Scheduler } from '../scheduler.js';
 import type { Config_LoadConfig_Settings } from './config.d.ts';
 import type { Shared_RuntimeSettings } from './shared.d.ts';
@@ -67,6 +68,8 @@ export type App_CreateApp_Attempts = Attempts;
 
 export type App_CreateApp_Notifier = Notifier;
 
+export type App_CreateApp_Web = Web;
+
 export type App_CreateApp_ApiLimiter = RateLimitRequestHandler;
 
 /**
@@ -102,6 +105,27 @@ export type App_HandleNotFound_Response = Response;
 export type App_HandleNotFound_Returns = void;
 
 /**
+ * App - Log Request Timing.
+ *
+ * @since 1.1.0
+ */
+export type App_LogRequestTiming_Request = Request;
+
+export type App_LogRequestTiming_Response = Response;
+
+export type App_LogRequestTiming_Next = NextFunction;
+
+export type App_LogRequestTiming_Returns = void;
+
+export type App_LogRequestTiming_StartedAt = number;
+
+export type App_LogRequestTiming_Path = string;
+
+export type App_LogRequestTiming_Elapsed = number;
+
+export type App_LogRequestTiming_EventStream = boolean;
+
+/**
  * App - Set Base Headers.
  *
  * @since 1.0.0
@@ -113,3 +137,10 @@ export type App_SetBaseHeaders_Response = Response;
 export type App_SetBaseHeaders_Next = NextFunction;
 
 export type App_SetBaseHeaders_Returns = void;
+
+/**
+ * App - Slow Request Milliseconds.
+ *
+ * @since 1.1.0
+ */
+export type App_SlowRequestMilliseconds = number;

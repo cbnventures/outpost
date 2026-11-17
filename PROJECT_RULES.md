@@ -91,7 +91,7 @@ Every TypeScript workspace uses the same layout:
 
 ### Environment Variables
 
-Environment variables carry only what Outpost needs before its database opens: `DOCKER_HOST`, `OUTPOST_DATA_DIRECTORY`, `PORT`, `PUID`, `PGID`, and `TZ`. Update behavior (the schedule, label mode, monitor-only mode, cleanup, replacement timing, and private registry sign-ins) is saved in SQLite and changed on the dashboard's **Settings** page. `apps/server/src/config.ts` reads the server's variables and holds the behavior defaults; `compose.yml` documents the common ones.
+Environment variables carry only what Outpost needs before its database opens: `DOCKER_HOST`, `OUTPOST_DATA_DIRECTORY`, `PUID`, `PGID`, and `TZ`. Update behavior (the schedule, label mode, monitor-only mode, cleanup, replacement timing, and private registry sign-ins) is saved in SQLite and changed on the dashboard's **Settings** page. `apps/server/src/config.ts` reads the server's variables and holds the behavior defaults; `compose.yml` documents the common ones.
 
 ## Workspace Rules
 
@@ -221,4 +221,15 @@ The supported verification commands are documented under Build and Tooling. Chan
 
 ## Additional Project Rules
 
-No additional project rules are currently documented.
+### Shared Console Foundation
+
+The console foundation is shared with pfsense-actions, discord-stonker-bot, and
+transmission-vpn. Keep `navigation.ts`, `nav-sheet.tsx`,
+`app-shell.tsx`, `primitives.tsx`, `confirm-dialog.tsx`, `field-label.tsx`,
+`password-meter.tsx`, `key-notice.tsx`, `password-strength.ts`,
+`use-dialog-focus.ts`, `use-escape-key.ts`, `theme.ts`, `passkeys.ts`,
+`auth-screen.tsx`, `security-view.tsx`, `totp-dialog.tsx`, `token-dialog.tsx`,
+`notification-dialog.tsx`, `notification-services.ts`,
+`notifications-view.tsx`, `format.ts`, `toast.ts`, and the shared `tokens.css`,
+`shell.css`, `components.css`, `dialogs.css`, `auth.css`, and `panels.css` as
+copies; change shared behavior in all four apps together.

@@ -52,19 +52,16 @@ describe('loadConfig', () => {
       DOCKER_HOST: 'tcp://docker:2375',
       HOSTNAME: 'abcdef123456',
       OUTPOST_DATA_DIRECTORY: '/var/lib/outpost',
-      PORT: '8080',
     });
 
     expect(config).toMatchObject({
       dataDirectory: '/var/lib/outpost',
       dockerHost: 'tcp://docker:2375',
-      port: 8080,
+      port: 22601,
       updater: {
         selfId: 'abcdef123456',
       },
     });
-
-    expect(() => loadConfig({ PORT: '-1' })).toThrow('PORT must be a positive integer');
 
     return;
   });

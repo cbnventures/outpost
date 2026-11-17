@@ -45,6 +45,83 @@ import type {
   Shared_TokenInput,
   Shared_VerifiedPasskeyCredential,
 } from '../shared.d.ts';
+import type {
+  Lib_Backup_AccessToken,
+  Lib_Backup_Document,
+  Lib_Backup_ExportSections,
+  Lib_Backup_ImportPreview,
+  Lib_Backup_ImportResult,
+  Lib_Backup_Notification,
+  Lib_Backup_Registry,
+  Lib_Backup_SectionId,
+} from './backup.d.ts';
+
+/**
+ * Lib - State - Runner - Apply Backup Import.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_Runner_ApplyBackupImport_Document = Lib_Backup_Document;
+export type Lib_State_Runner_ApplyBackupImport_CurrentSettings = Shared_RuntimeSettings;
+export type Lib_State_Runner_ApplyBackupImport_Returns = Lib_Backup_ImportResult;
+export type Lib_State_Runner_ApplyBackupImport_Preview = Lib_Backup_ImportPreview;
+export type Lib_State_Runner_ApplyBackupImport_ImportedSections = Lib_Backup_SectionId[];
+export type Lib_State_Runner_ApplyBackupImport_Apply = () => void;
+export type Lib_State_Runner_ApplyBackupImport_Now = string;
+export type Lib_State_Runner_ApplyBackupImport_ExistingRegistry = z.infer<typeof storedRegistryCredential> | undefined;
+export type Lib_State_Runner_ApplyBackupImport_ExistingTarget = Lib_State_Runner_StoredNotificationTarget | undefined;
+export type Lib_State_Runner_ApplyBackupImport_RegistryIds = Set<string>;
+export type Lib_State_Runner_ApplyBackupImport_TargetIds = Set<string>;
+export type Lib_State_Runner_ApplyBackupImport_TokenIds = Set<string>;
+export type Lib_State_Runner_ApplyBackupImport_TokenNames = Set<string>;
+export type Lib_State_Runner_ApplyBackupImport_TokenHashes = Set<string>;
+export type Lib_State_Runner_ApplyBackupImport_Id = string;
+export type Lib_State_Runner_ApplyBackupImport_SealedValue = Shared_EncryptedValue | undefined;
+export type Lib_State_Runner_ApplyBackupImport_SecretFields = string[];
+
+/**
+ * Lib - State - Runner - Create Backup Document.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_Runner_CreateBackupDocument_Sections = Lib_Backup_ExportSections;
+export type Lib_State_Runner_CreateBackupDocument_AppVersion = string;
+export type Lib_State_Runner_CreateBackupDocument_Settings = Shared_RuntimeSettings;
+export type Lib_State_Runner_CreateBackupDocument_Returns = Lib_Backup_Document;
+export type Lib_State_Runner_CreateBackupDocument_Document = Lib_Backup_Document;
+export type Lib_State_Runner_CreateBackupDocument_RegistryMapper = (registry: z.infer<typeof storedRegistryCredential>) => Lib_Backup_Registry;
+export type Lib_State_Runner_CreateBackupDocument_NotificationMapper = (target: Lib_State_Runner_StoredNotificationTarget) => Lib_Backup_Notification;
+export type Lib_State_Runner_CreateBackupDocument_TokenMapper = (token: Shared_StoredPersonalAccessToken) => Lib_Backup_AccessToken;
+export type Lib_State_Runner_CreateBackupDocument_TokenTimes = Map<string, string | null>;
+export type Lib_State_Runner_CreateBackupDocument_Password = string | null;
+
+/**
+ * Lib - State - Runner - Preview Backup Import.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_Runner_PreviewBackupImport_Document = Lib_Backup_Document;
+export type Lib_State_Runner_PreviewBackupImport_CurrentSettings = Shared_RuntimeSettings;
+export type Lib_State_Runner_PreviewBackupImport_Returns = Lib_Backup_ImportPreview;
+export type Lib_State_Runner_PreviewBackupImport_Registries = z.infer<typeof storedRegistryCredential>[];
+export type Lib_State_Runner_PreviewBackupImport_Targets = Lib_State_Runner_StoredNotificationTarget[];
+export type Lib_State_Runner_PreviewBackupImport_TokenRows = {
+  id: string;
+  name: string;
+  tokenHash: string;
+}[];
+export type Lib_State_Runner_PreviewBackupImport_StringSet = Set<string>;
+export type Lib_State_Runner_PreviewBackupImport_RegistryPredicate = (registry: Lib_Backup_Registry) => boolean;
+export type Lib_State_Runner_PreviewBackupImport_NotificationPredicate = (notification: Lib_Backup_Notification) => boolean;
+export type Lib_State_Runner_PreviewBackupImport_TokenPredicate = (token: Lib_Backup_AccessToken) => boolean;
+export type Lib_State_Runner_PreviewBackupImport_FileRegistries = Lib_Backup_Registry[];
+export type Lib_State_Runner_PreviewBackupImport_FileTargets = Lib_Backup_Notification[];
+export type Lib_State_Runner_PreviewBackupImport_FileTokens = Lib_Backup_AccessToken[];
+export type Lib_State_Runner_PreviewBackupImport_SettingsChanged = number;
+export type Lib_State_Runner_PreviewBackupImport_SettingKey = keyof Shared_RuntimeSettings;
+export type Lib_State_Runner_PreviewBackupImport_SettingKeys = Lib_State_Runner_PreviewBackupImport_SettingKey[];
+export type Lib_State_Runner_PreviewBackupImport_Sections = Lib_Backup_ImportPreview['sections'];
+export type Lib_State_Runner_PreviewBackupImport_PluralSuffix = '' | 's';
 
 /**
  * Lib - State - Runner - Authenticate Administrator.
@@ -549,6 +626,13 @@ export type Lib_State_Runner_GetAdministratorSecurity_Administrator = z.infer<ty
 export type Lib_State_Runner_GetAdministratorSecurity_Passkeys = Shared_AdministratorPasskeys;
 
 export type Lib_State_Runner_GetAdministratorSecurity_RecoveryCodeRow = Record<string, SQLOutputValue> | undefined;
+
+/**
+ * Lib - State - Runner - Get Debug Logging.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_Runner_GetDebugLogging_Returns = boolean;
 
 /**
  * Lib - State - Runner - Get Metadata.
@@ -1091,6 +1175,15 @@ export type Lib_State_Runner_SessionDurationMilliseconds = number;
  * @since 1.0.0
  */
 export type Lib_State_Runner_SessionSeenIntervalMilliseconds = number;
+
+/**
+ * Lib - State - Runner - Set Debug Logging.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_Runner_SetDebugLogging_Enabled = boolean;
+
+export type Lib_State_Runner_SetDebugLogging_Returns = void;
 
 /**
  * Lib - State - Runner - Set Metadata.

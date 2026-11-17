@@ -11,6 +11,7 @@ import {
 } from 'vitest';
 
 import { Runner as Handoff } from './handoff.js';
+import { setDebugLogging } from './lib/logger.js';
 import {
   finishSelfUpdate,
   handOver,
@@ -36,6 +37,10 @@ import type {
   SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Result,
   SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Context,
   SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Result,
+  SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context,
+  SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Engine,
+  SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Lines,
+  SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Write,
   SelfUpdate_OutpostContainer,
   SelfUpdate_Pending,
   SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan,
@@ -133,6 +138,7 @@ const outpostContainer: SelfUpdate_OutpostContainer = {
 const request: SelfUpdate_Request = {
   container: outpostContainer,
   newImageId: 'sha256:new',
+  newImageReference: 'cbnventures/outpost@sha256:new',
   reference: 'cbnventures/outpost:latest',
   results: [{
     container: 'web',
@@ -233,12 +239,12 @@ describe('self update', () => {
   });
 
   it('plans a helper with the data and socket mounts', () => {
-    const plan: SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan = planHelper(outpostContainer, 'cbnventures/outpost:latest', settings);
+    const plan: SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan = planHelper(outpostContainer, request['newImageReference'], 'cbnventures/outpost:latest', settings);
 
     expect(plan).toStrictEqual({
       name: 'outpost-outpost-self-update',
       body: {
-        Image: 'sha256:old',
+        Image: 'cbnventures/outpost@sha256:new',
         Entrypoint: [
           'node',
           'build/self-update-helper.js',
@@ -277,11 +283,11 @@ describe('self update', () => {
     const withoutData: SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutData = planHelper({
       ...outpostContainer,
       Mounts: [],
-    }, 'cbnventures/outpost:latest', settings);
+    }, request['newImageReference'], 'cbnventures/outpost:latest', settings);
     const withoutSocket: SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutSocket = planHelper({
       ...outpostContainer,
       Mounts: (outpostContainer['Mounts'] ?? []).filter((mount) => mount['Destination'] === '/data'),
-    }, 'cbnventures/outpost:latest', settings);
+    }, request['newImageReference'], 'cbnventures/outpost:latest', settings);
 
     expect(withoutData).toBe('Outpost can\'t update itself because /data isn\'t on a volume, so its account and history would be lost');
 
@@ -331,6 +337,40 @@ describe('self update', () => {
     return;
   });
 
+  it('creates the helper from the pulled digest when the outgoing image record is gone', async () => {
+    const context: SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Context = createContext('missing-old-image.json', 1);
+
+    context['engine']['createContainer'].mockImplementation(async (_name, body) => {
+      if (body['Image'] === outpostContainer['Image']) {
+        throw new Error(`Docker Engine API returned HTTP 404: No such image: ${outpostContainer['Image']}`);
+      }
+
+      return 'helper-id';
+    });
+
+    context['engine']['startContainer'].mockImplementation(async () => {
+      context['handoff'].recordOutcome({
+        detail: 'The helper started from the pulled digest',
+        finishedAt: '2026-10-25T04:00:02.000Z',
+        status: 'failed',
+      });
+
+      return;
+    });
+
+    const result: SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Result = await handOver(request, 'schedule', context);
+
+    expect(context['engine']['createContainer']).toHaveBeenCalledWith('outpost-outpost-self-update', expect.objectContaining({
+      Image: 'cbnventures/outpost@sha256:new',
+    }));
+
+    expect(result['detail']).toBe('The helper started from the pulled digest');
+
+    expect(context['engine']['removeImage']).not.toHaveBeenCalled();
+
+    return;
+  });
+
   it('skips an image that failed to start last time', async () => {
     const context: SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Context = createContext('skipped.json', 0);
 
@@ -361,6 +401,7 @@ describe('self update', () => {
         outcome: {
           detail: 'Recreated with cbnventures/outpost:latest',
           finishedAt: '2026-10-25T04:01:00.000Z',
+          previousImageMetadataAvailable: false,
           status: 'updated',
         },
       },
@@ -377,7 +418,7 @@ describe('self update', () => {
           container: 'outpost',
           image: 'cbnventures/outpost:latest',
           status: 'updated',
-          detail: 'Recreated with cbnventures/outpost:latest',
+          detail: 'Recreated with cbnventures/outpost:latest (previous image metadata was unavailable, so its defaults were carried over)',
         },
       ],
     });
@@ -385,6 +426,8 @@ describe('self update', () => {
     expect(context['engine']['removeContainer']).toHaveBeenCalledWith('outpost-outpost-self-update');
 
     expect(context['engine']['removeImage']).toHaveBeenCalledWith('sha256:old');
+
+    expect(context['engine']['removeContainer'].mock.invocationCallOrder.at(-1)).toBeLessThan(context['engine']['removeImage'].mock.invocationCallOrder[0] ?? 0);
 
     expect(context['handoff'].read()).toBeUndefined();
 
@@ -473,6 +516,69 @@ describe('self update', () => {
     expect(engine['listContainersByLabel']).toHaveBeenCalledWith(HELPER_LABEL);
 
     expect(engine['removeContainer']).toHaveBeenCalledExactlyOnceWith('stopped-helper');
+
+    return;
+  });
+
+  it('logs each self-update step while Debug logging is on', async () => {
+    const write: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const handOverContext: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context = createContext('debug-early.json', 1);
+    const finishContext: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context = createContext('debug-updated.json', 0);
+    const unfinishedContext: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context = createContext('debug-unfinished.json', undefined);
+    const engine: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Engine = {
+      listContainersByLabel: vi.fn(async () => [{
+        Id: 'stopped-helper',
+        Names: ['/outpost-outpost-self-update'],
+        Image: 'sha256:old',
+        ImageID: 'sha256:old',
+        Labels: { [HELPER_LABEL]: 'a'.repeat(64) },
+        State: 'exited',
+      }]),
+      removeContainer: vi.fn(async () => undefined),
+    };
+
+    finishContext['handoff'].write({
+      version: 1,
+      pending: {
+        ...pending,
+        outcome: {
+          detail: 'Recreated with cbnventures/outpost:latest',
+          finishedAt: '2026-10-25T04:01:00.000Z',
+          status: 'updated',
+        },
+      },
+    });
+
+    unfinishedContext['handoff'].write({
+      version: 1,
+      pending,
+    });
+
+    setDebugLogging(true);
+
+    await handOver(request, 'schedule', handOverContext);
+
+    await finishSelfUpdate(pending, finishContext);
+
+    await finishSelfUpdate(pending, unfinishedContext);
+
+    await removeExitedHelpers(engine);
+
+    setDebugLogging(false);
+
+    const lines: SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Lines = write.mock.calls.map((call) => String(call[0]));
+
+    write.mockRestore();
+
+    expect(lines).toEqual([
+      'DEBUG Self-update: started helper outpost-outpost-self-update to move outpost to image new\n',
+      'DEBUG Self-update: helper outpost-outpost-self-update stopped with exit code 1 after 0 ms, before replacing Outpost\n',
+      'DEBUG Self-update: waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n',
+      'DEBUG Self-update: helper outpost-outpost-self-update reported updated after 0 ms\n',
+      'DEBUG Self-update: waiting for helper outpost-outpost-self-update to finish moving outpost to image new\n',
+      'DEBUG Self-update: helper outpost-outpost-self-update ended after 0 ms without saying how the swap went\n',
+      'DEBUG Self-update: removed the stopped helper outpost-outpost-self-update\n',
+    ]);
 
     return;
   });

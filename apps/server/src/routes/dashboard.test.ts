@@ -80,6 +80,7 @@ describe('buildContainerRows', () => {
       monitorOnly: false,
     }, [
       {
+        action: 'check',
         startedAt: '2026-10-24T05:00:00.000Z',
         finishedAt: '2026-10-24T05:00:05.000Z',
         results: [{
@@ -171,6 +172,7 @@ describe('buildContainerRows', () => {
       row['name'],
       row['managed'],
       row['note'],
+      row['lastAction'],
       row['lastStatus'],
       row['lastCheckedAt'],
     ])).toStrictEqual([
@@ -178,6 +180,7 @@ describe('buildContainerRows', () => {
         'db',
         false,
         'Opted out by label',
+        'check',
         'up-to-date',
         '2026-10-24T05:00:05.000Z',
       ],
@@ -187,6 +190,7 @@ describe('buildContainerRows', () => {
         'Pinned image',
         undefined,
         undefined,
+        undefined,
       ],
       [
         'shared',
@@ -194,15 +198,22 @@ describe('buildContainerRows', () => {
         'Shared network namespace',
         undefined,
         undefined,
+        undefined,
       ],
       [
         'web',
         true,
         'Managed',
+        'update',
         'updated',
         '2026-10-24T04:00:05.000Z',
       ],
     ]);
+
+    expect(rows.find((row) => row['name'] === 'web')).toMatchObject({
+      fullId: 'aaaaaaaaaaaa1111',
+      id: 'aaaaaaaaaaaa',
+    });
 
     return;
   });

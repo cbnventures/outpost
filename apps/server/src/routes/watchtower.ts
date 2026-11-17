@@ -181,7 +181,7 @@ export function formatMetrics(state: Routes_Watchtower_FormatMetrics_State): Rou
     '# HELP outpost_containers_updated_total Containers updated since start.',
     '# TYPE outpost_containers_updated_total counter',
     `outpost_containers_updated_total ${String(state['totals']['updated'])}`,
-    '# HELP outpost_containers_failed_total Container updates that failed or rolled back since start.',
+    '# HELP outpost_containers_failed_total Container updates that failed, rolled back, or were kept after failure since start.',
     '# TYPE outpost_containers_failed_total counter',
     `outpost_containers_failed_total ${String(state['totals']['failed'])}`,
     '# HELP outpost_cycle_running Whether an update cycle is running.',

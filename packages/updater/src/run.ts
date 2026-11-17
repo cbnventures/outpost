@@ -21,21 +21,30 @@ import type {
   Run_CheckContainer_Cycle,
   Run_CheckContainer_Dependencies,
   Run_CheckContainer_Engine,
+  Run_CheckContainer_ImageConfig,
   Run_CheckContainer_ImageNote,
   Run_CheckContainer_Inspected,
+  Run_CheckContainer_LiveImageConfig,
   Run_CheckContainer_Lookup,
+  Run_CheckContainer_LookupError,
   Run_CheckContainer_LookupStatus,
   Run_CheckContainer_MonitorOnly,
   Run_CheckContainer_Name,
   Run_CheckContainer_NetworkMode,
+  Run_CheckContainer_NewImageReference,
   Run_CheckContainer_Options,
   Run_CheckContainer_Origin,
   Run_CheckContainer_Outcome,
   Run_CheckContainer_PulledImage,
+  Run_CheckContainer_PulledImageConfig,
+  Run_CheckContainer_RecoveryNote,
   Run_CheckContainer_Reference,
   Run_CheckContainer_RejectedImage,
+  Run_CheckContainer_RejectedRemoteImage,
   Run_CheckContainer_RemoteDigest,
   Run_CheckContainer_Returns,
+  Run_CheckContainer_Summary,
+  Run_CheckContainer_TaggedImage,
   Run_CheckContainer_Target,
   Run_ImageOrigin_Builds,
   Run_ImageOrigin_Descriptor,
@@ -44,10 +53,19 @@ import type {
   Run_ImageOrigin_Pulls,
   Run_ImageOrigin_RepoDigests,
   Run_ImageOrigin_Returns,
+  Run_ManualRecoveryDetail_Container,
+  Run_ManualRecoveryDetail_EnvironmentVariables,
+  Run_ManualRecoveryDetail_ExposedPorts,
+  Run_ManualRecoveryDetail_Mounts,
+  Run_ManualRecoveryDetail_Networks,
+  Run_ManualRecoveryDetail_Returns,
+  Run_ManualRecoveryDetail_Summary,
+  Run_RunUpdateCycle_Action,
   Run_RunUpdateCycle_Candidates,
   Run_RunUpdateCycle_ContainerIds,
   Run_RunUpdateCycle_Containers,
   Run_RunUpdateCycle_CredentialCache,
+  Run_RunUpdateCycle_CycleLabel,
   Run_RunUpdateCycle_Dependencies,
   Run_RunUpdateCycle_ErrorMessage,
   Run_RunUpdateCycle_IsSelf,
@@ -57,6 +75,7 @@ import type {
   Run_RunUpdateCycle_Result,
   Run_RunUpdateCycle_Results,
   Run_RunUpdateCycle_Returns,
+  Run_RunUpdateCycle_Rollback,
   Run_RunUpdateCycle_Selection,
   Run_RunUpdateCycle_Sorted,
   Run_RunUpdateCycle_StartedAt,
@@ -65,19 +84,21 @@ import type {
 /**
  * Run - Update Cycle.
  *
- * Checks the selected containers (or only the given IDs) one at a time in
- * dependency order, Outpost's own last since updating it restarts Outpost.
- * Failures are recorded, and the report is returned for the caller to act on.
+ * Checks or updates the selected containers (or only the given IDs) one at a
+ * time in dependency order. Update cycles put Outpost's own last since
+ * updating it restarts Outpost. Failures are recorded in the returned report.
  *
  * @param {Run_RunUpdateCycle_Options}      options        - Options.
  * @param {Run_RunUpdateCycle_Dependencies} dependencies   - Dependencies.
  * @param {Run_RunUpdateCycle_ContainerIds} [containerIds] - Container ids.
+ * @param {Run_RunUpdateCycle_Action}       [action]       - Action.
+ * @param {Run_RunUpdateCycle_Rollback}     [rollback]     - Rollback.
  *
  * @returns {Run_RunUpdateCycle_Returns}
  *
- * @since 0.0.1
+ * @since 1.1.0
  */
-export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, dependencies: Run_RunUpdateCycle_Dependencies, containerIds?: Run_RunUpdateCycle_ContainerIds): Run_RunUpdateCycle_Returns {
+export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, dependencies: Run_RunUpdateCycle_Dependencies, containerIds?: Run_RunUpdateCycle_ContainerIds, action: Run_RunUpdateCycle_Action = 'update', rollback: Run_RunUpdateCycle_Rollback = true): Run_RunUpdateCycle_Returns {
   const startedAt: Run_RunUpdateCycle_StartedAt = dependencies.now().toISOString();
   let report: Run_RunUpdateCycle_Report = undefined;
 
@@ -87,7 +108,11 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
     const containers: Run_RunUpdateCycle_Containers = await dependencies['engine'].listContainers();
     const selection: Run_RunUpdateCycle_Selection = selectContainers(containers, options);
 
-    // A targeted run (from the dashboard) only checks the requested containers.
+    if (dependencies['pruneImageConfigs'] !== undefined) {
+      await dependencies.pruneImageConfigs();
+    }
+
+    // A targeted API or dashboard run only operates on the requested containers.
     const candidates: Run_RunUpdateCycle_Candidates = (containerIds === undefined) ? selection['candidates'] : selection['candidates'].filter((candidate) => containerIds.some((containerId) => candidate['Id'].startsWith(containerId)));
     const sorted: Run_RunUpdateCycle_Sorted = sortByDependencies(candidates);
 
@@ -115,6 +140,8 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
 
       try {
         result = await checkContainer(container, options, dependencies, credentialCache, {
+          action,
+          rollback,
           results,
           startedAt,
           targeted: containerIds !== undefined,
@@ -140,6 +167,7 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
     };
   } catch (error) {
     const errorMessage: Run_RunUpdateCycle_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+    const cycleLabel: Run_RunUpdateCycle_CycleLabel = (action === 'check') ? 'Check cycle' : 'Update cycle';
 
     report = {
       startedAt,
@@ -147,9 +175,9 @@ export async function runUpdateCycle(options: Run_RunUpdateCycle_Options, depend
       error: errorMessage,
       results: [{
         container: 'Outpost',
-        image: 'update cycle',
+        image: cycleLabel.toLowerCase(),
         status: 'failed',
-        detail: `Update cycle failed: ${errorMessage}`,
+        detail: `${cycleLabel} failed: ${errorMessage}`,
       }],
     };
   }
@@ -181,6 +209,20 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
   const reference: Run_CheckContainer_Reference = inspected['Config']['Image'] ?? container['Image'];
   const networkMode: Run_CheckContainer_NetworkMode = inspected['HostConfig']['NetworkMode'] ?? '';
 
+  if (
+    cycle['action'] === 'update'
+    && cycle['rollback'] === false
+    && options['selfId'] !== undefined
+    && inspected['Id'].startsWith(options['selfId']) === true
+  ) {
+    return {
+      container: name,
+      image: reference,
+      status: 'failed',
+      detail: 'Rollback cannot be disabled when updating Outpost itself',
+    };
+  }
+
   // The container list shows an image ID once the tag moves, so pinning is judged from the config.
   if (reference.includes('@') === true || reference.startsWith('sha256:') === true) {
     return {
@@ -210,6 +252,17 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
   }
 
   const currentImage: Run_CheckContainer_CurrentImage = await engine.inspectImage(inspected['Image']);
+  const liveImageConfig: Run_CheckContainer_LiveImageConfig = (currentImage !== undefined) ? (currentImage['Config'] ?? undefined) : undefined;
+  let imageConfig: Run_CheckContainer_ImageConfig = liveImageConfig;
+
+  if (liveImageConfig !== undefined && dependencies['rememberImageConfig'] !== undefined) {
+    dependencies.rememberImageConfig(inspected['Image'], liveImageConfig);
+  }
+
+  if (imageConfig === undefined && dependencies['findImageConfig'] !== undefined) {
+    imageConfig = dependencies.findImageConfig(inspected['Image']);
+  }
+
   const origin: Run_CheckContainer_Origin = (currentImage !== undefined) ? imageOrigin(currentImage) : 'unknown';
 
   // No registry has an image Docker built here, even one that shares its name.
@@ -233,14 +286,17 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
 
   let remoteDigest: Run_CheckContainer_RemoteDigest = undefined;
   let lookupStatus: Run_CheckContainer_LookupStatus = undefined;
+  let lookupError: Run_CheckContainer_LookupError = undefined;
 
   try {
     const lookup: Run_CheckContainer_Lookup = await fetchRemoteDigest(reference, credentials, dependencies['fetchFunction']);
 
     remoteDigest = lookup['digest'];
     lookupStatus = lookup['status'];
-  } catch {
-    // An unreachable registry falls back to pulling and comparing image IDs.
+  } catch (error) {
+    lookupError = (error instanceof Error) ? error['message'] : String(error);
+
+    // An update cycle can fall back to pulling and comparing image IDs.
     remoteDigest = undefined;
   }
 
@@ -277,6 +333,72 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     };
   }
 
+  const rejectedImage: Run_CheckContainer_RejectedImage = dependencies.findRejectedImage(name);
+  let rejectedRemoteImage: Run_CheckContainer_RejectedRemoteImage = false;
+
+  if (rejectedImage !== undefined && remoteDigest !== undefined) {
+    if (rejectedImage['imageId'] === remoteDigest) {
+      rejectedRemoteImage = true;
+    } else {
+      const taggedImage: Run_CheckContainer_TaggedImage = await engine.inspectImage(reference);
+
+      rejectedRemoteImage = taggedImage !== undefined
+        && taggedImage['Id'] === rejectedImage['imageId']
+        && (taggedImage['RepoDigests'] ?? []).some((repoDigest) => repoDigest.endsWith(`@${remoteDigest}`));
+    }
+  }
+
+  // A check cycle is deliberately registry-only: it never pulls or mutates Docker state.
+  if (cycle['action'] === 'check') {
+    if (remoteDigest !== undefined) {
+      if (rejectedRemoteImage === true) {
+        return {
+          container: name,
+          image: reference,
+          status: 'held',
+          detail: 'Rolled back last time; waiting for a newer image. Update this container with rollback disabled to keep and inspect the rejected image',
+        };
+      }
+
+      return {
+        container: name,
+        image: reference,
+        status: 'available',
+        detail: `New digest ${remoteDigest}`,
+      };
+    }
+
+    let detail: Run_CheckContainer_LookupError = lookupError;
+
+    if (detail === undefined) {
+      if (lookupStatus === 'denied') {
+        detail = 'Registry denied the digest check';
+      } else if (lookupStatus === 'not-found') {
+        detail = 'Registry image was not found';
+      } else {
+        detail = 'Registry did not return an image digest';
+      }
+    }
+
+    return {
+      container: name,
+      image: reference,
+      status: 'failed',
+      detail,
+    };
+  }
+
+  // Bulk updates and ordinary targeted updates leave a rejected remote image
+  // untouched. Only the explicit one-container no-rollback path retries it.
+  if (rejectedRemoteImage === true && cycle['rollback'] !== false) {
+    return {
+      container: name,
+      image: reference,
+      status: 'held',
+      detail: 'Rolled back last time; waiting for a newer image. Update this container with rollback disabled to keep and inspect the rejected image',
+    };
+  }
+
   const monitorOnly: Run_CheckContainer_MonitorOnly = options['monitorOnly'] === true || (inspected['Config']['Labels'] ?? {})[MONITOR_ONLY_LABEL] === 'true';
 
   if (monitorOnly === true && remoteDigest !== undefined) {
@@ -293,6 +415,12 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
   const pulledImage: Run_CheckContainer_PulledImage = await engine.inspectImage(reference);
 
   if (pulledImage === undefined || pulledImage['Id'] === inspected['Image']) {
+    const pulledImageConfig: Run_CheckContainer_PulledImageConfig = (pulledImage !== undefined) ? (pulledImage['Config'] ?? undefined) : undefined;
+
+    if (pulledImageConfig !== undefined && dependencies['rememberImageConfig'] !== undefined) {
+      dependencies.rememberImageConfig(inspected['Image'], pulledImageConfig);
+    }
+
     return {
       container: name,
       image: reference,
@@ -321,35 +449,48 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
       };
     }
 
+    const newImageReference: Run_CheckContainer_NewImageReference = (pulledImage['RepoDigests'] ?? [])[0] ?? pulledImage['Id'];
+
     return dependencies.updateSelf({
       container: inspected,
       newImageId: pulledImage['Id'],
+      newImageReference,
       reference,
       results: [...cycle['results']],
       startedAt: cycle['startedAt'],
     });
   }
 
-  const rejectedImage: Run_CheckContainer_RejectedImage = dependencies.findRejectedImage(name);
-
-  // Retrying the image that was just rolled back would roll it back again on every cycle.
+  // Only an explicit no-rollback update retries an image that Outpost already rejected.
   if (
     rejectedImage !== undefined
     && rejectedImage['imageId'] === pulledImage['Id']
-    && cycle['targeted'] === false
+    && cycle['rollback'] !== false
   ) {
     return {
       container: name,
       image: reference,
-      status: 'skipped',
-      detail: `The new image (${pulledImage['Id'].replace('sha256:', '').slice(0, 12)}) was rolled back last time, so Outpost waits for a newer one; check this container on its own to try it again`,
+      status: 'held',
+      detail: `Rolled back last time; waiting for a newer image (${pulledImage['Id'].replace('sha256:', '').slice(0, 12)}). Update this container with rollback disabled to keep and inspect the rejected image`,
     };
   }
 
-  const outcome: Run_CheckContainer_Outcome = await recreateContainer(inspected, (currentImage !== undefined) ? (currentImage['Config'] ?? undefined) : undefined, reference, options, dependencies);
+  const outcome: Run_CheckContainer_Outcome = await recreateContainer(inspected, imageConfig, reference, options, dependencies, cycle['rollback']);
   let cleanupNote: Run_CheckContainer_CleanupNote = '';
 
-  if (outcome['status'] === 'rolled-back') {
+  if (outcome['status'] === 'updated' || outcome['status'] === 'kept-unhealthy') {
+    const pulledImageConfig: Run_CheckContainer_PulledImageConfig = pulledImage['Config'] ?? undefined;
+
+    if (pulledImageConfig !== undefined && dependencies['rememberImageConfig'] !== undefined) {
+      dependencies.rememberImageConfig(pulledImage['Id'], pulledImageConfig);
+    }
+
+    if (dependencies['pruneImageConfigs'] !== undefined) {
+      await dependencies.pruneImageConfigs();
+    }
+  }
+
+  if (outcome['status'] === 'rolled-back' || outcome['status'] === 'kept-unhealthy') {
     dependencies.rememberRejectedImage(name, pulledImage['Id']);
   }
 
@@ -357,7 +498,11 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
     dependencies.forgetRejectedImage(name);
   }
 
-  if (outcome['status'] === 'updated' && options['cleanup'] === true) {
+  if (
+    outcome['status'] === 'updated'
+    && options['cleanup'] === true
+    && cycle['rollback'] !== false
+  ) {
     try {
       await engine.removeImage(inspected['Image']);
     } catch (error) {
@@ -368,14 +513,47 @@ async function checkContainer(container: Run_CheckContainer_Container, options: 
   }
 
   // Without the old image's config, its defaults (such as env) cannot be told apart from user settings.
-  const imageNote: Run_CheckContainer_ImageNote = (outcome['status'] === 'updated' && currentImage === undefined) ? ' (previous image metadata was unavailable, so its defaults were carried over)' : '';
+  const imageNote: Run_CheckContainer_ImageNote = (outcome['status'] === 'updated' && imageConfig === undefined) ? ' (previous image metadata was unavailable, so its defaults were carried over)' : '';
+  const recoveryNote: Run_CheckContainer_RecoveryNote = (cycle['rollback'] === false) ? manualRecoveryDetail(inspected) : '';
+  const summary: Run_CheckContainer_Summary = outcome['summary'] ?? ((cycle['rollback'] === false) ? outcome['detail'] : undefined);
 
   return {
     container: name,
     image: reference,
     status: outcome['status'],
-    detail: `${outcome['detail']}${imageNote}${cleanupNote}`,
+    detail: `${outcome['detail']}${imageNote}${cleanupNote}${recoveryNote}`,
+    ...((summary === undefined) ? {} : { summary }),
   };
+}
+
+/**
+ * Run - Manual Recovery Detail.
+ *
+ * Records enough non-secret configuration to identify the previous container
+ * and image after a run that deliberately kept a failed replacement.
+ *
+ * @param {Run_ManualRecoveryDetail_Container} container - Container.
+ *
+ * @returns {Run_ManualRecoveryDetail_Returns}
+ *
+ * @since 1.1.0
+ */
+function manualRecoveryDetail(container: Run_ManualRecoveryDetail_Container): Run_ManualRecoveryDetail_Returns {
+  const environmentVariables: Run_ManualRecoveryDetail_EnvironmentVariables = (container['Config']['Env'] ?? []).map((entry) => entry.split('=', 1)[0] ?? '').filter((name) => name !== '');
+  const exposedPorts: Run_ManualRecoveryDetail_ExposedPorts = Object.keys(container['Config']['ExposedPorts'] ?? {});
+  const mounts: Run_ManualRecoveryDetail_Mounts = (container['Mounts'] ?? []).map((mount) => mount['Destination']);
+  const networks: Run_ManualRecoveryDetail_Networks = Object.keys(container['NetworkSettings']['Networks'] ?? {});
+  const summary: Run_ManualRecoveryDetail_Summary = {
+    configuredImage: container['Config']['Image'] ?? '',
+    containerId: container['Id'],
+    environmentVariables,
+    exposedPorts,
+    mounts,
+    name: container['Name'].replace('/', ''),
+    networks,
+  };
+
+  return `; rollback was disabled for this run; previous image ID: ${container['Image']}; previous container config summary: ${JSON.stringify(summary)}`;
 }
 
 /**

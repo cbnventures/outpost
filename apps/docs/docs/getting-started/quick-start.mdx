@@ -124,7 +124,7 @@ Read the container logs:
 docker logs outpost
 ```
 
-A healthy start prints the dashboard address, the schedule with its next run time in UTC, and the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>. Until the dashboard account exists, it also prints a <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology>:
+A healthy start prints the dashboard address, the schedule with its next run time in UTC, and the <Terminology title="Update everything by default, or only what you label" to="/docs/reference/terminology#container-selection">label mode</Terminology>. Until the dashboard account exists, it also prints a <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology>:
 
 ```text
 Outpost
@@ -142,19 +142,18 @@ If Outpost can't reach the Docker socket, the server stops before printing this 
 
 Open [http://localhost:22601/admin/](http://localhost:22601/admin/) on the Docker host, or `http://<server-ip>:22601/admin/` from another computer on its network. The first time, it asks you to set up your account:
 
-1. Enter the <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> from the log under **One-time code**. A code works for 30 minutes, and restarting the container prints a new one.
-2. Choose a username and a password of at least 12 characters, and repeat the password under **Confirm password**.
+1. Enter the <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology> from the log under **One-time code**. A code works for 30 minutes, and restarting the container prints a new one.
+2. Choose a username and a password of 12 to 1,024 characters, and repeat the password under **Confirm password**.
 3. Select **Create account**.
 
 The dashboard then opens signed in. It shows every running container, the next scheduled check, and the results of past checks.
 
 ## Run a First Check Now
 
-You don't have to wait for the schedule. Pick one of these:
+You don't have to wait for the schedule. Pick one of these check-only actions:
 
 - **Use the dashboard** — Select **Check now** on the overview.
-- **Check on every start** — Turn on **Check when Outpost starts** on the **Settings** page.
-- **Trigger it over HTTP** — Create an <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology> with the `updates:run` <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> on the dashboard's **Access tokens** page, then call the checks endpoint as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#start-a-check).
+- **Trigger it over HTTP** — Create an <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access token</Terminology> with the `updates:run` <Terminology title="What a token may do, such as read status or run updates" to="/docs/reference/terminology#api-access">scope</Terminology> on the dashboard's **Access tokens** page, then call the checks endpoint as shown in [HTTP API and Metrics](/docs/features/http-api-and-metrics/#start-a-check).
 
 ```bash
 # Paste the token and press Enter. It isn't shown or saved to the shell history.
@@ -165,24 +164,24 @@ curl --request POST \
   http://127.0.0.1:22601/api/v1/checks
 ```
 
-Each container gets one line in the logs when the <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> finishes:
+The check resolves registry digests and records available updates without pulling or recreating anything. Each container gets one line in the logs when the <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> finishes:
 
 ```text
 postgres (postgres:17): up-to-date - sha256:9c1d...
-web (ghcr.io/example/web:latest): updated - Recreated with ghcr.io/example/web:latest
+web (ghcr.io/example/web:latest): available - New digest sha256:7a3e...
 outpost (cbnventures/outpost:latest): up-to-date - sha256:4e7b...
 ```
 
 :::tip
-To try Outpost without changing any container, turn on **Monitor only** on the **Settings** page first. Outpost then only reports which containers have a newer image, though it still pulls an image when the registry can't report a digest.
+Select **Update all** after the check to apply every available managed update, or use the **Update** action on one container. Scheduled runs and **Check when Outpost starts** still apply updates automatically; turn on **Monitor only** if those automatic runs should only report them.
 :::
 
 ## What Is Next
 
 - **[Configuration](/docs/getting-started/configuration/)** — Dashboard settings, bootstrap variables, and their defaults.
 - **[Web Dashboard](/docs/features/dashboard/)** — Account setup, sign-in, every dashboard page, and running it behind a reverse proxy.
-- **[Account Security](/docs/features/account-security/)** — Change the password, and add an authenticator app or <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>.
+- **[Account Security](/docs/features/account-security/)** — Change the password, and add an authenticator app or <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>.
 - **[Access Tokens](/docs/features/access-tokens/)** — Give scripts and Prometheus their own keys to the API.
-- **[Labels and Modes](/docs/features/labels-and-modes/)** — Opt containers in or out, or keep them <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.
+- **[Labels and Modes](/docs/features/labels-and-modes/)** — Opt containers in or out, or keep them <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology>.
 - **[Notifications](/docs/features/notifications/)** — Get alerts in ntfy, Telegram, email, and more when something was updated or failed.
 - **[Private Registries](/docs/getting-started/private-registries/)** — Check images that need a login.

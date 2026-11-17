@@ -16,6 +16,9 @@
       "vitest/globals"
     ]
   },
+  "exclude": [
+    "./src/web/**/*.test.ts"
+  ],
   "include": [
     "./src/**/*.test.ts",
     "./tests/**/*.test.ts"

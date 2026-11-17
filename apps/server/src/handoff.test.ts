@@ -91,10 +91,18 @@ describe('handoff', () => {
     handoff.recordOutcome({
       detail: 'Recreated with cbnventures/outpost:latest',
       finishedAt: '2026-10-25T04:01:00.000Z',
+      previousImageMetadataAvailable: false,
       status: 'updated',
     });
 
-    expect(handoff.read()).toMatchObject({ pending: { outcome: { status: 'updated' } } });
+    expect(handoff.read()).toMatchObject({
+      pending: {
+        outcome: {
+          previousImageMetadataAvailable: false,
+          status: 'updated',
+        },
+      },
+    });
 
     handoff.settle('sha256:new');
 

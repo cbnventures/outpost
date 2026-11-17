@@ -4,7 +4,7 @@ import type {
   UpdateReport,
   UpdateResult,
 } from 'outpost-package-updater';
-import type { Mock } from 'vitest';
+import type { Mock, MockInstance } from 'vitest';
 
 import type { Runner as Handoff } from '../handoff.js';
 import type { Handoff_Pending } from './handoff.d.ts';
@@ -124,6 +124,19 @@ export type SelfUpdate_PlanHelper_PlansAHelperWithTheDataAndSocketMounts_Plan = 
 export type SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutData = SelfUpdate_HelperPlan | string;
 
 export type SelfUpdate_PlanHelper_RefusesWithoutADataVolumeOrSocketMount_WithoutSocket = SelfUpdate_HelperPlan | string;
+
+/**
+ * Self Update - Logs Each Step While Debug Logging Is On.
+ *
+ * @since 1.1.0
+ */
+export type SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Write = MockInstance<typeof process.stdout.write>;
+
+export type SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context = SelfUpdate_FakeContext;
+
+export type SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Engine = SelfUpdate_RemoveExitedHelpers_RemovesOnlyStoppedHelpers_Engine;
+
+export type SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Lines = string[];
 
 /**
  * Self Update - Remove Exited Helpers - Removes Only Stopped Helpers.

@@ -2,7 +2,13 @@ import { ENABLE_LABEL, MONITOR_ONLY_LABEL, selectContainers } from 'outpost-pack
 
 import { applyRuntimeSettings, runtimeSettingsFromConfig } from '../config.js';
 import { sendError, sendValidationError } from '../lib/http.js';
-import { checkStart, runtimeSettings } from '../lib/schema.js';
+import { setDebugLogging } from '../lib/logger.js';
+import {
+  checkStart,
+  diagnosticsUpdate,
+  runtimeSettings,
+  updateStart,
+} from '../lib/schema.js';
 
 import type {
   Routes_Dashboard_BuildContainerRows_AutoRemove,
@@ -57,6 +63,9 @@ import type {
   Routes_Dashboard_Runner_RouteContainers_Request,
   Routes_Dashboard_Runner_RouteContainers_Response,
   Routes_Dashboard_Runner_RouteContainers_Returns,
+  Routes_Dashboard_Runner_RouteDiagnostics_Request,
+  Routes_Dashboard_Runner_RouteDiagnostics_Response,
+  Routes_Dashboard_Runner_RouteDiagnostics_Returns,
   Routes_Dashboard_Runner_RouteEvents_Heartbeat,
   Routes_Dashboard_Runner_RouteEvents_Request,
   Routes_Dashboard_Runner_RouteEvents_Response,
@@ -74,6 +83,20 @@ import type {
   Routes_Dashboard_Runner_RouteStatus_Request,
   Routes_Dashboard_Runner_RouteStatus_Response,
   Routes_Dashboard_Runner_RouteStatus_Returns,
+  Routes_Dashboard_Runner_RouteUpdateDiagnostics_Enabled,
+  Routes_Dashboard_Runner_RouteUpdateDiagnostics_Request,
+  Routes_Dashboard_Runner_RouteUpdateDiagnostics_RequestBody,
+  Routes_Dashboard_Runner_RouteUpdateDiagnostics_Response,
+  Routes_Dashboard_Runner_RouteUpdateDiagnostics_Returns,
+  Routes_Dashboard_Runner_RouteUpdates_ContainerId,
+  Routes_Dashboard_Runner_RouteUpdates_IsSelf,
+  Routes_Dashboard_Runner_RouteUpdates_Request,
+  Routes_Dashboard_Runner_RouteUpdates_RequestBody,
+  Routes_Dashboard_Runner_RouteUpdates_Response,
+  Routes_Dashboard_Runner_RouteUpdates_Returns,
+  Routes_Dashboard_Runner_RouteUpdates_Rollback,
+  Routes_Dashboard_Runner_RouteUpdates_Started,
+  Routes_Dashboard_Runner_RouteUpdates_Trigger,
   Routes_Dashboard_Runner_RouteUpdateSettings_Request,
   Routes_Dashboard_Runner_RouteUpdateSettings_RequestBody,
   Routes_Dashboard_Runner_RouteUpdateSettings_Response,
@@ -251,7 +274,13 @@ export class Runner {
 
     app.put('/api/v1/settings', this.#access.requireSession(true), this['routeUpdateSettings'].bind(this));
 
+    app.get('/api/v1/diagnostics', this.#access.requireSession(false), this['routeDiagnostics'].bind(this));
+
+    app.put('/api/v1/diagnostics', this.#access.requireSession(true), this['routeUpdateDiagnostics'].bind(this));
+
     app.post('/api/v1/checks', this.#access.requireScope('updates:run', true), this['routeChecks'].bind(this));
+
+    app.post('/api/v1/updates', this.#access.requireScope('updates:run', true), this['routeUpdates'].bind(this));
 
     app.get('/api/v1/status', this.#access.requireScope('status:read', false), this['routeStatus'].bind(this));
 
@@ -288,8 +317,8 @@ export class Runner {
   /**
    * Routes - Dashboard - Route Checks.
    *
-   * Starts a check of every managed container, or of the one container named.
-   * Only one check runs at a time, so a second request gets a conflict.
+   * Checks every managed container, or the one container named, by resolving
+   * registry digests without pulling images or recreating containers.
    *
    * @param {Routes_Dashboard_Runner_RouteChecks_Request}  request  - Request.
    * @param {Routes_Dashboard_Runner_RouteChecks_Response} response - Response.
@@ -298,7 +327,7 @@ export class Runner {
    *
    * @returns {Routes_Dashboard_Runner_RouteChecks_Returns}
    *
-   * @since 1.0.0
+   * @since 1.1.0
    */
   private routeChecks(request: Routes_Dashboard_Runner_RouteChecks_Request, response: Routes_Dashboard_Runner_RouteChecks_Response): Routes_Dashboard_Runner_RouteChecks_Returns {
     const requestBody: Routes_Dashboard_Runner_RouteChecks_RequestBody = checkStart.safeParse(request.body ?? {});
@@ -311,10 +340,76 @@ export class Runner {
 
     const containerId: Routes_Dashboard_Runner_RouteChecks_ContainerId = requestBody['data']['containerId'];
     const trigger: Routes_Dashboard_Runner_RouteChecks_Trigger = (response.locals['personalAccessToken'] === undefined) ? 'dashboard' : 'api';
-    const started: Routes_Dashboard_Runner_RouteChecks_Started = this.#scheduler.trigger(trigger, (containerId === undefined) ? undefined : [containerId]);
+    const started: Routes_Dashboard_Runner_RouteChecks_Started = this.#scheduler.trigger(trigger, (containerId === undefined) ? undefined : [containerId], 'check');
 
     if (started === false) {
-      sendError(response, 409, 'check_running', 'A check is already running.');
+      sendError(response, 409, 'check_running', 'A check or update is already running.');
+
+      return;
+    }
+
+    response.status(202).json({
+      started: true,
+    });
+
+    return;
+  }
+
+  /**
+   * Routes - Dashboard - Route Updates.
+   *
+   * Applies updates to every managed container, or to the one container named.
+   * Only one check or update runs at a time, so a second request gets a conflict.
+   *
+   * @param {Routes_Dashboard_Runner_RouteUpdates_Request}  request  - Request.
+   * @param {Routes_Dashboard_Runner_RouteUpdates_Response} response - Response.
+   *
+   * @private
+   *
+   * @returns {Routes_Dashboard_Runner_RouteUpdates_Returns}
+   *
+   * @since 1.1.0
+   */
+  private routeUpdates(request: Routes_Dashboard_Runner_RouteUpdates_Request, response: Routes_Dashboard_Runner_RouteUpdates_Response): Routes_Dashboard_Runner_RouteUpdates_Returns {
+    const requestBody: Routes_Dashboard_Runner_RouteUpdates_RequestBody = updateStart.safeParse(request.body ?? {});
+
+    if (requestBody['success'] === false) {
+      sendValidationError(response, 422, requestBody['error'], 'Check the highlighted fields.');
+
+      return;
+    }
+
+    const containerId: Routes_Dashboard_Runner_RouteUpdates_ContainerId = requestBody['data']['containerId'];
+    const rollback: Routes_Dashboard_Runner_RouteUpdates_Rollback = requestBody['data']['rollback'];
+
+    if (rollback === false && containerId === undefined) {
+      sendError(response, 422, 'invalid_request', 'Rollback can only be disabled for one container at a time. Send containerId with rollback set to false.');
+
+      return;
+    }
+
+    const selfId: Routes_Dashboard_Runner_RouteUpdates_ContainerId = this.#config['updater']['selfId'];
+    const isSelf: Routes_Dashboard_Runner_RouteUpdates_IsSelf = (
+      rollback === false
+      && containerId !== undefined
+      && selfId !== undefined
+      && (
+        containerId.startsWith(selfId)
+        || selfId.startsWith(containerId)
+      )
+    );
+
+    if (isSelf === true) {
+      sendError(response, 422, 'invalid_request', 'Rollback cannot be disabled when updating Outpost itself.');
+
+      return;
+    }
+
+    const trigger: Routes_Dashboard_Runner_RouteUpdates_Trigger = (response.locals['personalAccessToken'] === undefined) ? 'dashboard' : 'api';
+    const started: Routes_Dashboard_Runner_RouteUpdates_Started = this.#scheduler.trigger(trigger, (containerId === undefined) ? undefined : [containerId], 'update', rollback);
+
+    if (started === false) {
+      sendError(response, 409, 'check_running', 'A check or update is already running.');
 
       return;
     }
@@ -531,6 +626,70 @@ export class Runner {
   }
 
   /**
+   * Routes - Dashboard - Route Diagnostics.
+   *
+   * Reports whether Debug logging is on for the Settings page's switch.
+   * The setting is the same for every session.
+   *
+   * @param {Routes_Dashboard_Runner_RouteDiagnostics_Request}  _request - Request.
+   * @param {Routes_Dashboard_Runner_RouteDiagnostics_Response} response - Response.
+   *
+   * @private
+   *
+   * @returns {Routes_Dashboard_Runner_RouteDiagnostics_Returns}
+   *
+   * @since 1.1.0
+   */
+  private routeDiagnostics(_request: Routes_Dashboard_Runner_RouteDiagnostics_Request, response: Routes_Dashboard_Runner_RouteDiagnostics_Response): Routes_Dashboard_Runner_RouteDiagnostics_Returns {
+    response.json({
+      debugLogging: this.#state.getDebugLogging(),
+    });
+
+    return;
+  }
+
+  /**
+   * Routes - Dashboard - Route Update Diagnostics.
+   *
+   * Turns Debug logging on or off, saves it, and applies it to the running logger.
+   * A real change logs debug logging is on or off, so the log shows where DEBUG lines start.
+   *
+   * @param {Routes_Dashboard_Runner_RouteUpdateDiagnostics_Request}  request  - Request.
+   * @param {Routes_Dashboard_Runner_RouteUpdateDiagnostics_Response} response - Response.
+   *
+   * @private
+   *
+   * @returns {Routes_Dashboard_Runner_RouteUpdateDiagnostics_Returns}
+   *
+   * @since 1.1.0
+   */
+  private routeUpdateDiagnostics(request: Routes_Dashboard_Runner_RouteUpdateDiagnostics_Request, response: Routes_Dashboard_Runner_RouteUpdateDiagnostics_Response): Routes_Dashboard_Runner_RouteUpdateDiagnostics_Returns {
+    const requestBody: Routes_Dashboard_Runner_RouteUpdateDiagnostics_RequestBody = diagnosticsUpdate.safeParse(request.body ?? {});
+
+    if (requestBody['success'] === false) {
+      sendValidationError(response, 422, requestBody['error'], 'Choose whether debug logging is on or off.');
+
+      return;
+    }
+
+    const enabled: Routes_Dashboard_Runner_RouteUpdateDiagnostics_Enabled = requestBody['data']['debugLogging'];
+
+    if (enabled !== this.#state.getDebugLogging()) {
+      this.#state.setDebugLogging(enabled);
+
+      setDebugLogging(enabled);
+
+      process.stdout.write((enabled === true) ? 'debug logging is on\n' : 'debug logging is off\n');
+    }
+
+    response.json({
+      debugLogging: enabled,
+    });
+
+    return;
+  }
+
+  /**
    * Routes - Dashboard - Route Status.
    *
    * Returns the scheduler state, the same body as the Watchtower-style status route.
@@ -643,6 +802,7 @@ export function buildContainerRows(containers: Routes_Dashboard_BuildContainerRo
 
     return {
       id: container['Id'].slice(0, 12),
+      fullId: container['Id'],
       name,
       image: container['Image'],
       state: container['State'],
@@ -650,8 +810,10 @@ export function buildContainerRows(containers: Routes_Dashboard_BuildContainerRo
       note,
       self: isSelf,
       monitorOnly: options['monitorOnly'] === true || labels[MONITOR_ONLY_LABEL] === 'true',
+      lastAction: (lastResult !== undefined && lastReport !== undefined) ? (lastReport['action'] ?? 'update') : undefined,
       lastStatus: (lastResult !== undefined) ? lastResult['status'] : undefined,
       lastDetail: (lastResult !== undefined) ? lastResult['detail'] : undefined,
+      lastSummary: (lastResult !== undefined) ? lastResult['summary'] : undefined,
       lastCheckedAt: (lastResult !== undefined && lastReport !== undefined) ? lastReport['finishedAt'] : undefined,
     };
   }).sort((a, b) => a['name'].localeCompare(b['name']));

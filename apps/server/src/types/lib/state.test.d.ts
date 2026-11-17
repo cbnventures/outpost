@@ -380,3 +380,12 @@ export type Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_State = St
 export type Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Settings = Shared_RuntimeSettings;
 
 export type Lib_State_RuntimeSettings_SeedsAndPersistsRuntimeSettings_Reopened = State;
+
+/**
+ * Lib - State - Runtime Settings - Keeps Debug Logging Across Restarts.
+ *
+ * @since 1.1.0
+ */
+export type Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_State = State;
+
+export type Lib_State_RuntimeSettings_KeepsDebugLoggingAcrossRestarts_Reopened = State;

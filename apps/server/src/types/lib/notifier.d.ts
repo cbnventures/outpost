@@ -1,9 +1,7 @@
-import type {
-  UpdateReport,
-  UpdateResult,
-} from 'outpost-package-updater';
+import type { UpdateResult } from 'outpost-package-updater';
 
 import type { Runner as State } from '../../lib/state.js';
+import type { Shared_CheckReport } from '../shared.d.ts';
 import type {
   Lib_Notifications_App,
   Lib_Notifications_EventDefinitions,
@@ -53,11 +51,13 @@ export type Lib_Notifier_Runner_NotifySignInLimit_Now = number;
 
 export type Lib_Notifier_Runner_NotifySignInLimit_LockedAt = number | undefined;
 
-export type Lib_Notifier_Runner_NotifyUpdateReport_Report = UpdateReport;
+export type Lib_Notifier_Runner_NotifyUpdateReport_Report = Shared_CheckReport;
 
 export type Lib_Notifier_Runner_NotifyUpdateReport_Returns = void;
 
 export type Lib_Notifier_Runner_NotifyUpdateReport_Results = UpdateResult[];
+
+export type Lib_Notifier_Runner_NotifyUpdateReport_RollbackNote = string;
 
 export type Lib_Notifier_Runner_SendTest_Id = string;
 

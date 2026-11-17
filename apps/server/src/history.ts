@@ -33,6 +33,11 @@ import type {
  * @since 0.0.1
  */
 const reportsSchema = z.array(z.object({
+  action: z.enum([
+    'check',
+    'update',
+  ]).optional(),
+  rollback: z.boolean().optional(),
   startedAt: z.string(),
   finishedAt: z.string(),
   error: z.string().optional(),
@@ -42,12 +47,15 @@ const reportsSchema = z.array(z.object({
     status: z.enum([
       'updated',
       'available',
+      'held',
       'up-to-date',
       'skipped',
       'rolled-back',
+      'kept-unhealthy',
       'failed',
     ]),
     detail: z.string(),
+    summary: z.string().optional(),
   })),
   trigger: z.enum([
     'api',

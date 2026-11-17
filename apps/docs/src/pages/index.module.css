@@ -281,3 +281,18 @@
 
   background: var(--dashboard-warning-subtle);
 }
+
+/**
+ * ============================
+ * Spotlights - Dashboard Showcase
+ * ============================
+ */
+
+/*
+ * The dashboard section uses the full page width instead of the preset's
+ * 768px text column, so the screenshot shows near its real size. The
+ * Showcase block keeps the heading, tabs and text at a readable width.
+ */
+.shot-spotlight :global(.nova-spotlight-inner) {
+  max-width: var(--nova-grid-container-max);
+}

@@ -23,14 +23,14 @@ Decide which containers Outpost updates, which it only watches, and which it lea
 
 1. Lets you update everything by default and carve out the few services that need care so a big host stays low-maintenance.
 2. Lets you start with nothing and opt services in one at a time so you build trust before Outpost touches anything important.
-3. Keeps databases and other sensitive services <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> so you hear about new images but choose when to apply them.
+3. Keeps databases and other sensitive services <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> so you hear about new images but choose when to apply them.
 
 ## Labels
 
-| Label                                 | Value             | Effect                                                                                                                                                                               |
-|---------------------------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `io.cbnventures.outpost.enable`       | `true` or `false` | Opts a container in or out, depending on the <Terminology title="whether containers are opted out or opted in" to="/docs/reference/terminology#label-mode">label mode</Terminology>. |
-| `io.cbnventures.outpost.monitor-only` | `true`            | Reports a newer image for this container without recreating it.                                                                                                                      |
+| Label                                 | Value             | Effect                                                                                                                                                                                                |
+|---------------------------------------|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `io.cbnventures.outpost.enable`       | `true` or `false` | Opts a container in or out, depending on the <Terminology title="Update everything by default, or only what you label" to="/docs/reference/terminology#container-selection">label mode</Terminology>. |
+| `io.cbnventures.outpost.monitor-only` | `true`            | Reports a newer image for this container without recreating it.                                                                                                                                       |
 
 Values are matched exactly, so `True`, `yes`, or `1` have no effect.
 
@@ -63,11 +63,11 @@ services:
       io.cbnventures.outpost.enable: "true"
 ```
 
-Containers that are left out by the label rules don't appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> at all.
+Containers that are left out by the label rules don't appear in the <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology> at all.
 
 ## Monitor-Only
 
-A <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container is checked like any other, but when a newer image exists it is reported as `available` instead of being recreated. You can turn it on in two ways:
+A <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> container is checked like any other, but when a newer image exists it is reported as `available` instead of being recreated. You can turn it on in two ways:
 
 - **For one container** — Add `io.cbnventures.outpost.monitor-only: "true"` to it.
 - **For everything** — Turn on **Monitor only** on Outpost's **Settings** page.
@@ -80,10 +80,10 @@ services:
       io.cbnventures.outpost.monitor-only: "true"
 ```
 
-Every check that finds a newer image for a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container sends the **New images available** alert to the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> that chose it, as described in [Notifications](/docs/features/notifications/#choose-events).
+Every check that finds a newer image for a <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> container sends the **New images available** alert to the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> that chose it, as described in [Notifications](/docs/features/notifications/#choose-events).
 
 :::info
-When the registry can't report a digest, Outpost falls back to pulling the image to compare it. In that case a <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> container's new image is downloaded, but the container is still left as it is.
+With **Monitor only** on in **Settings**, scheduled and startup runs are registry-only checks that never pull, so a registry that can't report a digest gives `failed`. A container labeled <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> in an update cycle still falls back to pulling the image to compare it when the registry can't report a digest. Its new image is downloaded, but the container is left as it is.
 :::
 
 ## Outpost Itself
@@ -92,7 +92,7 @@ Outpost follows the same labels for its own container, so it keeps itself curren
 
 - **Opt-out mode** — Outpost updates itself unless its container has `io.cbnventures.outpost.enable=false`.
 - **Opt-in mode** — Outpost updates itself only when its container has `io.cbnventures.outpost.enable=true`, like every other container.
-- **<Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">Monitor-only</Terminology>** — Outpost reports a newer image of itself as `available` instead when its container has `io.cbnventures.outpost.monitor-only=true` or **Monitor only** is on in **Settings**.
+- **<Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">Monitor-only</Terminology>** — Outpost reports a newer image of itself as `available` instead when its container has `io.cbnventures.outpost.monitor-only=true` or **Monitor only** is on in **Settings**.
 
 To keep Outpost on the image it runs now, label it off:
 
@@ -105,13 +105,13 @@ services:
       io.cbnventures.outpost.enable: "false"
 ```
 
-Outpost checks itself last in every <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology>, and you can also check it on its own from the dashboard or the API. [How Outpost Updates Itself](/docs/features/updates-and-rollback/#how-outpost-updates-itself) explains the swap and what it needs.
+Outpost checks itself last in every <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology>, and you can also check it on its own from the dashboard or the API. [How Outpost Updates Itself](/docs/features/updates-and-rollback/#how-outpost-updates-itself) explains the swap and what it needs.
 
 Outpost finds its own container from Linux process metadata, with Docker's container-ID hostname as a fallback. If it can't, it leaves alone every container running an image named `outpost`, such as `cbnventures/outpost:latest`, so it never stops itself in the middle of a check.
 
 ## Containers Outpost Always Skips
 
-Some containers are never recreated, even when the label rules select them. Those that are selected appear in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> as `skipped` with a reason:
+Some containers are never recreated, even when the label rules select them. Those that are selected appear in the <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology> as `skipped` with a reason:
 
 | Container                                                 | Reason shown                                                                     |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------|
@@ -127,7 +127,7 @@ Outpost decides that an image is locally built like this:
 
 - **Docker 29, or the classic image store** — Docker records where each image came from. An image built on this host gets the first message without any registry being asked, even when a registry publishes the same name, and a pulled image is checked like any other.
 - **Docker 28 or older with the containerd image store** — Docker keeps no such record, so Outpost asks the registry and skips the image only when the registry doesn't have it or won't show it without a login. Docker Hub answers a missing name as if it needed a login, so local builds there get the second message, and so does a pulled private image when Outpost has no [sign-in for its registry](/docs/getting-started/private-registries/#add-a-sign-in).
-- **Registry can't be reached** — Outpost tries the pull instead, and a failed pull shows as `failed`.
+- **Registry can't be reached** — In an update, Outpost tries the pull instead, and a failed pull shows as `failed`. A check never pulls, so it shows `failed` right away.
 
 A container the label rules leave out never reaches these checks, so it gets no `skipped` line, and that includes Outpost itself. Stopped containers are not checked either, because Outpost only looks at running containers.
 

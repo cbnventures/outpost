@@ -50,11 +50,18 @@ export type Shared_Engine = Pick<DockerEngine, 'listContainers' | 'inspectContai
 export type Shared_LabelMode = 'opt-in' | 'opt-out';
 
 /**
+ * Shared - Cycle Action.
+ *
+ * @since 1.1.0
+ */
+export type Shared_CycleAction = 'check' | 'update';
+
+/**
  * Shared - Result Status.
  *
  * @since 0.0.1
  */
-export type Shared_ResultStatus = 'updated' | 'available' | 'up-to-date' | 'skipped' | 'rolled-back' | 'failed';
+export type Shared_ResultStatus = 'updated' | 'available' | 'held' | 'up-to-date' | 'skipped' | 'rolled-back' | 'kept-unhealthy' | 'failed';
 
 /**
  * Shared - Result.
@@ -69,11 +76,14 @@ export type Shared_Result_Status = Shared_ResultStatus;
 
 export type Shared_Result_Detail = string;
 
+export type Shared_Result_Summary = string | undefined;
+
 export type Shared_Result = {
   container: Shared_Result_Container;
   image: Shared_Result_Image;
   status: Shared_Result_Status;
   detail: Shared_Result_Detail;
+  summary?: Shared_Result_Summary;
 };
 
 /**
@@ -134,6 +144,8 @@ export type Shared_SelfUpdateRequest_Container = Shared_ContainerInspect;
 
 export type Shared_SelfUpdateRequest_NewImageId = string;
 
+export type Shared_SelfUpdateRequest_NewImageReference = string;
+
 export type Shared_SelfUpdateRequest_Reference = string;
 
 export type Shared_SelfUpdateRequest_Results = Shared_Result[];
@@ -143,6 +155,7 @@ export type Shared_SelfUpdateRequest_StartedAt = string;
 export type Shared_SelfUpdateRequest = {
   container: Shared_SelfUpdateRequest_Container;
   newImageId: Shared_SelfUpdateRequest_NewImageId;
+  newImageReference: Shared_SelfUpdateRequest_NewImageReference;
   reference: Shared_SelfUpdateRequest_Reference;
   results: Shared_SelfUpdateRequest_Results;
   startedAt: Shared_SelfUpdateRequest_StartedAt;
@@ -185,6 +198,12 @@ export type Shared_Dependencies_RememberRejectedImage = (container: string, imag
 
 export type Shared_Dependencies_ForgetRejectedImage = (container: string) => void;
 
+export type Shared_Dependencies_FindImageConfig = (imageId: string) => Shared_ContainerConfig | undefined;
+
+export type Shared_Dependencies_RememberImageConfig = (imageId: string, config: Shared_ContainerConfig) => void;
+
+export type Shared_Dependencies_PruneImageConfigs = () => Promise<void>;
+
 export type Shared_Dependencies = {
   engine: Shared_Dependencies_Engine;
   fetchFunction: Shared_Dependencies_FetchFunction;
@@ -194,6 +213,9 @@ export type Shared_Dependencies = {
   findRejectedImage: Shared_Dependencies_FindRejectedImage;
   rememberRejectedImage: Shared_Dependencies_RememberRejectedImage;
   forgetRejectedImage: Shared_Dependencies_ForgetRejectedImage;
+  findImageConfig?: Shared_Dependencies_FindImageConfig;
+  rememberImageConfig?: Shared_Dependencies_RememberImageConfig;
+  pruneImageConfigs?: Shared_Dependencies_PruneImageConfigs;
   updateSelf?: Shared_Dependencies_UpdateSelf;
 };
 

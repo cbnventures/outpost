@@ -33,6 +33,8 @@ import type {
   Engine_Runner_InspectImage_Reference,
   Engine_Runner_InspectImage_Response,
   Engine_Runner_InspectImage_Returns,
+  Engine_Runner_ListContainers_All,
+  Engine_Runner_ListContainers_Endpoint,
   Engine_Runner_ListContainers_Response,
   Engine_Runner_ListContainers_Returns,
   Engine_Runner_ListContainersByLabel_Filters,
@@ -135,15 +137,18 @@ export class Runner {
   /**
    * Engine - List Containers.
    *
-   * Lists running containers. Stopped containers are never updated,
-   * so they are not requested.
+   * Lists running containers by default. Cache maintenance can include every
+   * stopped container so image metadata remains while Docker references it.
+   *
+   * @param {Engine_Runner_ListContainers_All} [all] - All.
    *
    * @returns {Engine_Runner_ListContainers_Returns}
    *
    * @since 0.0.1
    */
-  public async listContainers(): Engine_Runner_ListContainers_Returns {
-    const response: Engine_Runner_ListContainers_Response = await this.send('GET', '/containers/json', undefined, {});
+  public async listContainers(all: Engine_Runner_ListContainers_All = false): Engine_Runner_ListContainers_Returns {
+    const endpoint: Engine_Runner_ListContainers_Endpoint = (all === true) ? '/containers/json?all=true' : '/containers/json';
+    const response: Engine_Runner_ListContainers_Response = await this.send('GET', endpoint, undefined, {});
 
     return containerSummariesSchema.parse(Runner.expect(response, [200]));
   }

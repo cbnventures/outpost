@@ -1,11 +1,11 @@
 ---
 id: account-security
-title: Account Security
-description: Change the dashboard password or username, turn on an authenticator app with recovery codes, and add or remove passkeys on Outpost's Security page.
+title: Sign-in and Security
+description: Change the dashboard password or username, turn on an authenticator app with recovery codes, and manage passkeys from Sign-in and security.
 sidebar_position: 6
 keywords:
   - outpost
-  - account security
+  - sign-in security
   - password
   - authenticator app
   - recovery codes
@@ -28,27 +28,27 @@ import accountSecurityThreeDark from './_assets_/account-security-3-dark.png';
 import accountSecurityFourLight from './_assets_/account-security-4-light.png';
 import accountSecurityFourDark from './_assets_/account-security-4-dark.png';
 
-Protect the dashboard account with a strong password, an authenticator app, and <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, all from the **Security** page.
+Protect the dashboard account with a strong password, an authenticator app, and <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, all from **Sign-in and security**.
 
 ## Why Add Sign-In Security?
 
 1. Adds an authenticator app so a stolen password alone can't sign in.
-2. Gives you <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> so losing your phone doesn't lock you out.
-3. Adds <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> so you can sign in without typing a password.
+2. Gives you <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> so losing your phone doesn't lock you out.
+3. Adds <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> so you can sign in without typing a password.
 4. Asks for your password before every change so a browser left signed in can't quietly change how you sign in.
 
-## Open the Security Page
+## Open Sign-in and Security
 
-Select **Security** in the sidebar, or **Password and sign-in** in the account menu. The page has four parts: **Password**, **Username**, **Authenticator app**, and **Passkeys**.
+Select **Sign-in and security** in the account menu on a desktop or phone. The page has four parts: **Password**, **Username**, **Authenticator app**, and **Passkeys**.
 
-<Frame caption="The Security page">
-  <ThemedImage sources={{ light: accountSecurityOneLight, dark: accountSecurityOneDark }} alt="Outpost Password and sign-in page with the Password, Username, Authenticator app, and Passkeys sections, the authenticator app turned on, and two passkeys saved at outpost.example.net" width={1280} height={1157} style={{ maxWidth: '100%', height: 'auto' }} />
+<Frame caption="The Sign-in and security page">
+  <ThemedImage sources={{ light: accountSecurityOneLight, dark: accountSecurityOneDark }} alt="Outpost Sign-in and security page with the Password, Username, Authenticator app, and Passkeys sections, the authenticator app turned on, and two passkeys saved at outpost.example.net" width={1280} height={1157} style={{ maxWidth: '100%', height: 'auto' }} />
 </Frame>
 
 ## Change the Password
 
 1. Under **Password**, enter your **Current password**.
-2. Enter a **New password** of at least 12 characters, and repeat it under **Confirm new password**. The bar under the field rates it from **Weak** to **Strong**, and any password of 12 or more characters is accepted.
+2. Enter a **New password** of 12 to 1,024 characters, and repeat it under **Confirm new password**. The bar under the field rates it from **Weak** to **Strong**, and any password in that range is accepted.
 3. Select **Change password**.
 
 Changing the password signs out every other browser, and this one stays signed in.
@@ -74,11 +74,11 @@ The new username applies right away, including in browsers that are already sign
 
 - You have 10 minutes to finish these steps before you need to start again.
 - From then on, password sign-in asks for a code, and each code works only once.
-- If Outpost turned the app off after losing its <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology>, the **Set up the authenticator app** link in the **Saved secrets were removed** notice opens the **Security** page. Turning the app on again takes it off the notice, as described in [Web Dashboard](/docs/features/dashboard/#saved-secrets-notice).
+- If Outpost turned the app off after losing its <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology>, the **Set up the authenticator app** link in the **Saved secrets were removed** notice opens **Sign-in and security**. Turning the app on again takes it off the notice, as described in [Web Dashboard](/docs/features/dashboard/#saved-secrets-notice).
 
 ## Recovery Codes
 
-- Each <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery code</Terminology> works once in place of an authenticator code. **Authenticator app** shows how many are left.
+- Each <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery code</Terminology> works once in place of an authenticator code. **Authenticator app** shows how many are left.
 - The codes appear only once. Outpost stores only a hash of each one, so it can't show them again.
 - **New recovery codes** asks for your password, then shows the new set in the same dialog and replaces the old one, so the old codes stop working.
 - **Done** stays unavailable until **I saved these codes** is checked, and the dialog can't be closed another way, because the codes aren't shown again.
@@ -94,27 +94,27 @@ The new username applies right away, including in browsers that are already sign
 3. Follow your browser's prompt.
 
 <Frame caption="Adding a passkey">
-  <ThemedImage sources={{ light: accountSecurityFourLight, dark: accountSecurityFourDark }} alt="Passkeys section listing the MacBook Pro and iPhone passkeys, each saved at outpost.example.net, with the name iPad and a password entered and an Add passkey button" width={958} height={364} style={{ maxWidth: '100%', height: 'auto' }} />
+  <ThemedImage sources={{ light: accountSecurityFourLight, dark: accountSecurityFourDark }} alt="Passkeys section listing the MacBook Pro and iPhone passkeys, each saved at outpost.example.net, with the name iPad and a password entered and an Add passkey button" width={958} height={363} style={{ maxWidth: '100%', height: 'auto' }} />
 </Frame>
 
-- <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">Passkeys</Terminology> need the dashboard open at a domain name over HTTPS, or at `localhost`. On an IP address or plain HTTP, the page explains why it can't add one there.
-- A <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> works only at the address it was added on, and the list shows that address next to each one. Opening the dashboard at a new address means adding your <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> again there.
+- <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">Passkeys</Terminology> need the dashboard open at a domain name over HTTPS, or at `localhost`. On an IP address or plain HTTP, the page explains why it can't add one there.
+- A <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> works only at the address it was added on, and the list shows that address next to each one. Opening the dashboard at a new address means adding your <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> again there.
 - Behind a reverse proxy, HTTPS and the address come from its headers, as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
 
 :::warning
-A <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> added at `localhost`, for example through an SSH tunnel, works only at `localhost`. It is recommended to add the <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> you'll use every day at the HTTPS address you plan to keep.
+A <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> added at `localhost`, for example through an SSH tunnel, works only at `localhost`. It is recommended to add the <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> you'll use every day at the HTTPS address you plan to keep.
 :::
 
 ## Remove a Method
 
-- **Authenticator app** — Select **Turn off**, enter your password in the dialog, and select **Turn off** again. The <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> are deleted with it.
-- **<Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">Passkey</Terminology>** — Select **Remove** next to it, enter your password in the dialog, and select **Remove passkey**. It stops working right away.
+- **Authenticator app** — Select **Turn off**, enter your password in the dialog, and select **Turn off** again. The <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> are deleted with it.
+- **<Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">Passkey</Terminology>** — Select **Remove** next to it, enter your password in the dialog, and select **Remove passkey**. It stops working right away.
 
 ## If You Lose Access
 
 :::warning
-Keep the <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> somewhere other than the phone with your authenticator app. If you lose both and have no <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>, getting back in takes access to the Docker host, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-authenticator).
+Keep the <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> somewhere other than the phone with your authenticator app. If you lose both and have no <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>, getting back in takes access to the Docker host, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-authenticator).
 :::
 
-- **Lost phone** — Sign in with a <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery code</Terminology> or a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>. Then turn the authenticator app off and set it up again on your new phone.
-- **Forgotten password** — There's no password reset, but a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> still signs you in. [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-password) covers the other ways back in.
+- **Lost phone** — Sign in with a <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery code</Terminology> or a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>. Then turn the authenticator app off and set it up again on your new phone.
+- **Forgotten password** — There's no password reset, but a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> still signs you in. [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-password) covers the other ways back in.

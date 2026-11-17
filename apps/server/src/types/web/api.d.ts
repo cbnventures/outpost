@@ -156,6 +156,7 @@ export type Web_Api_AccountSecurity = {
   passkeys: Web_Api_Passkey[];
   passkeysAvailable: boolean;
   recoveryCodesRemaining: number;
+  role?: string;
   totpEnabled: boolean;
   username: string;
 };
@@ -256,7 +257,14 @@ export type Web_Api_LabelMode = 'opt-in' | 'opt-out';
  *
  * @since 1.0.0
  */
-export type Web_Api_ResultStatus = 'available' | 'failed' | 'rolled-back' | 'skipped' | 'up-to-date' | 'updated';
+export type Web_Api_ResultStatus = 'available' | 'failed' | 'held' | 'kept-unhealthy' | 'rolled-back' | 'skipped' | 'up-to-date' | 'updated';
+
+/**
+ * API.
+ *
+ * @since 1.1.0
+ */
+export type Web_Api_CycleAction = 'check' | 'update';
 
 /**
  * API.
@@ -268,6 +276,7 @@ export type Web_Api_Result = {
   detail: string;
   image: string;
   status: Web_Api_ResultStatus;
+  summary?: string | undefined;
 };
 
 /**
@@ -276,8 +285,10 @@ export type Web_Api_Result = {
  * @since 1.0.0
  */
 export type Web_Api_Report = {
+  action?: Web_Api_CycleAction | null | undefined;
   error?: string | null | undefined;
   finishedAt: string;
+  rollback?: boolean | null | undefined;
   results: Web_Api_Result[];
   startedAt: string;
   trigger?: string | null | undefined;
@@ -300,6 +311,7 @@ export type Web_Api_Totals = {
  * @since 1.0.0
  */
 export type Web_Api_Overview = {
+  action?: Web_Api_CycleAction | null | undefined;
   labelMode: Web_Api_LabelMode;
   lastError?: string | null | undefined;
   lastReport?: Web_Api_Report | null | undefined;
@@ -318,10 +330,13 @@ export type Web_Api_Overview = {
  * @since 1.0.0
  */
 export type Web_Api_Container = {
+  fullId: string;
   id: string;
   image: string;
+  lastAction?: Web_Api_CycleAction | null | undefined;
   lastCheckedAt?: string | null | undefined;
   lastDetail?: string | null | undefined;
+  lastSummary?: string | null | undefined;
   lastStatus?: Web_Api_ResultStatus | null | undefined;
   managed: boolean;
   monitorOnly: boolean;
@@ -361,6 +376,15 @@ export type Web_Api_SystemSettings = {
 /**
  * API.
  *
+ * @since 1.1.0
+ */
+export type Web_Api_Diagnostics = {
+  debugLogging: boolean;
+};
+
+/**
+ * API.
+ *
  * @since 1.0.0
  */
 export type Web_Api_Settings = {
@@ -382,6 +406,16 @@ export type Web_Api_UpdateSettingsInput = Web_Api_RuntimeSettings;
  */
 export type Web_Api_CheckStarted = {
   started: boolean;
+};
+
+/**
+ * API - Start Update.
+ *
+ * @since 1.1.0
+ */
+export type Web_Api_StartUpdate_Body = {
+  containerId?: string;
+  rollback?: boolean;
 };
 
 /**

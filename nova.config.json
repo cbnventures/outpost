@@ -169,6 +169,15 @@
       ]
     }
   },
+  "dockerHub": {
+    "namespace": "cbnventures",
+    "repository": "outpost",
+    "visibility": "public",
+    "categories": [
+      "integration-and-delivery",
+      "monitoring-and-observability"
+    ]
+  },
   "workflows": [
     {
       "template": "check-sponsor-gated-issues",
@@ -177,7 +186,7 @@
         "issue-comment",
         "issues"
       ],
-      "runsOn": "ubuntu-latest",
+      "runsOn": "ubuntu-24.04",
       "timeoutMinutes": 5
     },
     {
@@ -186,7 +195,7 @@
       "triggers": [
         "schedule-weekly"
       ],
-      "runsOn": "ubuntu-latest",
+      "runsOn": "ubuntu-24.04",
       "timeoutMinutes": 5
     },
     {
@@ -195,7 +204,7 @@
       "triggers": [
         "release"
       ],
-      "runsOn": "ubuntu-latest",
+      "runsOn": "ubuntu-24.04",
       "timeoutMinutes": 45,
       "build": [
         "./apps/docs"
@@ -203,11 +212,7 @@
       "deploy": [
         {
           "to": "docker-hub",
-          "path": "./",
-          "with": {
-            "IMAGE_NAMESPACE": "cbnventures",
-            "IMAGE_REPOSITORY": "outpost"
-          }
+          "path": "./"
         },
         {
           "to": "ghcr",
@@ -251,39 +256,39 @@
   },
   "workspaces": {
     "./": {
+      "name": "outpost-project",
       "role": "project",
-      "policy": "freezable",
-      "name": "outpost-project"
+      "policy": "freezable"
     },
     "./apps/docs": {
+      "name": "outpost-docs",
       "role": "docs",
-      "policy": "freezable",
-      "name": "outpost-docs"
+      "policy": "freezable"
     },
     "./apps/server": {
+      "name": "outpost-app-server",
       "role": "app",
-      "policy": "trackable",
-      "name": "outpost-app-server"
+      "policy": "trackable"
     },
     "./packages/docker-engine": {
+      "name": "outpost-package-docker-engine",
       "role": "package",
-      "policy": "trackable",
-      "name": "outpost-package-docker-engine"
+      "policy": "trackable"
     },
     "./packages/registry": {
+      "name": "outpost-package-registry",
       "role": "package",
-      "policy": "trackable",
-      "name": "outpost-package-registry"
+      "policy": "trackable"
     },
     "./packages/updater": {
+      "name": "outpost-package-updater",
       "role": "package",
-      "policy": "trackable",
-      "name": "outpost-package-updater"
+      "policy": "trackable"
     },
     "./packages/docker": {
+      "name": "outpost-tool-docker",
       "role": "tool",
-      "policy": "freezable",
-      "name": "outpost-tool-docker"
+      "policy": "freezable"
     }
   },
   "artifacts": {
@@ -313,7 +318,13 @@
       "bundles": [
         "nova"
       ],
-      "patterns": []
+      "patterns": [
+        ".changelog",
+        "apps/docs",
+        "assets",
+        "conventions",
+        "graphify-out"
+      ]
     }
   },
   "agents": [
@@ -321,6 +332,14 @@
     "codex"
   ],
   "recipes": {
+    "docker-hub": {
+      "sync-identity": {
+        "enabled": true
+      },
+      "sync-policies": {
+        "enabled": true
+      }
+    },
     "github": {
       "sync-actions": {
         "enabled": true
@@ -687,6 +706,18 @@
       },
       "./apps/server": {
         "prefix": "SERVER_"
+      },
+      "./packages/docker": {
+        "prefix": "DOCKER_"
+      },
+      "./packages/docker-engine": {
+        "prefix": "ENGINE_"
+      },
+      "./packages/registry": {
+        "prefix": "REGISTRY_"
+      },
+      "./packages/updater": {
+        "prefix": "UPDATER_"
       }
     },
     "workflows": {

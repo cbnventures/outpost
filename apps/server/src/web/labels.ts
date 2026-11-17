@@ -1,9 +1,8 @@
-import {
-  formatRelative,
-  formatUntil,
-} from '@/web/format.ts';
+import { formatRelative } from '@/web/format.ts';
+import { formatUntil } from '@/web/outpost-format.ts';
 
 import type {
+  Web_Api_CycleAction,
   Web_Api_Overview,
   Web_Api_Report,
   Web_Api_Result,
@@ -25,6 +24,8 @@ import type {
 export const statusLabels: Record<Web_Api_ResultStatus, string> = {
   'available': 'Update available',
   'failed': 'Failed',
+  'held': 'Held',
+  'kept-unhealthy': 'Kept after failure',
   'rolled-back': 'Rolled back',
   'skipped': 'Skipped',
   'up-to-date': 'Up to date',
@@ -44,6 +45,8 @@ export const statusLabels: Record<Web_Api_ResultStatus, string> = {
 export const statusClasses: Record<Web_Api_ResultStatus, string> = {
   'available': 'status-dot status-checking',
   'failed': 'status-dot status-error',
+  'held': 'status-dot status-checking',
+  'kept-unhealthy': 'status-dot status-error',
   'rolled-back': 'status-dot status-error',
   'skipped': 'status-dot status-queued',
   'up-to-date': 'status-dot status-paused',
@@ -63,6 +66,8 @@ export const statusClasses: Record<Web_Api_ResultStatus, string> = {
 const countOrder: Web_Api_ResultStatus[] = [
   'updated',
   'available',
+  'held',
+  'kept-unhealthy',
   'rolled-back',
   'failed',
   'up-to-date',
@@ -83,6 +88,48 @@ const triggerLabels: Record<string, string> = {
   schedule: 'Schedule',
   startup: 'Startup',
 };
+
+/**
+ * Labels - Cycle action label.
+ *
+ * Names a history action. Reports written before actions were recorded were
+ * update cycles, so a missing value remains an update.
+ *
+ * @param {Web_Api_CycleAction | null | undefined} action - Action.
+ *
+ * @returns {string}
+ *
+ * @since 1.1.0
+ */
+export const cycleActionLabel = (action: Web_Api_CycleAction | null | undefined): string => (action === 'check') ? 'Check' : 'Update';
+
+/**
+ * Labels - Cycle action completed label.
+ *
+ * Names the completed action beside a container's result time. Reports written
+ * before actions were recorded were update cycles, so they remain updated.
+ *
+ * @param {Web_Api_CycleAction | null | undefined} action - Action.
+ *
+ * @returns {string}
+ *
+ * @since 1.1.0
+ */
+export const cycleActionCompletedLabel = (action: Web_Api_CycleAction | null | undefined): string => (action === 'check') ? 'Checked' : 'Updated';
+
+/**
+ * Labels - Cycle action running label.
+ *
+ * Distinguishes a registry-only check from an update everywhere live scheduler
+ * state appears. A missing legacy action remains an update.
+ *
+ * @param {Web_Api_CycleAction | null | undefined} action - Action.
+ *
+ * @returns {string}
+ *
+ * @since 1.1.0
+ */
+export const cycleActionRunningLabel = (action: Web_Api_CycleAction | null | undefined): string => (action === 'check') ? 'Checking' : 'Updating';
 
 // countResults tallies a check's results by status, leaving out statuses that didn't occur.
 
@@ -130,7 +177,7 @@ export const countLabel = (entry: Web_Components_ResultCount): string => {
  * @since 1.0.0
  */
 export const failedCount = (results: Web_Api_Result[]): number => results.filter(
-  (result: Web_Api_Result): boolean => result['status'] === 'failed' || result['status'] === 'rolled-back',
+  (result: Web_Api_Result): boolean => result['status'] === 'failed' || result['status'] === 'rolled-back' || result['status'] === 'kept-unhealthy',
 ).length;
 
 // reportFailed says whether a check failed as a whole or for any container.
@@ -220,9 +267,11 @@ export const describeScheduler = (
   }
 
   if (overview['running']) {
+    const runningLabel: string = cycleActionRunningLabel(overview['action']);
+
     return {
-      detail: (overview['startedAt'] === null || overview['startedAt'] === undefined) ? 'Checking containers' : `Started ${formatRelative(overview['startedAt'])}`,
-      label: 'Checking',
+      detail: (overview['startedAt'] === null || overview['startedAt'] === undefined) ? `${runningLabel} containers` : `Started ${formatRelative(overview['startedAt'])}`,
+      label: runningLabel,
       tone: 'connecting',
     };
   }
@@ -235,26 +284,30 @@ export const describeScheduler = (
     };
   }
 
+  const lastReport: Web_Api_Report | null | undefined = overview['lastReport'];
+  const lastAction: string = cycleActionLabel((lastReport === null || lastReport === undefined) ? undefined : lastReport['action']).toLowerCase();
+  const scheduledAction: string = (overview['monitorOnly']) ? 'check' : 'update';
+
   if (overview['lastError'] !== null && overview['lastError'] !== undefined && overview['lastError'] !== '') {
     return {
       detail: overview['lastError'],
-      label: 'Last check failed',
+      label: `Last ${lastAction} failed`,
       tone: 'blocked',
     };
   }
 
-  const failed: number = (overview['lastReport'] === null || overview['lastReport'] === undefined) ? 0 : failedCount(overview['lastReport']['results']);
+  const failed: number = (lastReport === null || lastReport === undefined) ? 0 : failedCount(lastReport['results']);
 
   if (failed > 0) {
     return {
-      detail: `${failed} failed in the last check`,
+      detail: `${failed} failed in the last ${lastAction}`,
       label: 'Idle',
       tone: 'blocked',
     };
   }
 
   return {
-    detail: (overview['nextRun'] === null || overview['nextRun'] === undefined) ? 'No check scheduled' : `Next check ${formatUntil(overview['nextRun'])}`,
+    detail: (overview['nextRun'] === null || overview['nextRun'] === undefined) ? `No ${scheduledAction} scheduled` : `Next ${scheduledAction} ${formatUntil(overview['nextRun'])}`,
     label: 'Idle',
     tone: 'protected',
   };

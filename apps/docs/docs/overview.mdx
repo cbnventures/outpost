@@ -38,12 +38,12 @@ If the new container stops or reports unhealthy, Outpost puts the old one back. 
 - **Automatic rollback** — A replacement that stops, turns unhealthy, or never settles is removed and the previous container is started again.
 - **Safe recreation** — Environment, labels, ports, restart policy, volumes, and networks are kept, while defaults from the old image are dropped so the new image's defaults apply.
 - **Digest-first checks** — Outpost compares the registry's digest with the running image before pulling.
-- **Label control** — Update everything unless labeled off, or only what is labeled on, and mark single containers as <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology>.
+- **Label control** — Update everything unless labeled off, or only what is labeled on, and mark single containers as <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology>.
 - **Dependency order** — Compose `depends_on` services are updated before the services that need them.
 - **Self-updates** — Outpost updates its own container too, last in each check, and puts the old one back if the new image fails.
 - **Notifications** — Get alerts in ntfy, Telegram, Discord, Slack, email, and six other services when containers are updated, new images are found, or an update fails.
-- **Web dashboard** — See every container, the next check, and the last 50 checks in your browser, and start a check with one click. Sign in with a password, an authenticator app, or a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.
-- **HTTP API and metrics** — Start a check, read the latest results, and scrape Prometheus metrics with <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access tokens</Terminology> that each do only what you allow.
+- **Web dashboard** — See every container, the next check, and the last 50 runs in your browser, then check for or apply updates with one click. Sign in with a password, an authenticator app, or a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>.
+- **HTTP API and metrics** — Check for images, apply updates, read the latest results, and scrape Prometheus metrics with <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access tokens</Terminology> that each do only what you allow.
 
 ## How It Works
 
@@ -58,7 +58,7 @@ flowchart LR
     Healthy --> Bad([No]):::muted --> Restore[Previous container restored]
 ```
 
-Each <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> goes through your containers one at a time and records a result for each in a <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology>. The <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> feeds notifications, the dashboard, the status endpoint, and the metrics endpoint.
+Each <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> goes through your containers one at a time and records a result for each in a <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology>. The <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology> feeds notifications, the dashboard, the status endpoint, and the metrics endpoint.
 
 :::info
 Outpost manages one Docker host through its local socket. Docker Swarm services, Kubernetes, and fleets of remote hosts are out of scope.

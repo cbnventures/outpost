@@ -21,6 +21,8 @@ import { Terminology } from '@cbnventures/docusaurus-preset-nova/blocks';
 
 Diagnose the most common startup, registry, and update problems and get Outpost checking your containers again.
 
+For a problem that isn't listed here, turn on [Debug logging](/docs/features/dashboard/#debug-logging) and read the `DEBUG` lines with `docker logs outpost`.
+
 ## Permission Denied on the Docker Socket
 
 **Symptom**: The logs repeat `EACCES` or `permission denied` for `/var/run/docker.sock`, and the container reports unhealthy.
@@ -44,16 +46,32 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 - Fix the highlighted field using [Configuration](/docs/getting-started/configuration/#validation).
 - Timing values must be positive whole numbers, and the schedule must be a valid cron expression.
 
+## An Export File Won't Import
+
+**Symptom**: **Settings** > **Backup** > **Import…** refuses the selected <Terminology title="A JSON backup you can carry to another Outpost" to="/docs/reference/terminology#backup-and-encryption">export file</Terminology>, or the import stops before applying it.
+
+**Cause**: The file is too large, is not valid JSON, is not an Outpost export, has no importable section, or the one-use account confirmation expired or was already used.
+
+**Solution**:
+
+- For `Choose an export file smaller than 10 MB.`, select the original Outpost export rather than a data-directory archive.
+- For `That file is not valid JSON.`, do not edit or recompress the exported JSON file.
+- For `That file is not a valid Outpost export.` or a format, version, or field error, make another export from **Settings** > **Backup**.
+- In **Settings**, make sure at least one file section is listed as importable before continuing to **Review**.
+- For `Confirm it's you again.`, repeat <Terminology title="Prove it's you again before an export or import" to="/docs/reference/terminology#backup-and-encryption">Confirm it’s you</Terminology> in the same browser session and finish the import within five minutes.
+
+The server applies all selected sections in one database transaction, so an import error does not leave part of the file applied. [Export and Import](/docs/reference/backup-and-recovery/#export-and-import) lists the additions, replacements, and skips.
+
 ## Startup Stops With an Encryption Key Error
 
 **Symptom**: The logs repeat `The encryption key at "/data/keys/installation.key" doesn't belong to this database. Put back the key file this database was created with, or delete "/data/keys/installation.key" and restart to make a new key, then enter the saved secrets again.` or `The encryption key file at "..." is not 64 hexadecimal characters.`, and the container reports unhealthy.
 
-**Cause**: The <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> in `keys/installation.key`, next to the database, belongs to another database or is damaged. A missing key file doesn't stop startup, because Outpost makes a new key, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key).
+**Cause**: The <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> in `keys/installation.key`, next to the database, belongs to another database or is damaged. A missing key file doesn't stop startup, because Outpost makes a new key, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-encryption-key).
 
 **Solution**:
 
 - Restore `keys/installation.key` from the same backup as the database, as described in [Backup and Recovery](/docs/reference/backup-and-recovery/#encryption-key-doesnt-match).
-- Without that key, delete the key file and restart, so Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="destination field that is sealed and never shown" to="/docs/reference/terminology#secret-field">secret fields</Terminology> of notification <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destinations</Terminology> and the saved registry passwords. Then enter them again from the notice in the dashboard.
+- Without that key, delete the key file and restart, so Outpost makes a new key, turns off the authenticator app, and removes the <Terminology title="A saved token or password the API never hands back" to="/docs/reference/terminology#notifications">secret fields</Terminology> of notification <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destinations</Terminology> and the saved registry passwords. Then enter them again from the notice in the dashboard.
 
 ## Startup Stops With a Permission Error
 
@@ -70,7 +88,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Symptom**: Results show `failed` with `toomanyrequests` or `HTTP 429`.
 
-**Cause**: Docker Hub and some other registries limit anonymous requests. When the <Terminology title="registry manifest digest for an image tag" to="/docs/reference/terminology#remote-digest">remote digest</Terminology> lookup is refused, Outpost falls back to pulling, which counts against the pull limit too.
+**Cause**: Docker Hub and some other registries limit anonymous requests. When the <Terminology title="The registry's image fingerprint, compared without pulling" to="/docs/reference/terminology#update-cycles">remote digest</Terminology> lookup is refused during an update, Outpost falls back to pulling, which counts against the pull limit too. A check never pulls, so it fails right away.
 
 **Solution**:
 
@@ -88,7 +106,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 - Add a sign-in under **Private registries** on the **Settings** page, as shown in [Private Registries](/docs/getting-started/private-registries/#add-a-sign-in).
 - Check that the host matches the image name, such as `ghcr.io` for `ghcr.io/your-org/app`. Docker Hub images use `docker.io`.
-- If the password expired or a lost <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> removed it, select **Edit** and enter a new one.
+- If the password expired or a lost <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> removed it, select **Edit** and enter a new one.
 
 ## Container Is Skipped for Its Network Mode
 
@@ -99,7 +117,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 **Solution**:
 
 - Update the pair by hand, for example `docker compose pull && docker compose up --detach`.
-- Watch their images some other way, such as the image's release notes. Outpost never checks these containers, so it can't report new images for them, even with the <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> label.
+- Watch their images some other way, such as the image's release notes. Outpost never checks these containers, so it can't report new images for them, even with the <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> label.
 
 ## Container Is Skipped as Pinned
 
@@ -116,7 +134,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Symptom**: A container shows `skipped` with `Image is locally built or has no published registry digest` or `Image is locally built, or its registry needs credentials Outpost doesn't have`.
 
-**Cause**: The first message means Docker built the image on this host, so there's no registry image to follow. The second appears only on Docker 28 or older with the containerd image store, where Docker keeps no build record: the registry wouldn't answer without a login, which Docker Hub also does for a name it doesn't have.
+**Cause**: The first message means Docker built the image on this host, or, when Docker can't tell where the image came from, that the registry has no image under that name, so there's no registry image to follow. The second appears only on Docker 28 or older with the containerd image store, where Docker keeps no build record: the registry wouldn't answer without a login, which Docker Hub also does for a name it doesn't have.
 
 **Solution**:
 
@@ -125,21 +143,21 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 ## Updates Keep Rolling Back
 
-**Symptom**: A container shows `rolled-back`, and later <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycles</Terminology> show `skipped` with `The new image (3f2a9c1b7d4e) was rolled back last time, so Outpost waits for a newer one; check this container on its own to try it again`.
+**Symptom**: A container shows `rolled-back`, and later update <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycles</Terminology> show `held` with `Rolled back last time; waiting for a newer image. Update this container with rollback disabled to keep and inspect the rejected image`.
 
 **Cause**: The new image fails to start, reports unhealthy, or takes longer than the timeout to become healthy.
 
 **Solution**:
 
 - Read the detail of the `rolled-back` line in **History**, such as `New container is not running (exited)` or `New container did not become healthy within 120s`.
-- Once the cause is fixed, check the container on its own from the **Containers** page to try the same image again.
+- Once the cause is fixed, select **Update** on the container's row on the **Containers** page and confirm **Update without rollback** to try the same image again.
 - Start the new image by hand with `docker run` to see its logs.
 - For slow starters, raise **Health timeout** on the **Settings** page.
-- Mark the container <Terminology title="report updates without recreating containers" to="/docs/reference/terminology#monitor-only">monitor-only</Terminology> until a fixed image is released.
+- Mark the container <Terminology title="Tells you about updates but never applies them" to="/docs/reference/terminology#container-selection">monitor-only</Terminology> until a fixed image is released.
 
 ## Outpost Didn't Update Itself
 
-**Symptom**: A newer Outpost image exists, but Outpost's line in the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> is `skipped`, `rolled-back`, or `failed`, or the <Terminology title="per-container results of a cycle" to="/docs/reference/terminology#report">report</Terminology> has no line for Outpost at all.
+**Symptom**: A newer Outpost image exists, but Outpost's line in the <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology> is `skipped`, `rolled-back`, or `failed`, or the <Terminology title="What happened to each container in one check" to="/docs/reference/terminology#update-cycles">report</Terminology> has no line for Outpost at all.
 
 **Cause**: The line's detail names the reason:
 
@@ -167,13 +185,13 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 **Cause**: The status code says which check failed:
 
 - **`401`** — The `Authorization` header is missing, or the token is mistyped, expired, or revoked. The message is `Sign in, or send a valid API token.` or `A valid personal access token is required.`
-- **`403`** — The token doesn't have the <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> the route needs, such as `This token doesn't have the metrics:read scope.` A route only the dashboard can use, such as `/api/v1/notifications`, answers every token with `An administrator browser session is required.`
-- **`404`** — The request used `GET` on `/v1/update` or `/api/v1/checks`, which only accept `POST`. Plain `curl` sends `GET` unless you add `--request POST`.
+- **`403`** — The token doesn't have the <Terminology title="What a token may do, such as read status or run updates" to="/docs/reference/terminology#api-access">scope</Terminology> the route needs, such as `This token doesn't have the metrics:read scope.` A route only the dashboard can use, such as `/api/v1/notifications`, answers every token with `An administrator browser session is required.`
+- **`404`** — The request used `GET` on `/v1/update`, `/api/v1/checks`, or `/api/v1/updates`, which only accept `POST`. Plain `curl` sends `GET` unless you add `--request POST`.
 
 **Solution**:
 
 - Check the token on the dashboard's **Access tokens** page. An expired token is marked there, and a revoked one is gone.
-- Add a missing <Terminology title="what an access token is allowed to do" to="/docs/reference/terminology#scope">scope</Terminology> with **Edit**, which applies to the next request.
+- Add a missing <Terminology title="What a token may do, such as read status or run updates" to="/docs/reference/terminology#api-access">scope</Terminology> with **Edit**, which applies to the next request.
 - Send the header as `Authorization: Bearer outpost_…`, with the whole token.
 
 ## Setup Code Is Wrong or Expired
@@ -184,7 +202,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Solution**:
 
-- Read the newest <Terminology title="one-time code that creates the dashboard account" to="/docs/reference/terminology#setup-code">setup code</Terminology> with `docker logs outpost` and enter it again. Letter case, spaces, and dashes don't matter.
+- Read the newest <Terminology title="One-time code from the log that creates your account" to="/docs/reference/terminology#dashboard-sign-in">setup code</Terminology> with `docker logs outpost` and enter it again. Letter case, spaces, and dashes don't matter.
 - If the code expired, restart the container with `docker restart outpost` to print a new one.
 - After 10 wrong codes from one address within 15 minutes, setup answers `Too many setup attempts. Try again in 15 minutes.` Wait for the window to pass, or restart Outpost, which clears the count.
 
@@ -196,8 +214,8 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Solution**:
 
-- If you added a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>, sign in with it. You can use the dashboard, but changing the password asks for the current one.
-- Otherwise, restore a backup from a time you knew the password, or start over as shown in [Backup and Recovery](/docs/reference/backup-and-recovery/#start-over). Starting over keeps the history, but it removes the account, every <Terminology title="scoped key that scripts use to call the API" to="/docs/reference/terminology#access-token">access token</Terminology>, and every sign-in method.
+- If you added a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>, sign in with it. You can use the dashboard, but changing the password asks for the current one.
+- Otherwise, restore a backup from a time you knew the password, or start over as shown in [Backup and Recovery](/docs/reference/backup-and-recovery/#start-over). Starting over keeps the history, but it removes the account, every <Terminology title="A key your scripts send to call the API" to="/docs/reference/terminology#api-access">access token</Terminology>, and every sign-in method.
 
 ## Lost the Authenticator App
 
@@ -207,8 +225,8 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Solution**:
 
-- Enter one of your <Terminology title="single-use code that replaces an authenticator code" to="/docs/reference/terminology#recovery-code">recovery codes</Terminology> instead, or sign in with a <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.
-- Then open **Security**, turn the authenticator app off, and set it up again on your new phone.
+- Enter one of your <Terminology title="A spare code for when your authenticator is gone" to="/docs/reference/terminology#dashboard-sign-in">recovery codes</Terminology> instead, or sign in with a <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>.
+- Then open **Sign-in and security** from the account menu, turn the authenticator app off, and set it up again on your new phone.
 - Without either, follow [Backup and Recovery](/docs/reference/backup-and-recovery/#lost-authenticator).
 
 ## History Is Empty After a Restart
@@ -236,16 +254,16 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 ## Too Many Failed Sign-Ins
 
-**Symptom**: Signing in fails with `Too many sign-in attempts. Try again in 15 minutes.`, or a change on the **Security** page fails with `Too many attempts. Try again in 15 minutes.`
+**Symptom**: Signing in fails with `Too many sign-in attempts. Try again in 15 minutes.`, or a change on the **Sign-in and security** page fails with `Too many attempts. Try again in 15 minutes.`
 
-**Cause**: Ten attempts failed from the same address within 15 minutes. Wrong passwords, wrong codes, rejected <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology>, and wrong passwords on the **Security** page all count.
+**Cause**: Ten attempts failed from the same address within 15 minutes. Wrong passwords, wrong codes, rejected <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology>, and wrong passwords on the **Sign-in and security** page all count.
 
 **Solution**:
 
 - Wait 15 minutes, then sign in with the correct password.
 - Behind a reverse proxy that doesn't send `X-Forwarded-For`, every client shares the proxy's address, so other people's attempts count too. Check the proxy as described in [Web Dashboard](/docs/features/dashboard/#behind-a-reverse-proxy).
 - If nobody remembers the password, see [Forgot the Dashboard Password](/docs/reference/troubleshooting/#forgot-the-dashboard-password).
-- If a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to **Sign-in locked**, its alert names the address that reached the limit.
+- If a <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> listens to **Sign-in locked**, its alert names the address that reached the limit.
 - Restarting Outpost also clears the count.
 
 ## Dashboard Keeps Signing You Out
@@ -261,7 +279,7 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 ## Passkeys Aren't Offered
 
-**Symptom**: The **Security** page says <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkeys</Terminology> need https and a domain name, or <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> sign-in fails with `Passkeys need https and a domain name. Open this page at its domain, or use your password.`
+**Symptom**: The **Sign-in and security** page says <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkeys</Terminology> need https and a domain name, or <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> sign-in fails with `Passkeys need https and a domain name. Open this page at its domain, or use your password.`
 
 **Cause**: The dashboard is open at an IP address, such as `192.168.1.20`, or over plain HTTP at a name other than `localhost`.
 
@@ -274,22 +292,22 @@ Diagnose the most common startup, registry, and update problems and get Outpost 
 
 **Symptom**: Sign-in fails with `That passkey wasn't accepted. It may belong to a different address for this app.`
 
-**Cause**: The <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology> was added at a different address, and it works only there.
+**Cause**: The <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology> was added at a different address, and it works only there.
 
 **Solution**:
 
-- Open the dashboard at the address the **Passkeys** list shows for that <Terminology title="device sign-in without a password or code" to="/docs/reference/terminology#passkey">passkey</Terminology>.
+- Open the dashboard at the address the **Passkeys** list shows for that <Terminology title="Sign in with your device, no password or code" to="/docs/reference/terminology#dashboard-sign-in">passkey</Terminology>.
 - If your browser or password manager no longer has it, sign in another way, remove it, and add it again.
 
 ## No Notifications Arrive
 
-**Symptom**: Updates happen, but no alert reaches a <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>.
+**Symptom**: Updates happen, but no alert reaches a <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>.
 
-**Cause**: No <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to that <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> is paused until removed secrets are entered again, or the service refused the send.
+**Cause**: No <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> listens to that <Terminology title="What an alert is about, such as Update failed" to="/docs/reference/terminology#notifications">event</Terminology>, the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> is paused until removed secrets are entered again, or the service refused the send.
 
 **Solution**:
 
-- Open **Notifications** and read the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology>'s row. The red **Last attempt failed** line shows the service's answer, such as `HTTP 401: unauthorized`, or `No answer within 10 seconds.`
-- Select **Send test** to try the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> right away, and fix its fields with **Edit**.
-- Check under **Edit** that the <Terminology title="a place Outpost sends alerts to" to="/docs/reference/terminology#destination">destination</Terminology> listens to the <Terminology title="something a destination can be alerted about" to="/docs/reference/terminology#notification-event">event</Terminology>, such as **Containers updated**. A <Terminology title="one pass over all selected containers" to="/docs/reference/terminology#cycle">cycle</Terminology> where every container is `up-to-date` or `skipped` sends nothing.
-- If the row asks you to enter a secret again, a lost <Terminology title="key file that seals saved secrets" to="/docs/reference/terminology#encryption-key">encryption key</Terminology> removed it, as described in [Notifications](/docs/features/notifications/#lost-encryption-key).
+- Open **Notifications** and read the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology>'s row. The red **Last attempt failed** line shows the service's answer, such as `HTTP 401: unauthorized`, or `No answer within 10 seconds.`
+- Select **Send test** to try the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> right away, and fix its fields with **Edit**.
+- Check under **Edit** that the <Terminology title="Where your alerts land, like ntfy, Telegram, or email" to="/docs/reference/terminology#notifications">destination</Terminology> listens to the <Terminology title="What an alert is about, such as Update failed" to="/docs/reference/terminology#notifications">event</Terminology>, such as **Containers updated**. A <Terminology title="One check-and-update pass over your containers" to="/docs/reference/terminology#update-cycles">cycle</Terminology> where every container is `up-to-date` or `skipped` sends nothing.
+- If the row asks you to enter a secret again, a lost <Terminology title="The file that unlocks your saved secrets" to="/docs/reference/terminology#backup-and-encryption">encryption key</Terminology> removed it, as described in [Notifications](/docs/features/notifications/#lost-encryption-key).

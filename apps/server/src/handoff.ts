@@ -47,6 +47,7 @@ const handoffSchema = z.object({
     outcome: z.object({
       detail: z.string(),
       finishedAt: z.string(),
+      previousImageMetadataAvailable: z.boolean().optional(),
       status: z.enum([
         'failed',
         'rolled-back',
@@ -61,12 +62,15 @@ const handoffSchema = z.object({
       status: z.enum([
         'updated',
         'available',
+        'held',
         'up-to-date',
         'skipped',
         'rolled-back',
+        'kept-unhealthy',
         'failed',
       ]),
       detail: z.string(),
+      summary: z.string().optional(),
     })),
     startedAt: z.string(),
     trigger: z.enum([

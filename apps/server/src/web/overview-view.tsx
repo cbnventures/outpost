@@ -4,6 +4,7 @@ import {
 } from 'react';
 
 import { summaryFor } from '@/web/api.ts';
+import { ConfirmDialog } from '@/web/confirm-dialog.tsx';
 import {
   formatDate,
   formatDuration,
@@ -12,6 +13,8 @@ import {
 import { ResultList } from '@/web/history-view.tsx';
 import {
   checkDuration,
+  cycleActionLabel,
+  cycleActionRunningLabel,
   failedCount,
   modeSummary,
   triggerLabel,
@@ -21,6 +24,7 @@ import {
   Icon,
 } from '@/web/primitives.tsx';
 import { describeSchedule } from '@/web/schedule.ts';
+import { showToast } from '@/web/toast.ts';
 
 import type { ReactElement } from 'react';
 
@@ -60,6 +64,7 @@ export const OverviewView = ({
   onOpenContainers,
   onOpenHistory,
   onStartCheck,
+  onStartUpdate,
   overview,
 }: Web_Components_OverviewView_Props): ReactElement => {
   const [
@@ -70,6 +75,10 @@ export const OverviewView = ({
     actionError,
     setActionError,
   ] = useState<string>('');
+  const [
+    confirmingUpdateAll,
+    setConfirmingUpdateAll,
+  ] = useState<boolean>(false);
   const [
     now,
     setNow,
@@ -95,15 +104,37 @@ export const OverviewView = ({
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
-   * @since 1.0.0
+   * @since 1.1.0
    */
   const checkNow = async (): Promise<void> => {
     setBusy(true);
     setActionError('');
     try {
       await onStartCheck();
+      showToast('Check started.', true);
     } catch (caughtError) {
       setActionError((caughtError instanceof Error) ? caughtError.message : 'The check could not be started.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Overview View - Updates all.
+   *
+   * Starts the apply cycle after the confirmation dialog closes.
+   * The shared scheduler state disables both actions while it runs.
+   *
+   * @since 1.1.0
+   */
+  const updateAll = async (): Promise<void> => {
+    setBusy(true);
+    setActionError('');
+    try {
+      await onStartUpdate();
+      showToast('Update started.', true);
+    } catch (caughtError) {
+      setActionError((caughtError instanceof Error) ? caughtError.message : 'The update could not be started.');
     } finally {
       setBusy(false);
     }
@@ -124,9 +155,13 @@ export const OverviewView = ({
 
   const lastReport: Web_Api_Report | null = overview['lastReport'] ?? null;
   const managedCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed']).length;
+  const availableCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed'] && !container['monitorOnly'] && container['lastStatus'] === 'available').length;
   const failed: number = (lastReport === null) ? 0 : failedCount(lastReport['results']);
   const available: number = (lastReport === null) ? 0 : countOf(lastReport, 'available');
   const startedBy: string = (lastReport === null) ? '' : triggerLabel(lastReport['trigger']);
+  const runningActionLabel: string = cycleActionRunningLabel(overview['action']);
+  const lastActionLabel: string = cycleActionLabel((lastReport === null) ? undefined : lastReport['action']).toLowerCase();
+  const scheduledActionLabel: string = (overview['monitorOnly']) ? 'check' : 'update';
 
   return (
     <section className="workspace-section">
@@ -135,16 +170,26 @@ export const OverviewView = ({
           <h1>Overview</h1>
           <p>{modeSummary(overview)}</p>
         </div>
-        <Button
-          disabled={busy || running}
-          icon="refresh"
-          onClick={(): void => {
-            void checkNow();
-          }}
-          variant="primary"
-        >
-          {(running) ? 'Checking…' : 'Check now'}
-        </Button>
+        <div className="panel-actions">
+          {(availableCount === 0) ? null : (
+            <Button
+              disabled={busy || running}
+              onClick={(): void => setConfirmingUpdateAll(true)}
+            >
+              {`Update all (${availableCount})`}
+            </Button>
+          )}
+          <Button
+            disabled={busy || running}
+            icon="refresh"
+            onClick={(): void => {
+              void checkNow();
+            }}
+            variant="primary"
+          >
+            {(running) ? `${runningActionLabel}…` : 'Check now'}
+          </Button>
+        </div>
       </div>
 
       {(actionError === '') ? null : (
@@ -157,7 +202,7 @@ export const OverviewView = ({
       {(overview['lastError'] === null || overview['lastError'] === undefined || overview['lastError'] === '') ? null : (
         <div className="form-error" role="alert">
           <Icon name="warning" size={16} />
-          <span>{`The last check failed: ${overview['lastError']}`}</span>
+          <span>{`The last ${lastActionLabel} failed: ${overview['lastError']}`}</span>
         </div>
       )}
 
@@ -172,7 +217,7 @@ export const OverviewView = ({
               <dt>Status</dt>
               <dd className={(running) ? 'details-status-connecting' : 'details-status-protected'}>
                 <span className="status-dot" />
-                {(running) ? 'Checking' : 'Idle'}
+                {(running) ? runningActionLabel : 'Idle'}
               </dd>
             </div>
             {(running) ? (
@@ -182,7 +227,7 @@ export const OverviewView = ({
               </div>
             ) : (
               <div>
-                <dt>Next check</dt>
+                <dt>{`Next ${scheduledActionLabel}`}</dt>
                 <dd>{(overview['nextRun'] === null || overview['nextRun'] === undefined) ? 'Not scheduled' : formatDate(overview['nextRun'])}</dd>
               </div>
             )}
@@ -210,17 +255,21 @@ export const OverviewView = ({
 
         <section className="form-section">
           <div className="form-section-head">
-            <h2>Last check</h2>
+            <h2>Last run</h2>
             <button className="text-button" onClick={onOpenHistory} type="button">View history</button>
           </div>
           {(lastReport === null) ? (
-            <p className="select-list select-list-empty">No checks have run yet. Use &quot;Check now&quot; to run one.</p>
+            <p className="select-list select-list-empty">No checks or updates have run yet. Use &quot;Check now&quot; to run a check.</p>
           ) : (
             <>
               <dl className="details">
                 <div>
                   <dt>Finished</dt>
                   <dd>{formatDate(lastReport['finishedAt'])}</dd>
+                </div>
+                <div>
+                  <dt>Action</dt>
+                  <dd>{cycleActionLabel(lastReport['action'])}</dd>
                 </div>
                 <div>
                   <dt>Took</dt>
@@ -259,6 +308,23 @@ export const OverviewView = ({
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        busy={false}
+        busyLabel=""
+        confirmLabel="Update all"
+        error=""
+        message="Outpost checks every managed container, applies newer images, and updates itself last if needed. Monitor-only containers stay unchanged."
+        onCancel={(): void => setConfirmingUpdateAll(false)}
+        onConfirm={(): void => {
+          setConfirmingUpdateAll(false);
+
+          void updateAll();
+        }}
+        open={confirmingUpdateAll}
+        title="Update all available containers?"
+        tone="primary"
+      />
     </section>
   );
 };

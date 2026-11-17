@@ -118,6 +118,28 @@ describe('update reports and alerts', () => {
     });
 
     notifier.notifyUpdateReport({
+      finishedAt: '2026-10-26T04:00:45.000Z',
+      results: [{
+        container: 'plex',
+        detail: 'New digest sha256:4.',
+        image: 'plexinc/pms-docker:latest',
+        status: 'available',
+      }],
+      startedAt: '2026-10-26T04:00:30.000Z',
+    });
+
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(1);
+
+      return;
+    });
+
+    expect(send).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+      event: 'updates-available',
+      message: 'New images are ready for 1 container: plex (plexinc/pms-docker:latest).',
+    }));
+
+    notifier.notifyUpdateReport({
       finishedAt: '2026-10-26T04:01:00.000Z',
       results: [
         {
@@ -133,18 +155,19 @@ describe('update reports and alerts', () => {
           status: 'updated',
         },
         {
-          container: 'plex',
-          detail: 'sha256:4 is available.',
-          image: 'plexinc/pms-docker:latest',
-          status: 'available',
-        },
-        {
           container: 'grafana',
           detail: 'The new container exited with code 1.',
           image: 'grafana/grafana:11',
           status: 'rolled-back',
         },
+        {
+          container: 'immich',
+          detail: 'New container is unhealthy; rollback was disabled for this run.',
+          image: 'ghcr.io/immich-app/immich-server:release',
+          status: 'kept-unhealthy',
+        },
       ],
+      rollback: false,
       startedAt: '2026-10-26T04:00:00.000Z',
     });
 
@@ -154,23 +177,18 @@ describe('update reports and alerts', () => {
       return;
     });
 
-    expect(send).toHaveBeenNthCalledWith(1, {
+    expect(send).toHaveBeenNthCalledWith(2, {
       key: 'outpost',
       name: 'Outpost',
     }, expect.objectContaining({ service: 'ntfy' }), expect.objectContaining({
       event: 'updates-applied',
-      message: 'Updated 2 containers: pihole (pihole/pihole:latest), homeassistant (ghcr.io/home-assistant/home-assistant:stable).',
+      message: 'Updated 2 containers: pihole (pihole/pihole:latest), homeassistant (ghcr.io/home-assistant/home-assistant:stable). Rollback was disabled for this run.',
       title: 'Containers updated',
-    }));
-
-    expect(send).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything(), expect.objectContaining({
-      event: 'updates-available',
-      message: 'New images are ready for 1 container: plex (plexinc/pms-docker:latest).',
     }));
 
     expect(send).toHaveBeenNthCalledWith(3, expect.anything(), expect.anything(), expect.objectContaining({
       event: 'update-failed',
-      message: 'Couldn\'t update 1 container: grafana (grafana/grafana:11) was rolled back: The new container exited with code 1.',
+      message: 'Couldn\'t update 2 containers: grafana (grafana/grafana:11) was rolled back: The new container exited with code 1; immich (ghcr.io/immich-app/immich-server:release) was kept after the update failed: New container is unhealthy; rollback was disabled for this run.',
       priority: 'high',
     }));
 

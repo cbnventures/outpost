@@ -11,7 +11,10 @@ import {
 } from 'vitest';
 
 import { Runner as History } from './history.js';
-import { Runner as Scheduler } from './scheduler.js';
+import {
+  Runner as Scheduler,
+  scheduledCycleAction,
+} from './scheduler.js';
 
 import type {
   Scheduler_Directory,
@@ -78,6 +81,7 @@ describe('scheduler', () => {
     const reloaded: Scheduler_Scheduler_PersistsWholeCycleFailures_Reloaded = new History(join(directory, 'failures.json'), 50);
 
     expect(reloaded.list()[0]).toMatchObject({
+      action: 'update',
       error: 'Docker socket is unreachable',
       results: [{ status: 'failed' }],
       trigger: 'schedule',
@@ -116,6 +120,7 @@ describe('scheduler', () => {
     })).toBe(true);
 
     expect(scheduler.getState()).toMatchObject({
+      action: 'update',
       running: true,
       startedAt: '2026-10-25T04:00:00.000Z',
     });
@@ -144,6 +149,7 @@ describe('scheduler', () => {
     expect(history.list()).toHaveLength(1);
 
     expect(history.list()[0]).toMatchObject({
+      action: 'update',
       startedAt: '2026-10-25T04:00:00.000Z',
       trigger: 'schedule',
     });
@@ -161,8 +167,8 @@ describe('scheduler', () => {
       results: [{
         container: 'web',
         image: 'nginx:1',
-        status: 'updated',
-        detail: 'Recreated with nginx:1',
+        status: 'available',
+        detail: 'New digest sha256:new',
       }],
     }));
     const scheduler: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Scheduler = new Scheduler(runCycle, history, () => undefined);
@@ -184,11 +190,14 @@ describe('scheduler', () => {
       return;
     });
 
-    expect(scheduler.trigger('dashboard', ['aaaaaaaaaaaa'])).toBe(true);
+    expect(scheduler.trigger('dashboard', ['aaaaaaaaaaaa'], 'check')).toBe(true);
 
     expect(scheduler.trigger('api')).toBe(false);
 
-    expect(scheduler.getState()['running']).toBe(true);
+    expect(scheduler.getState()).toMatchObject({
+      action: 'check',
+      running: true,
+    });
 
     expect(events).toStrictEqual([{ type: 'state' }]);
 
@@ -198,20 +207,21 @@ describe('scheduler', () => {
       return;
     });
 
-    expect(runCycle).toHaveBeenCalledExactlyOnceWith(['aaaaaaaaaaaa'], 'dashboard');
+    expect(runCycle).toHaveBeenCalledExactlyOnceWith(['aaaaaaaaaaaa'], 'dashboard', 'check', true);
 
     expect(events).toStrictEqual([
       { type: 'state' },
       {
         type: 'check',
         report: {
+          action: 'check',
           startedAt: '2026-10-25T04:00:00.000Z',
           finishedAt: '2026-10-25T04:00:05.000Z',
           results: [{
             container: 'web',
             image: 'nginx:1',
-            status: 'updated',
-            detail: 'Recreated with nginx:1',
+            status: 'available',
+            detail: 'New digest sha256:new',
           }],
           trigger: 'dashboard',
         },
@@ -220,10 +230,13 @@ describe('scheduler', () => {
     ]);
 
     expect(scheduler.getState()).toMatchObject({
-      lastReport: { trigger: 'dashboard' },
+      lastReport: {
+        action: 'check',
+        trigger: 'dashboard',
+      },
       totals: {
         cycles: 1,
-        updated: 1,
+        updated: 0,
         failed: 0,
       },
     });
@@ -232,11 +245,20 @@ describe('scheduler', () => {
 
     expect(scheduler.trigger('schedule')).toBe(true);
 
+    expect(scheduler.getState()).toMatchObject({
+      action: 'update',
+      running: true,
+    });
+
     await vi.waitFor(() => {
       expect(scheduler.getState()['running']).toBe(false);
 
       return;
     });
+
+    expect(runCycle).toHaveBeenNthCalledWith(2, undefined, 'schedule', 'update', true);
+
+    expect(scheduler.getState()['action']).toBeUndefined();
 
     expect(events).toHaveLength(3);
 
@@ -245,7 +267,32 @@ describe('scheduler', () => {
       'dashboard',
     ]);
 
+    expect(history.list().map((report) => report['action'])).toStrictEqual([
+      'update',
+      'check',
+    ]);
+
     stdout.mockRestore();
+
+    return;
+  });
+
+  return;
+});
+
+/**
+ * Scheduler - Scheduled Cycle Action.
+ *
+ * Keeps automated runs registry-only in monitor-only mode while normal
+ * schedules continue applying updates.
+ *
+ * @since 1.1.0
+ */
+describe('scheduledCycleAction', () => {
+  it('uses checks only in monitor-only mode', () => {
+    expect(scheduledCycleAction(true)).toBe('check');
+
+    expect(scheduledCycleAction(false)).toBe('update');
 
     return;
   });

@@ -3,7 +3,11 @@ import type { Mock, MockInstance } from 'vitest';
 
 import type { Runner as History } from '../history.js';
 import type { Runner as Scheduler } from '../scheduler.js';
-import type { Shared_CheckTrigger, Shared_SchedulerEvent } from './shared.d.ts';
+import type {
+  Shared_CheckTrigger,
+  Shared_CycleAction,
+  Shared_SchedulerEvent,
+} from './shared.d.ts';
 
 /**
  * Scheduler.
@@ -57,7 +61,11 @@ export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_
 
 export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Source = Shared_CheckTrigger;
 
-export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle = (containerIds: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_ContainerIds, source: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Source) => Promise<UpdateReport>;
+export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Action = Shared_CycleAction;
+
+export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Rollback = boolean;
+
+export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle = (containerIds: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_ContainerIds, source: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Source, action: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Action, rollback: Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle_Rollback) => Promise<UpdateReport>;
 
 export type Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_RunCycle = Mock<Scheduler_Scheduler_TellsListenersWhenACheckStartsAndFinishes_Cycle>;
 
