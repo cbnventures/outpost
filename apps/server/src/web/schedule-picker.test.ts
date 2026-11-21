@@ -12,7 +12,7 @@ import { SchedulePicker } from './schedule-picker.js';
 import type { Web_SchedulePicker_Render } from '@/types/web/schedule-picker.test.d.ts';
 
 /**
- * Web - Schedule Picker.
+ * Schedule Picker - Schedule Picker.
  *
  * Verifies the next scheduled cycle is named for the action it will perform.
  * Normal update mode and monitor-only check mode keep distinct wording.

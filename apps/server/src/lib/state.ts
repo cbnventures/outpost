@@ -10,6 +10,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+/* eslint-disable-next-line n/no-unsupported-features/node-builtins -- The image's Node.js release ships node:sqlite, but the rule still marks it experimental. */
 import { DatabaseSync } from 'node:sqlite';
 
 import { normalizeRegistryHost } from 'outpost-package-registry';

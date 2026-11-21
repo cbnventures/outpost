@@ -1,0 +1,25 @@
+{
+  "files": [
+    "rootfs/etc/nova-docker/legacy-state-paths",
+    "rootfs/etc/nova-docker/writable-paths",
+    "rootfs/etc/s6-overlay/s6-rc.d/nova-container-init/dependencies.d/base",
+    "rootfs/etc/s6-overlay/s6-rc.d/nova-container-init/type",
+    "rootfs/etc/s6-overlay/s6-rc.d/nova-container-init/up",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/dependencies.d/nova-container-init",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/finish",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/run",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/timeout-down",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/timeout-finish",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/timeout-kill",
+    "rootfs/etc/s6-overlay/s6-rc.d/server/type",
+    "rootfs/etc/s6-overlay/user-bundles.d/user/contents.d/nova-container-init",
+    "rootfs/etc/s6-overlay/user-bundles.d/user/contents.d/server",
+    "rootfs/usr/local/libexec/nova-docker/healthcheck",
+    "rootfs/usr/local/libexec/nova-docker/init-user",
+    "rootfs/usr/local/libexec/nova-docker/log",
+    "workspace-manifests/apps/server/package.json",
+    "workspace-manifests/packages/docker-engine/package.json",
+    "workspace-manifests/packages/registry/package.json",
+    "workspace-manifests/packages/updater/package.json"
+  ]
+}

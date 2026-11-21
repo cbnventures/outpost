@@ -12,6 +12,7 @@ import {
   UpdateConfirmationDialog,
 } from './containers-view.js';
 import { ImageName } from './image-name.js';
+import { checkedLabelPattern } from '@/web/regex.js';
 
 import type {
   Web_ContainersView_ContainersView_RendersAnAccessibleActionsHeader_Container,
@@ -31,7 +32,7 @@ import type {
 } from '@/types/web/containers-view.test.d.ts';
 
 /**
- * Containers View - Containers view.
+ * Containers View - Containers View.
  *
  * Covers the table's accessible action heading and the completed-action time.
  * Static markup also exposes the safe wrapping tokens used in result details.
@@ -173,7 +174,7 @@ describe('ContainersView', () => {
       overview,
     }));
 
-    expect(html.match(/Checked /gu)).toHaveLength(8);
+    expect(html.match(new RegExp(checkedLabelPattern, 'gu'))).toHaveLength(8);
 
     expect(html).not.toContain('Updated ');
 
@@ -233,7 +234,7 @@ describe('ContainersView', () => {
 });
 
 /**
- * Containers View - Image name.
+ * Containers View - Image Name.
  *
  * Verifies separators stay with their preceding token, leaving the browser a
  * wrap opportunity only after each registry, path, tag, or digest delimiter.

@@ -1,5 +1,5 @@
 /**
- * Web - Notification Dialog - Service selection - Keeps the placeholder selectable.
+ * Notification Dialog.
  *
  * @since 1.1.0
  */

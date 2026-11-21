@@ -1,5 +1,5 @@
 /**
- * Web - Schedule Picker.
+ * Schedule Picker.
  *
  * @since 1.1.0
  */

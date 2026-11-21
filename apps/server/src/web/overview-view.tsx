@@ -26,87 +26,126 @@ import {
 import { describeSchedule } from '@/web/schedule.ts';
 import { showToast } from '@/web/toast.ts';
 
-import type { ReactElement } from 'react';
-
-import type {
-  Web_Api_Container,
-  Web_Api_Report,
-  Web_Api_Result,
-  Web_Api_ResultStatus,
-} from '@/types/web/api.d.ts';
 import type { Web_Components_OverviewView_Props } from '@/types/web/components.d.ts';
+import type {
+  Web_OverviewView_CountOf_Report,
+  Web_OverviewView_CountOf_Returns,
+  Web_OverviewView_CountOf_Status,
+  Web_OverviewView_OverviewView_ActionError,
+  Web_OverviewView_OverviewView_ActionErrorState,
+  Web_OverviewView_OverviewView_Available,
+  Web_OverviewView_OverviewView_AvailableCount,
+  Web_OverviewView_OverviewView_Busy,
+  Web_OverviewView_OverviewView_BusyState,
+  Web_OverviewView_OverviewView_CheckNow,
+  Web_OverviewView_OverviewView_CheckNow_Returns,
+  Web_OverviewView_OverviewView_ConfirmingUpdateAll,
+  Web_OverviewView_OverviewView_ConfirmingUpdateAllState,
+  Web_OverviewView_OverviewView_Containers,
+  Web_OverviewView_OverviewView_Error,
+  Web_OverviewView_OverviewView_Failed,
+  Web_OverviewView_OverviewView_LastActionLabel,
+  Web_OverviewView_OverviewView_LastErrorNotice,
+  Web_OverviewView_OverviewView_LastReport,
+  Web_OverviewView_OverviewView_ManagedCount,
+  Web_OverviewView_OverviewView_Now,
+  Web_OverviewView_OverviewView_NowState,
+  Web_OverviewView_OverviewView_OnOpenContainers,
+  Web_OverviewView_OverviewView_OnOpenHistory,
+  Web_OverviewView_OverviewView_OnStartCheck,
+  Web_OverviewView_OverviewView_OnStartUpdate,
+  Web_OverviewView_OverviewView_Overview,
+  Web_OverviewView_OverviewView_Returns,
+  Web_OverviewView_OverviewView_Running,
+  Web_OverviewView_OverviewView_RunningActionLabel,
+  Web_OverviewView_OverviewView_ScheduledActionLabel,
+  Web_OverviewView_OverviewView_SetActionError,
+  Web_OverviewView_OverviewView_SetBusy,
+  Web_OverviewView_OverviewView_SetConfirmingUpdateAll,
+  Web_OverviewView_OverviewView_SetNow,
+  Web_OverviewView_OverviewView_StartedBy,
+  Web_OverviewView_OverviewView_Timer,
+  Web_OverviewView_OverviewView_UpdateAll,
+  Web_OverviewView_OverviewView_UpdateAll_Returns,
+} from '@/types/web/overview-view.d.ts';
 
 // countOf counts one status in a check's results.
 
 /**
- * Overview View - Count of.
+ * Overview View - Count Of.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
+ * @param {Web_OverviewView_CountOf_Report} report - Report.
+ * @param {Web_OverviewView_CountOf_Status} status - Status.
+ *
+ * @returns {Web_OverviewView_CountOf_Returns}
+ *
  * @since 1.0.0
  */
-const countOf = (report: Web_Api_Report, status: Web_Api_ResultStatus): number => report['results'].filter(
-  (result: Web_Api_Result): boolean => result['status'] === status,
+const countOf = (report: Web_OverviewView_CountOf_Report, status: Web_OverviewView_CountOf_Status): Web_OverviewView_CountOf_Returns => report['results'].filter(
+  (result) => result['status'] === status,
 ).length;
 
 /**
- * Overview View.
+ * Overview View - Overview View.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_OverviewView_Props} props - Props.
+ *
+ * @returns {Web_OverviewView_OverviewView_Returns}
+ *
  * @since 1.0.0
  */
-export const OverviewView = ({
-  containers,
-  error,
-  onOpenContainers,
-  onOpenHistory,
-  onStartCheck,
-  onStartUpdate,
-  overview,
-}: Web_Components_OverviewView_Props): ReactElement => {
-  const [
-    busy,
-    setBusy,
-  ] = useState<boolean>(false);
-  const [
-    actionError,
-    setActionError,
-  ] = useState<string>('');
-  const [
-    confirmingUpdateAll,
-    setConfirmingUpdateAll,
-  ] = useState<boolean>(false);
-  const [
-    now,
-    setNow,
-  ] = useState<number>(Date.now());
-  const running: boolean = overview !== null && overview['running'];
+export const OverviewView = (props: Web_Components_OverviewView_Props): Web_OverviewView_OverviewView_Returns => {
+  const containers: Web_OverviewView_OverviewView_Containers = props['containers'];
+  const error: Web_OverviewView_OverviewView_Error = props['error'];
+  const onOpenContainers: Web_OverviewView_OverviewView_OnOpenContainers = props['onOpenContainers'];
+  const onOpenHistory: Web_OverviewView_OverviewView_OnOpenHistory = props['onOpenHistory'];
+  const onStartCheck: Web_OverviewView_OverviewView_OnStartCheck = props['onStartCheck'];
+  const onStartUpdate: Web_OverviewView_OverviewView_OnStartUpdate = props['onStartUpdate'];
+  const overview: Web_OverviewView_OverviewView_Overview = props['overview'];
+  const busyState: Web_OverviewView_OverviewView_BusyState = useState<Web_OverviewView_OverviewView_Busy>(false);
+  const busy: Web_OverviewView_OverviewView_Busy = busyState[0];
+  const setBusy: Web_OverviewView_OverviewView_SetBusy = busyState[1];
+  const actionErrorState: Web_OverviewView_OverviewView_ActionErrorState = useState<Web_OverviewView_OverviewView_ActionError>('');
+  const actionError: Web_OverviewView_OverviewView_ActionError = actionErrorState[0];
+  const setActionError: Web_OverviewView_OverviewView_SetActionError = actionErrorState[1];
+  const confirmingUpdateAllState: Web_OverviewView_OverviewView_ConfirmingUpdateAllState = useState<Web_OverviewView_OverviewView_ConfirmingUpdateAll>(false);
+  const confirmingUpdateAll: Web_OverviewView_OverviewView_ConfirmingUpdateAll = confirmingUpdateAllState[0];
+  const setConfirmingUpdateAll: Web_OverviewView_OverviewView_SetConfirmingUpdateAll = confirmingUpdateAllState[1];
+  const nowState: Web_OverviewView_OverviewView_NowState = useState<Web_OverviewView_OverviewView_Now>(Date.now());
+  const now: Web_OverviewView_OverviewView_Now = nowState[0];
+  const setNow: Web_OverviewView_OverviewView_SetNow = nowState[1];
+  const running: Web_OverviewView_OverviewView_Running = overview !== null && overview['running'] === true;
 
   // While a check runs, "started … ago" keeps counting.
-  useEffect((): (() => void) | undefined => {
-    if (!running) {
+  useEffect(() => {
+    if (running === false) {
       return undefined;
     }
 
     setNow(Date.now());
 
-    const timer: number = window.setInterval((): void => setNow(Date.now()), 15_000);
+    const timer: Web_OverviewView_OverviewView_Timer = window.setInterval(() => setNow(Date.now()), 15_000);
 
-    return (): void => window.clearInterval(timer);
+    return () => window.clearInterval(timer);
   }, [running]);
 
   /**
-   * Overview View - Checks now.
+   * Overview View - Check Now.
    *
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
+   * @returns {Web_OverviewView_OverviewView_CheckNow_Returns}
+   *
    * @since 1.1.0
    */
-  const checkNow = async (): Promise<void> => {
+  const checkNow: Web_OverviewView_OverviewView_CheckNow = async (): Web_OverviewView_OverviewView_CheckNow_Returns => {
     setBusy(true);
     setActionError('');
     try {
@@ -117,17 +156,21 @@ export const OverviewView = ({
     } finally {
       setBusy(false);
     }
+
+    return;
   };
 
   /**
-   * Overview View - Updates all.
+   * Overview View - Update All.
    *
    * Starts the apply cycle after the confirmation dialog closes.
    * The shared scheduler state disables both actions while it runs.
    *
+   * @returns {Web_OverviewView_OverviewView_UpdateAll_Returns}
+   *
    * @since 1.1.0
    */
-  const updateAll = async (): Promise<void> => {
+  const updateAll: Web_OverviewView_OverviewView_UpdateAll = async (): Web_OverviewView_OverviewView_UpdateAll_Returns => {
     setBusy(true);
     setActionError('');
     try {
@@ -138,6 +181,8 @@ export const OverviewView = ({
     } finally {
       setBusy(false);
     }
+
+    return;
   };
 
   if (overview === null) {
@@ -153,15 +198,35 @@ export const OverviewView = ({
     );
   }
 
-  const lastReport: Web_Api_Report | null = overview['lastReport'] ?? null;
-  const managedCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed']).length;
-  const availableCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed'] && !container['monitorOnly'] && container['lastStatus'] === 'available').length;
-  const failed: number = (lastReport === null) ? 0 : failedCount(lastReport['results']);
-  const available: number = (lastReport === null) ? 0 : countOf(lastReport, 'available');
-  const startedBy: string = (lastReport === null) ? '' : triggerLabel(lastReport['trigger']);
-  const runningActionLabel: string = cycleActionRunningLabel(overview['action']);
-  const lastActionLabel: string = cycleActionLabel((lastReport === null) ? undefined : lastReport['action']).toLowerCase();
-  const scheduledActionLabel: string = (overview['monitorOnly']) ? 'check' : 'update';
+  const lastReport: Web_OverviewView_OverviewView_LastReport = overview['lastReport'] ?? null;
+  const managedCount: Web_OverviewView_OverviewView_ManagedCount = (containers === null) ? 0 : containers.filter((container) => container['managed']).length;
+  const availableCount: Web_OverviewView_OverviewView_AvailableCount = (containers === null) ? 0 : containers.filter((container) => {
+    return (
+      container['managed'] === true
+      && container['monitorOnly'] === false
+      && container['lastStatus'] === 'available'
+    );
+  }).length;
+  const failed: Web_OverviewView_OverviewView_Failed = (lastReport === null) ? 0 : failedCount(lastReport['results']);
+  const available: Web_OverviewView_OverviewView_Available = (lastReport === null) ? 0 : countOf(lastReport, 'available');
+  const startedBy: Web_OverviewView_OverviewView_StartedBy = (lastReport === null) ? '' : triggerLabel(lastReport['trigger']);
+  const runningActionLabel: Web_OverviewView_OverviewView_RunningActionLabel = cycleActionRunningLabel(overview['action']);
+  const lastActionLabel: Web_OverviewView_OverviewView_LastActionLabel = cycleActionLabel((lastReport === null) ? undefined : lastReport['action']).toLowerCase();
+  const scheduledActionLabel: Web_OverviewView_OverviewView_ScheduledActionLabel = (overview['monitorOnly'] === true) ? 'check' : 'update';
+  let lastErrorNotice: Web_OverviewView_OverviewView_LastErrorNotice = null;
+
+  if (
+    overview['lastError'] !== null
+    && overview['lastError'] !== undefined
+    && overview['lastError'] !== ''
+  ) {
+    lastErrorNotice = (
+      <div className="form-error" role="alert">
+        <Icon name="warning" size={16} />
+        <span>{`The last ${lastActionLabel} failed: ${overview['lastError']}`}</span>
+      </div>
+    );
+  }
 
   return (
     <section className="workspace-section">
@@ -174,7 +239,7 @@ export const OverviewView = ({
           {(availableCount === 0) ? null : (
             <Button
               disabled={busy || running}
-              onClick={(): void => setConfirmingUpdateAll(true)}
+              onClick={() => setConfirmingUpdateAll(true)}
             >
               {`Update all (${availableCount})`}
             </Button>
@@ -182,12 +247,14 @@ export const OverviewView = ({
           <Button
             disabled={busy || running}
             icon="refresh"
-            onClick={(): void => {
+            onClick={() => {
               void checkNow();
+
+              return;
             }}
             variant="primary"
           >
-            {(running) ? `${runningActionLabel}…` : 'Check now'}
+            {(running === true) ? `${runningActionLabel}…` : 'Check now'}
           </Button>
         </div>
       </div>
@@ -199,12 +266,7 @@ export const OverviewView = ({
         </div>
       )}
 
-      {(overview['lastError'] === null || overview['lastError'] === undefined || overview['lastError'] === '') ? null : (
-        <div className="form-error" role="alert">
-          <Icon name="warning" size={16} />
-          <span>{`The last ${lastActionLabel} failed: ${overview['lastError']}`}</span>
-        </div>
-      )}
+      {lastErrorNotice}
 
       <div className="panel">
         <section className="form-section">
@@ -215,12 +277,12 @@ export const OverviewView = ({
           <dl className="details">
             <div>
               <dt>Status</dt>
-              <dd className={(running) ? 'details-status-connecting' : 'details-status-protected'}>
+              <dd className={(running === true) ? 'details-status-connecting' : 'details-status-protected'}>
                 <span className="status-dot" />
-                {(running) ? runningActionLabel : 'Idle'}
+                {(running === true) ? runningActionLabel : 'Idle'}
               </dd>
             </div>
-            {(running) ? (
+            {(running === true) ? (
               <div>
                 <dt>Started</dt>
                 <dd>{formatRelative(overview['startedAt'], now)}</dd>
@@ -244,7 +306,7 @@ export const OverviewView = ({
             </div>
             <div>
               <dt>Monitor only</dt>
-              <dd>{(overview['monitorOnly']) ? 'On' : 'Off'}</dd>
+              <dd>{(overview['monitorOnly'] === true) ? 'On' : 'Off'}</dd>
             </div>
             <div>
               <dt>Managed containers</dt>
@@ -315,11 +377,13 @@ export const OverviewView = ({
         confirmLabel="Update all"
         error=""
         message="Outpost checks every managed container, applies newer images, and updates itself last if needed. Monitor-only containers stay unchanged."
-        onCancel={(): void => setConfirmingUpdateAll(false)}
-        onConfirm={(): void => {
+        onCancel={() => setConfirmingUpdateAll(false)}
+        onConfirm={() => {
           setConfirmingUpdateAll(false);
 
           void updateAll();
+
+          return;
         }}
         open={confirmingUpdateAll}
         title="Update all available containers?"

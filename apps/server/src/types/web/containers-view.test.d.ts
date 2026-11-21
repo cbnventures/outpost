@@ -7,7 +7,7 @@ import type {
 import type { Web_Components_UpdateConfirmationDialog_Props } from './components.d.ts';
 
 /**
- * Web - Containers View - Containers view - Renders an accessible Actions header.
+ * Containers View.
  *
  * @since 1.1.0
  */
@@ -18,7 +18,7 @@ export type Web_ContainersView_ContainersView_RendersAnAccessibleActionsHeader_O
 export type Web_ContainersView_ContainersView_RendersAnAccessibleActionsHeader_Html = string;
 
 /**
- * Web - Containers View - Containers view - Uses result neutral checked labels.
+ * Containers View.
  *
  * @since 1.1.0
  */
@@ -29,7 +29,7 @@ export type Web_ContainersView_ContainersView_UsesResultNeutralCheckedLabels_Ove
 export type Web_ContainersView_ContainersView_UsesResultNeutralCheckedLabels_Html = string;
 
 /**
- * Web - Containers View - Containers view - Uses the short result summary.
+ * Containers View.
  *
  * @since 1.1.0
  */
@@ -40,14 +40,14 @@ export type Web_ContainersView_ContainersView_UsesTheShortResultSummary_Overview
 export type Web_ContainersView_ContainersView_UsesTheShortResultSummary_Html = string;
 
 /**
- * Web - Containers View - Image name - Wraps only after image delimiters.
+ * Containers View.
  *
  * @since 1.1.0
  */
 export type Web_ContainersView_ImageName_WrapsOnlyAfterImageDelimiters_Html = string;
 
 /**
- * Web - Containers View - Update confirmation dialog.
+ * Containers View.
  *
  * @since 1.1.0
  */

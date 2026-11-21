@@ -15,7 +15,7 @@ import type {
 } from '@/types/web/history-view.test.d.ts';
 
 /**
- * History View - Result list.
+ * History View - Result List.
  *
  * Keeps compact overview rows short while expanded history retains recovery
  * detail. Long image references and Docker IDs use the shared safe tokens.

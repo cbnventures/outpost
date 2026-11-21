@@ -5,8 +5,8 @@
       "slug": "outpost"
     },
     "description": {
-      "short": "Self-hosted container auto-updater for Docker, a modern Watchtower replacement",
-      "long": "Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, notifications to ntfy, Telegram, Discord, email, and more, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image."
+      "short": "A modern Watchtower replacement that updates Docker containers and rolls back failed starts",
+      "long": "Pull image updates on your schedule and bring each container back with its original settings, volumes, and networks. Pick containers by label or watch in monitor-only mode, follow it all from a web dashboard, and get notified through ntfy, Telegram, Discord, email, and more."
     },
     "keywords": [
       "docker",
@@ -165,8 +165,243 @@
     ],
     "issueTemplate": {
       "bugReportFields": [
-        "nodejs"
-      ]
+        "docker",
+        "web",
+        "screenshots",
+        "notifications"
+      ],
+      "customQuestions": {
+        "bug": [
+          {
+            "type": "dropdown",
+            "id": "affected-area",
+            "attributes": {
+              "label": "Affected Area",
+              "description": "Select the Outpost area involved.",
+              "options": [
+                "Container Selection",
+                "Image Check or Registry",
+                "Recreation",
+                "Rollback",
+                "Self-Update",
+                "Dashboard",
+                "HTTP API",
+                "Metrics",
+                "Notifications",
+                "Other"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "label-mode",
+            "attributes": {
+              "label": "Label Mode",
+              "description": "Select the configured label mode.",
+              "options": [
+                "Opt-Out",
+                "Opt-In"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "monitor-only",
+            "attributes": {
+              "label": "Monitor-Only",
+              "description": "Select whether monitor-only was on for the affected container.",
+              "options": [
+                "On",
+                "Off",
+                "Not Sure"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "cycle-result",
+            "attributes": {
+              "label": "Cycle Result",
+              "description": "Select the result reported by the affected update cycle.",
+              "options": [
+                "Updated",
+                "Update Available",
+                "Held",
+                "Up to Date",
+                "Skipped",
+                "Rolled Back",
+                "Kept Unhealthy",
+                "Failed",
+                "Not Sure"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "registry-type",
+            "attributes": {
+              "label": "Registry Type",
+              "description": "Select the registry hosting the affected image.",
+              "options": [
+                "Docker Hub",
+                "GitHub Container Registry",
+                "Private Registry",
+                "Other"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          }
+        ],
+        "feature": [
+          {
+            "type": "dropdown",
+            "id": "affected-area",
+            "attributes": {
+              "label": "Affected Area",
+              "description": "Select the Outpost area involved.",
+              "options": [
+                "Container Selection",
+                "Image Check or Registry",
+                "Recreation",
+                "Rollback",
+                "Self-Update",
+                "Dashboard",
+                "HTTP API",
+                "Metrics",
+                "Notifications",
+                "Other"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "label-mode",
+            "attributes": {
+              "label": "Label Mode",
+              "description": "Select the configured label mode.",
+              "options": [
+                "Opt-Out",
+                "Opt-In"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          }
+        ],
+        "support": [
+          {
+            "type": "dropdown",
+            "id": "affected-area",
+            "attributes": {
+              "label": "Affected Area",
+              "description": "Select the Outpost area involved.",
+              "options": [
+                "Container Selection",
+                "Image Check or Registry",
+                "Recreation",
+                "Rollback",
+                "Self-Update",
+                "Dashboard",
+                "HTTP API",
+                "Metrics",
+                "Notifications",
+                "Other"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "label-mode",
+            "attributes": {
+              "label": "Label Mode",
+              "description": "Select the configured label mode.",
+              "options": [
+                "Opt-Out",
+                "Opt-In"
+              ]
+            },
+            "validations": {
+              "required": true
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "monitor-only",
+            "attributes": {
+              "label": "Monitor-Only",
+              "description": "Select whether monitor-only was on for the affected container.",
+              "options": [
+                "On",
+                "Off",
+                "Not Sure"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "cycle-result",
+            "attributes": {
+              "label": "Cycle Result",
+              "description": "Select the result reported by the affected update cycle.",
+              "options": [
+                "Updated",
+                "Update Available",
+                "Held",
+                "Up to Date",
+                "Skipped",
+                "Rolled Back",
+                "Kept Unhealthy",
+                "Failed",
+                "Not Sure"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          },
+          {
+            "type": "dropdown",
+            "id": "registry-type",
+            "attributes": {
+              "label": "Registry Type",
+              "description": "Select the registry hosting the affected image.",
+              "options": [
+                "Docker Hub",
+                "GitHub Container Registry",
+                "Private Registry",
+                "Other"
+              ]
+            },
+            "validations": {
+              "required": false
+            }
+          }
+        ]
+      }
     }
   },
   "dockerHub": {
@@ -205,7 +440,7 @@
         "release"
       ],
       "runsOn": "ubuntu-24.04",
-      "timeoutMinutes": 45,
+      "timeoutMinutes": 90,
       "build": [
         "./apps/docs"
       ],
@@ -251,6 +486,7 @@
       "github-release",
       "github-top-language",
       "github-license",
+      "coverage",
       "funding"
     ]
   },
@@ -327,11 +563,24 @@
       ]
     }
   },
+  "attributeFiles": {
+    "./packages/docker/.gitattributes": {
+      "bundles": [
+        "docker-scripts"
+      ],
+      "patterns": []
+    }
+  },
   "agents": [
     "claude-code",
     "codex"
   ],
   "recipes": {
+    "docker": {
+      "sync-image": {
+        "enabled": true
+      }
+    },
     "docker-hub": {
       "sync-identity": {
         "enabled": true
@@ -407,6 +656,11 @@
         "enabled": true
       },
       "update-introduction": {
+        "enabled": true
+      }
+    },
+    "tsconfig": {
+      "sync-references": {
         "enabled": true
       }
     },
@@ -727,6 +981,9 @@
     }
   },
   "settings": {
+    "coverage": {
+      "minimum": 55
+    },
     "lockStepVersioning": true,
     "runWorkspaces": {
       "cache": {

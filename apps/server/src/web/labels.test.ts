@@ -20,7 +20,7 @@ import type {
 } from '@/types/web/labels.test.d.ts';
 
 /**
- * Labels - Cycle action labels.
+ * Labels - Cycle Action Labels.
  *
  * Keeps the running and completed wording aligned with the scheduler action.
  * Both dashboard status surfaces and container result times reuse these labels.
@@ -44,7 +44,7 @@ describe('cycle action labels', () => {
 });
 
 /**
- * Labels - Describe scheduler.
+ * Labels - Describe Scheduler.
  *
  * Verifies the sidebar status names the action carried by live scheduler state.
  * The detail follows the same action when a start time is unavailable.

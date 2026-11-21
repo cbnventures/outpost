@@ -4,6 +4,11 @@ import type {
 } from 'outpost-package-updater';
 
 import type {
+  Lib_Notifications_Dependencies,
+  Lib_Notifications_HttpRequest,
+  Lib_Notifications_Notification,
+  Lib_Notifications_Payload,
+  Lib_Notifications_Result,
   Lib_Notifications_Service,
   Lib_Notifications_Target,
 } from './lib/notifications.d.ts';
@@ -562,6 +567,54 @@ export type Shared_WebauthnConfiguration = {
   origin: Shared_WebauthnConfiguration_Origin;
   rpId: Shared_WebauthnConfiguration_RpId;
   rpName: Shared_WebauthnConfiguration_RpName;
+};
+
+/**
+ * Shared - Notifier Payload.
+ *
+ * Carries the common notification forms every project-owned adapter needs.
+ * HTTP webhooks receive the versioned payload while services use the title.
+ *
+ * @since 1.2.1
+ */
+export type Shared_NotifierPayload_Notification = Lib_Notifications_Notification;
+
+export type Shared_NotifierPayload_Title = string;
+
+export type Shared_NotifierPayload_Webhook = Lib_Notifications_Payload;
+
+export type Shared_NotifierPayload = {
+  notification: Shared_NotifierPayload_Notification;
+  title: Shared_NotifierPayload_Title;
+  webhook: Shared_NotifierPayload_Webhook;
+};
+
+/**
+ * Shared - Notifier.
+ *
+ * Defines the delivery boundary shared by every notification service adapter.
+ * Callers never need to know how a third-party service receives its message.
+ *
+ * @since 1.2.1
+ */
+export type Shared_Notifier_Send = (payload: Shared_NotifierPayload, dependencies: Lib_Notifications_Dependencies) => Promise<Lib_Notifications_Result>;
+
+export type Shared_Notifier = {
+  send: Shared_Notifier_Send;
+};
+
+/**
+ * Shared - HTTP Notifier.
+ *
+ * Extends a notifier with request construction so tests can compare the exact
+ * URL, headers, method, and body without making a network call.
+ *
+ * @since 1.2.1
+ */
+export type Shared_HttpNotifier_BuildRequest = (payload: Shared_NotifierPayload) => Lib_Notifications_HttpRequest;
+
+export type Shared_HttpNotifier = Shared_Notifier & {
+  buildRequest: Shared_HttpNotifier_BuildRequest;
 };
 
 /**

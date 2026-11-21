@@ -61,6 +61,7 @@ Every TypeScript workspace uses the same layout:
 | `apps/server/src/app.ts`                                   | HTTP app, limits, and route wiring      | Adding middleware or route modules                 |
 | `apps/server/src/routes/`                                  | API, sign-in, dashboard, and metrics    | Adding or changing endpoints or metrics            |
 | `apps/server/src/lib/state.ts`                             | SQLite account, sessions, and tokens    | Changing what the server stores                    |
+| `apps/server/src/lib/notifiers/`                           | Third-party notification adapters       | Changing service delivery or validation            |
 | `apps/server/src/web/`                                     | Dashboard (React + Vite)                | Changing the dashboard UI                          |
 | `apps/server/src/self-update.ts`                           | Self-update helper and hand-off         | Changing how Outpost updates itself                |
 | `packages/docker/manifest.json`                            | s6 services                             | Changing services, health, or writable paths       |
@@ -110,6 +111,7 @@ Environment variables carry only what Outpost needs before its database opens: `
 
 **Do:**
 - Keep Docker, registry, and update logic in their packages; `apps/server` wires them together and owns notifications, which share their design with the other Docker apps.
+- Keep every third-party notification API behind its project-owned adapter in `apps/server/src/lib/notifiers/`.
 - Inject I/O (engine, fetch, clock, sleep) into the updater so every decision is unit-testable without Docker.
 - Validate every Docker Engine and registry response with Zod.
 - Roll back on any failure after the old container has been stopped.

@@ -13,7 +13,7 @@ import { notificationServiceIssue } from '@/web/notification-services.js';
 import type { Web_NotificationDialog_ServiceSelection_KeepsThePlaceholderSelectable_Html } from '@/types/web/notification-dialog.test.d.ts';
 
 /**
- * Notification Dialog - Service selection.
+ * Notification Dialog - Service Selection.
  *
  * Keeps the empty service available as a deliberate choice while preserving
  * the required-field error shown when the form is submitted with that choice.

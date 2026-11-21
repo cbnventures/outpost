@@ -1,3 +1,4 @@
+import { VitestCoverage } from '@cbnventures/nova/toolkit';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -19,5 +20,6 @@ export default defineConfig({
       'src/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
+    coverage: VitestCoverage.options(),
   },
 });

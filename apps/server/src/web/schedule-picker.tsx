@@ -14,110 +14,141 @@ import {
   scheduleIntervals,
 } from '@/web/schedule.ts';
 
-import type {
-  MutableRefObject,
-  ReactElement,
-} from 'react';
-
 import type { Web_Components_SchedulePicker_Props } from '@/types/web/components.d.ts';
 import type {
-  Web_Schedule_Day,
-  Web_Schedule_Frequency,
-  Web_Schedule_Simple,
-} from '@/types/web/schedule.d.ts';
+  Web_SchedulePicker_SchedulePicker_ChangeSimple,
+  Web_SchedulePicker_SchedulePicker_ChangeSimple_Cron,
+  Web_SchedulePicker_SchedulePicker_ChangeSimple_Next,
+  Web_SchedulePicker_SchedulePicker_ChangeSimple_Returns,
+  Web_SchedulePicker_SchedulePicker_Emitted,
+  Web_SchedulePicker_SchedulePicker_Frequency,
+  Web_SchedulePicker_SchedulePicker_Issue,
+  Web_SchedulePicker_SchedulePicker_MonitorOnly,
+  Web_SchedulePicker_SchedulePicker_Next,
+  Web_SchedulePicker_SchedulePicker_OnChange,
+  Web_SchedulePicker_SchedulePicker_Returns,
+  Web_SchedulePicker_SchedulePicker_ScheduledAction,
+  Web_SchedulePicker_SchedulePicker_SetSimple,
+  Web_SchedulePicker_SchedulePicker_ShowInterval,
+  Web_SchedulePicker_SchedulePicker_ShowTime,
+  Web_SchedulePicker_SchedulePicker_Simple,
+  Web_SchedulePicker_SchedulePicker_SimpleState,
+  Web_SchedulePicker_SchedulePicker_TimeZone,
+  Web_SchedulePicker_SchedulePicker_ToggleDay,
+  Web_SchedulePicker_SchedulePicker_ToggleDay_Day,
+  Web_SchedulePicker_SchedulePicker_ToggleDay_Returns,
+  Web_SchedulePicker_SchedulePicker_ToggleDay_Selected,
+  Web_SchedulePicker_SchedulePicker_Value,
+} from '@/types/web/schedule-picker.d.ts';
 
 /**
- * Schedule Picker.
+ * Schedule Picker - Schedule Picker.
  *
  * Picks when checks run without writing cron: every hour, every few hours, every day,
  * or chosen days, at a time. Custom shows the cron field for anyone who prefers it.
  *
+ * @param {Web_Components_SchedulePicker_Props} props - Props.
+ *
+ * @returns {Web_SchedulePicker_SchedulePicker_Returns}
+ *
  * @since 1.0.0
  */
-export const SchedulePicker = ({
-  issue,
-  monitorOnly,
-  onChange,
-  timeZone,
-  value,
-}: Web_Components_SchedulePicker_Props): ReactElement => {
-  const [
-    simple,
-    setSimple,
-  ] = useState<Web_Schedule_Simple>(parseSchedule(value));
-  const emitted: MutableRefObject<string> = useRef<string>(value);
-  const scheduledAction: string = (monitorOnly) ? 'check' : 'update';
+export const SchedulePicker = (props: Web_Components_SchedulePicker_Props): Web_SchedulePicker_SchedulePicker_Returns => {
+  const issue: Web_SchedulePicker_SchedulePicker_Issue = props['issue'];
+  const monitorOnly: Web_SchedulePicker_SchedulePicker_MonitorOnly = props['monitorOnly'];
+  const onChange: Web_SchedulePicker_SchedulePicker_OnChange = props['onChange'];
+  const timeZone: Web_SchedulePicker_SchedulePicker_TimeZone = props['timeZone'];
+  const value: Web_SchedulePicker_SchedulePicker_Value = props['value'];
+  const simpleState: Web_SchedulePicker_SchedulePicker_SimpleState = useState<Web_SchedulePicker_SchedulePicker_Simple>(parseSchedule(value));
+  const simple: Web_SchedulePicker_SchedulePicker_Simple = simpleState[0];
+  const setSimple: Web_SchedulePicker_SchedulePicker_SetSimple = simpleState[1];
+  const emitted: Web_SchedulePicker_SchedulePicker_Emitted = useRef<Web_SchedulePicker_SchedulePicker_Value>(value);
+  const scheduledAction: Web_SchedulePicker_SchedulePicker_ScheduledAction = (monitorOnly === true) ? 'check' : 'update';
 
   // A value from outside, like Discard, picks the matching choice again; the picker's own edits don't.
-  useEffect((): void => {
+  useEffect(() => {
     if (value === emitted.current) {
       return;
     }
 
     emitted.current = value;
     setSimple(parseSchedule(value));
+
+    return;
   }, [value]);
 
   /**
-   * Schedule Picker - Change simple.
+   * Schedule Picker - Change Simple.
    *
    * Applies one choice and sends the cron it makes. Custom keeps the current cron,
    * so switching to it starts from the schedule already picked.
    *
+   * @param {Web_SchedulePicker_SchedulePicker_ChangeSimple_Next} next - Next.
+   *
+   * @returns {Web_SchedulePicker_SchedulePicker_ChangeSimple_Returns}
+   *
    * @since 1.0.0
    */
-  const changeSimple = (next: Web_Schedule_Simple): void => {
+  const changeSimple: Web_SchedulePicker_SchedulePicker_ChangeSimple = (next: Web_SchedulePicker_SchedulePicker_ChangeSimple_Next): Web_SchedulePicker_SchedulePicker_ChangeSimple_Returns => {
     setSimple(next);
 
     if (next['frequency'] === 'custom') {
       return;
     }
 
-    const cron: string = buildSchedule(next);
+    const cron: Web_SchedulePicker_SchedulePicker_ChangeSimple_Cron = buildSchedule(next);
 
     emitted.current = cron;
     onChange(cron);
+
+    return;
   };
 
   /**
-   * Schedule Picker - Toggle day.
+   * Schedule Picker - Toggle Day.
    *
    * Adds or removes one weekday. The last day can't be removed,
    * so a weekly schedule always runs.
    *
+   * @param {Web_SchedulePicker_SchedulePicker_ToggleDay_Day} day - Day.
+   *
+   * @returns {Web_SchedulePicker_SchedulePicker_ToggleDay_Returns}
+   *
    * @since 1.0.0
    */
-  const toggleDay = (day: number): void => {
-    const selected: boolean = simple['days'].includes(day);
+  const toggleDay: Web_SchedulePicker_SchedulePicker_ToggleDay = (day: Web_SchedulePicker_SchedulePicker_ToggleDay_Day): Web_SchedulePicker_SchedulePicker_ToggleDay_Returns => {
+    const selected: Web_SchedulePicker_SchedulePicker_ToggleDay_Selected = simple['days'].includes(day);
 
-    if (selected && simple['days'].length === 1) {
+    if (selected === true && simple['days'].length === 1) {
       return;
     }
 
     changeSimple({
       ...simple,
-      days: (selected) ? simple['days'].filter((candidate: number): boolean => candidate !== day) : [
+      days: (selected === true) ? simple['days'].filter((candidate) => candidate !== day) : [
         ...simple['days'],
         day,
       ],
     });
+
+    return;
   };
 
-  const frequency: Web_Schedule_Frequency = simple['frequency'];
-  const showTime: boolean = frequency === 'daily' || frequency === 'weekly';
-  const showInterval: boolean = frequency === 'hours';
-  const next: string | null = nextRun(value, timeZone);
+  const frequency: Web_SchedulePicker_SchedulePicker_Frequency = simple['frequency'];
+  const showTime: Web_SchedulePicker_SchedulePicker_ShowTime = frequency === 'daily' || frequency === 'weekly';
+  const showInterval: Web_SchedulePicker_SchedulePicker_ShowInterval = frequency === 'hours';
+  const next: Web_SchedulePicker_SchedulePicker_Next = nextRun(value, timeZone);
 
   return (
     <div className="schedule-picker">
-      <div className={(showTime || showInterval) ? 'schedule-fields schedule-fields-split' : 'schedule-fields'}>
+      <div className={(showTime === true || showInterval === true) ? 'schedule-fields schedule-fields-split' : 'schedule-fields'}>
         <FieldLabel>
           <span>Frequency</span>
           <select
             className="select-control"
-            onChange={(event): void => changeSimple({
+            onChange={(event) => changeSimple({
               ...simple,
-              frequency: event.currentTarget.value as Web_Schedule_Frequency,
+              frequency: event.currentTarget.value as Web_SchedulePicker_SchedulePicker_Frequency,
             })}
             value={frequency}
           >
@@ -128,32 +159,34 @@ export const SchedulePicker = ({
             <option value="custom">Custom (cron)</option>
           </select>
         </FieldLabel>
-        {(showInterval) ? (
+        {(showInterval === true) ? (
           <FieldLabel>
             <span>Interval</span>
             <select
               className="select-control"
-              onChange={(event): void => changeSimple({
+              onChange={(event) => changeSimple({
                 ...simple,
                 interval: Number(event.currentTarget.value),
               })}
               value={simple['interval']}
             >
-              {scheduleIntervals.map((interval: number): ReactElement => <option key={interval} value={interval}>{`${String(interval)} hours`}</option>)}
+              {scheduleIntervals.map((interval) => <option key={interval} value={interval}>{`${String(interval)} hours`}</option>)}
             </select>
           </FieldLabel>
         ) : null}
-        {(showTime) ? (
+        {(showTime === true) ? (
           <FieldLabel>
             <span>Time</span>
             <input
-              onChange={(event): void => {
+              onChange={(event) => {
                 if (event.currentTarget.value !== '') {
                   changeSimple({
                     ...simple,
                     time: event.currentTarget.value,
                   });
                 }
+
+                return;
               }}
               type="time"
               value={simple['time']}
@@ -166,12 +199,12 @@ export const SchedulePicker = ({
         <fieldset className="schedule-days">
           <legend>Days</legend>
           <div>
-            {scheduleDays.map((day: Web_Schedule_Day): ReactElement => (
+            {scheduleDays.map((day) => (
               <button
                 aria-label={day['name']}
                 aria-pressed={simple['days'].includes(day['value'])}
                 key={day['value']}
-                onClick={(): void => toggleDay(day['value'])}
+                onClick={() => toggleDay(day['value'])}
                 type="button"
               >
                 {day['label']}
@@ -187,9 +220,11 @@ export const SchedulePicker = ({
           <input
             aria-invalid={issue !== ''}
             className="monospace"
-            onChange={(event): void => {
+            onChange={(event) => {
               emitted.current = event.currentTarget.value;
               onChange(event.currentTarget.value);
+
+              return;
             }}
             spellCheck={false}
             value={value}

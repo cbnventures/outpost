@@ -12,7 +12,7 @@ import type {
 } from '@/types/web/backup-format.test.d.ts';
 
 /**
- * Browser Backup Format - Valid document.
+ * Backup Format - Valid Document.
  *
  * Supplies a minimal version-one export for strict browser-schema tests.
  * Each case derives one invalid document without mutating the fixture.
@@ -74,8 +74,11 @@ describe('browser backup format', () => {
     };
 
     expect(backupDocumentSchema.safeParse(unknownTopLevel).success).toBe(false);
+
     expect(backupDocumentSchema.safeParse(unknownNested).success).toBe(false);
+
     expect(backupDocumentSchema.safeParse(emptyDocument).success).toBe(false);
+
     expect(backupDocumentSchema.safeParse(duplicateDocument).success).toBe(false);
 
     return;

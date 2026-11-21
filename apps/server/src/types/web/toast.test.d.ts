@@ -9,21 +9,21 @@ import type {
 } from 'vitest';
 
 /**
- * Web - Toast - Click handler.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_ClickHandler = NotyfEventCallback;
 
 /**
- * Web - Toast - Error notification.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_ErrorNotification = NotyfNotification;
 
 /**
- * Web - Toast - Notyf mocks.
+ * Toast.
  *
  * @since 1.1.0
  */
@@ -43,35 +43,35 @@ export type Web_Toast_NotyfMocks = {
 };
 
 /**
- * Web - Toast - Notification.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_Notification = NotyfNotification;
 
 /**
- * Web - Toast - Notification call.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_NotificationCall = Parameters<NotyfNotification['on']> | undefined;
 
 /**
- * Web - Toast - Notification on.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_NotificationOn = MockInstance<NotyfNotification['on']>;
 
 /**
- * Web - Toast - Success notification.
+ * Toast.
  *
  * @since 1.1.0
  */
 export type Web_Toast_SuccessNotification = NotyfNotification;
 
 /**
- * Web - Toast - Visible toast.
+ * Toast.
  *
  * @since 1.1.0
  */

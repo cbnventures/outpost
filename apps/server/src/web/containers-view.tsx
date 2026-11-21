@@ -23,33 +23,109 @@ import {
 } from '@/web/primitives.tsx';
 import { showToast } from '@/web/toast.ts';
 
-import type { ReactElement } from 'react';
-
-import type { Web_Api_Container } from '@/types/web/api.d.ts';
 import type {
   Web_Components_ContainerCell_Props,
   Web_Components_ContainersView_Props,
   Web_Components_UpdateConfirmationDialog_Props,
 } from '@/types/web/components.d.ts';
+import type {
+  Web_ContainersView_ActionLabel_Checking,
+  Web_ContainersView_ActionLabel_Container,
+  Web_ContainersView_ActionLabel_Returns,
+  Web_ContainersView_ActionLabel_Updating,
+  Web_ContainersView_ContainersView_ActionError,
+  Web_ContainersView_ContainersView_ActionErrorState,
+  Web_ContainersView_ContainersView_AvailableCount,
+  Web_ContainersView_ContainersView_Busy,
+  Web_ContainersView_ContainersView_BusyState,
+  Web_ContainersView_ContainersView_Check,
+  Web_ContainersView_ContainersView_Check_Container,
+  Web_ContainersView_ContainersView_Check_Returns,
+  Web_ContainersView_ContainersView_Checking,
+  Web_ContainersView_ContainersView_CheckingState,
+  Web_ContainersView_ContainersView_ConfirmedContainer,
+  Web_ContainersView_ContainersView_ConfirmingUpdate,
+  Web_ContainersView_ContainersView_ConfirmingUpdateAll,
+  Web_ContainersView_ContainersView_ConfirmingUpdateAllState,
+  Web_ContainersView_ContainersView_ConfirmingUpdateState,
+  Web_ContainersView_ContainersView_Containers,
+  Web_ContainersView_ContainersView_Content,
+  Web_ContainersView_ContainersView_Error,
+  Web_ContainersView_ContainersView_OnRefresh,
+  Web_ContainersView_ContainersView_OnStartCheck,
+  Web_ContainersView_ContainersView_OnStartUpdate,
+  Web_ContainersView_ContainersView_Overview,
+  Web_ContainersView_ContainersView_Refresh,
+  Web_ContainersView_ContainersView_Refresh_Returns,
+  Web_ContainersView_ContainersView_Returns,
+  Web_ContainersView_ContainersView_Running,
+  Web_ContainersView_ContainersView_SetActionError,
+  Web_ContainersView_ContainersView_SetBusy,
+  Web_ContainersView_ContainersView_SetChecking,
+  Web_ContainersView_ContainersView_SetConfirmingUpdate,
+  Web_ContainersView_ContainersView_SetConfirmingUpdateAll,
+  Web_ContainersView_ContainersView_SetUpdating,
+  Web_ContainersView_ContainersView_Update,
+  Web_ContainersView_ContainersView_Update_Container,
+  Web_ContainersView_ContainersView_Update_Returns,
+  Web_ContainersView_ContainersView_Update_Rollback,
+  Web_ContainersView_ContainersView_Updating,
+  Web_ContainersView_ContainersView_UpdatingState,
+  Web_ContainersView_LastResult_CheckedVerb,
+  Web_ContainersView_LastResult_Container,
+  Web_ContainersView_LastResult_Detail,
+  Web_ContainersView_LastResult_DetailNote,
+  Web_ContainersView_LastResult_Returns,
+  Web_ContainersView_LastResult_Status,
+  Web_ContainersView_Managed_Container,
+  Web_ContainersView_Managed_Returns,
+  Web_ContainersView_ManagedNote_Container,
+  Web_ContainersView_ManagedNote_Returns,
+  Web_ContainersView_UpdateConfirmationDialog_Container,
+  Web_ContainersView_UpdateConfirmationDialog_Held,
+  Web_ContainersView_UpdateConfirmationDialog_KeepNewContainer,
+  Web_ContainersView_UpdateConfirmationDialog_KeepNewContainerState,
+  Web_ContainersView_UpdateConfirmationDialog_Message,
+  Web_ContainersView_UpdateConfirmationDialog_OnCancel,
+  Web_ContainersView_UpdateConfirmationDialog_OnConfirm,
+  Web_ContainersView_UpdateConfirmationDialog_Returns,
+  Web_ContainersView_UpdateConfirmationDialog_SetKeepNewContainer,
+} from '@/types/web/containers-view.d.ts';
 
 // LastResult shows what the last check did with a container, or that none has looked at it yet.
 
 /**
- * Containers View - Last result.
+ * Containers View - Last Result.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_ContainerCell_Props} props - Props.
+ *
+ * @returns {Web_ContainersView_LastResult_Returns}
+ *
  * @since 1.0.0
  */
-const LastResult = ({
-  container,
-}: Web_Components_ContainerCell_Props): ReactElement => {
-  const status: Web_Api_Container['lastStatus'] = container['lastStatus'];
-  const detail: Web_Api_Container['lastDetail'] = container['lastSummary'] ?? container['lastDetail'];
+const LastResult = (props: Web_Components_ContainerCell_Props): Web_ContainersView_LastResult_Returns => {
+  const container: Web_ContainersView_LastResult_Container = props['container'];
+  const status: Web_ContainersView_LastResult_Status = container['lastStatus'];
+  const detail: Web_ContainersView_LastResult_Detail = container['lastSummary'] ?? container['lastDetail'];
 
   if (status === null || status === undefined) {
     return <span className="container-note">Not checked yet</span>;
+  }
+
+  const checkedVerb: Web_ContainersView_LastResult_CheckedVerb = (status === 'updated') ? 'Updated' : 'Checked';
+  let detailNote: Web_ContainersView_LastResult_DetailNote = null;
+
+  if (
+    detail !== null
+    && detail !== undefined
+    && detail !== ''
+  ) {
+    detailNote = (
+      <BreakableText breakAtNameSeparators className="container-note container-detail" text={detail} title={detail} />
+    );
   }
 
   return (
@@ -58,11 +134,9 @@ const LastResult = ({
         <span aria-hidden="true" className={statusClasses[status]} />
         {statusLabels[status]}
       </span>
-      {(detail === null || detail === undefined || detail === '') ? null : (
-        <BreakableText breakAtNameSeparators className="container-note container-detail" text={detail} title={detail} />
-      )}
+      {detailNote}
       {(container['lastCheckedAt'] === null || container['lastCheckedAt'] === undefined) ? null : (
-        <span className="container-note">{`${(status === 'updated') ? 'Updated' : 'Checked'} ${formatRelative(container['lastCheckedAt'])}`}</span>
+        <span className="container-note">{`${checkedVerb} ${formatRelative(container['lastCheckedAt'])}`}</span>
       )}
     </>
   );
@@ -71,23 +145,35 @@ const LastResult = ({
 // actionLabel names the operation a row can start from its latest status.
 
 /**
- * Containers View - Action label.
+ * Containers View - Action Label.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
+ * @param {Web_ContainersView_ActionLabel_Container} container - Container.
+ * @param {Web_ContainersView_ActionLabel_Checking}  checking  - Checking.
+ * @param {Web_ContainersView_ActionLabel_Updating}  updating  - Updating.
+ *
+ * @returns {Web_ContainersView_ActionLabel_Returns}
+ *
  * @since 1.1.0
  */
-const actionLabel = (container: Web_Api_Container, checking: boolean, updating: boolean): string => {
-  if (updating) {
+const actionLabel = (container: Web_ContainersView_ActionLabel_Container, checking: Web_ContainersView_ActionLabel_Checking, updating: Web_ContainersView_ActionLabel_Updating): Web_ContainersView_ActionLabel_Returns => {
+  if (updating === true) {
     return 'Updating…';
   }
 
-  if (checking) {
+  if (checking === true) {
     return 'Checking…';
   }
 
-  return ((container['lastStatus'] === 'available' || container['lastStatus'] === 'held') && !container['monitorOnly']) ? 'Update' : 'Check';
+  return (
+    (
+      container['lastStatus'] === 'available'
+      || container['lastStatus'] === 'held'
+    )
+    && container['monitorOnly'] === false
+  ) ? 'Update' : 'Check';
 };
 
 // Managed says whether Outpost updates a container, and why not when it doesn't.
@@ -98,12 +184,16 @@ const actionLabel = (container: Web_Api_Container, checking: boolean, updating: 
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_ContainerCell_Props} props - Props.
+ *
+ * @returns {Web_ContainersView_Managed_Returns}
+ *
  * @since 1.0.0
  */
-const Managed = ({
-  container,
-}: Web_Components_ContainerCell_Props): ReactElement => {
-  if (!container['managed']) {
+const Managed = (props: Web_Components_ContainerCell_Props): Web_ContainersView_Managed_Returns => {
+  const container: Web_ContainersView_Managed_Container = props['container'];
+
+  if (container['managed'] === false) {
     return (
       <>
         <span>No</span>
@@ -115,8 +205,8 @@ const Managed = ({
   return (
     <>
       <span>Yes</span>
-      {(container['self']) ? <span className="container-note">Outpost itself</span> : null}
-      {(container['monitorOnly']) ? <span className="container-note">Monitor only</span> : null}
+      {(container['self'] === true) ? <span className="container-note">Outpost itself</span> : null}
+      {(container['monitorOnly'] === true) ? <span className="container-note">Monitor only</span> : null}
     </>
   );
 };
@@ -124,17 +214,21 @@ const Managed = ({
 // managedNote sums up a managed container on small screens, where the Managed column is hidden.
 
 /**
- * Containers View - Managed note.
+ * Containers View - Managed Note.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
+ * @param {Web_ContainersView_ManagedNote_Container} container - Container.
+ *
+ * @returns {Web_ContainersView_ManagedNote_Returns}
+ *
  * @since 1.0.0
  */
-const managedNote = (container: Web_Api_Container): string => [
+const managedNote = (container: Web_ContainersView_ManagedNote_Container): Web_ContainersView_ManagedNote_Returns => [
   'Managed',
-  ...((container['self']) ? ['Outpost itself'] : []),
-  ...((container['monitorOnly']) ? ['Monitor only'] : []),
+  ...((container['self'] === true) ? ['Outpost itself'] : []),
+  ...((container['monitorOnly'] === true) ? ['Monitor only'] : []),
 ].join('\u00a0·\u00a0');
 
 /**
@@ -143,23 +237,25 @@ const managedNote = (container: Web_Api_Container): string => [
  * Confirms every one-container update. Non-self containers can deliberately
  * keep a failed replacement, while Outpost itself always keeps rollback on.
  *
+ * @param {Web_Components_UpdateConfirmationDialog_Props} props - Props.
+ *
+ * @returns {Web_ContainersView_UpdateConfirmationDialog_Returns}
+ *
  * @since 1.1.0
  */
-export const UpdateConfirmationDialog = ({
-  container,
-  onCancel,
-  onConfirm,
-}: Web_Components_UpdateConfirmationDialog_Props): ReactElement => {
-  const [
-    keepNewContainer,
-    setKeepNewContainer,
-  ] = useState<boolean>(container['lastStatus'] === 'held' && !container['self']);
-  const held: boolean = container['lastStatus'] === 'held' && !container['self'];
-  let message: string = `Outpost will recreate ${container['name']} with the new image and normally roll back if its health check fails.`;
+export const UpdateConfirmationDialog = (props: Web_Components_UpdateConfirmationDialog_Props): Web_ContainersView_UpdateConfirmationDialog_Returns => {
+  const container: Web_ContainersView_UpdateConfirmationDialog_Container = props['container'];
+  const onCancel: Web_ContainersView_UpdateConfirmationDialog_OnCancel = props['onCancel'];
+  const onConfirm: Web_ContainersView_UpdateConfirmationDialog_OnConfirm = props['onConfirm'];
+  const keepNewContainerState: Web_ContainersView_UpdateConfirmationDialog_KeepNewContainerState = useState<Web_ContainersView_UpdateConfirmationDialog_KeepNewContainer>(container['lastStatus'] === 'held' && container['self'] === false);
+  const keepNewContainer: Web_ContainersView_UpdateConfirmationDialog_KeepNewContainer = keepNewContainerState[0];
+  const setKeepNewContainer: Web_ContainersView_UpdateConfirmationDialog_SetKeepNewContainer = keepNewContainerState[1];
+  const held: Web_ContainersView_UpdateConfirmationDialog_Held = container['lastStatus'] === 'held' && container['self'] === false;
+  let message: Web_ContainersView_UpdateConfirmationDialog_Message = `Outpost will recreate ${container['name']} with the new image and normally roll back if its health check fails.`;
 
-  if (container['self']) {
+  if (container['self'] === true) {
     message = 'Outpost updates itself after every other selected container, then the dashboard reconnects on its own.';
-  } else if (held) {
+  } else if (held === true) {
     message = `${container['name']} was rolled back from this image last time. Outpost is waiting for a newer image; proceeding now requires rollback to stay off so you can keep and inspect the rejected replacement.`;
   }
 
@@ -167,18 +263,18 @@ export const UpdateConfirmationDialog = ({
     <ConfirmDialog
       busy={false}
       busyLabel=""
-      confirmLabel={(held) ? 'Update without rollback' : 'Update'}
+      confirmLabel={(held === true) ? 'Update without rollback' : 'Update'}
       error=""
       message={message}
       onCancel={onCancel}
-      onConfirm={(): void => onConfirm(!keepNewContainer)}
+      onConfirm={() => onConfirm(keepNewContainer === false)}
       open
-      title={(container['self']) ? 'Update Outpost itself?' : `Update ${container['name']}?`}
+      title={(container['self'] === true) ? 'Update Outpost itself?' : `Update ${container['name']}?`}
       tone="primary"
     >
-      {(container['self']) ? null : (
+      {(container['self'] === true) ? null : (
         <label aria-label="Keep the new container even if it fails its health check (don't roll back)" className="check-row check-row-danger">
-          <input checked={keepNewContainer} disabled={held} onChange={(event): void => setKeepNewContainer(event.currentTarget.checked)} type="checkbox" />
+          <input checked={keepNewContainer} disabled={held} onChange={(event) => setKeepNewContainer(event.currentTarget.checked)} type="checkbox" />
           <span>
             <strong>{'Keep the new container even if it fails its health check (don\'t roll back)'}</strong>
             <small>The replacement may be stopped, unhealthy, or unable to serve traffic. Use the saved history detail to recover manually.</small>
@@ -190,53 +286,52 @@ export const UpdateConfirmationDialog = ({
 };
 
 /**
- * Containers View.
+ * Containers View - Containers View.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_ContainersView_Props} props - Props.
+ *
+ * @returns {Web_ContainersView_ContainersView_Returns}
+ *
  * @since 1.0.0
  */
-export const ContainersView = ({
-  containers,
-  error,
-  onRefresh,
-  onStartCheck,
-  onStartUpdate,
-  overview,
-}: Web_Components_ContainersView_Props): ReactElement => {
-  const [
-    busy,
-    setBusy,
-  ] = useState<boolean>(false);
-  const [
-    checking,
-    setChecking,
-  ] = useState<string>('');
-  const [
-    updating,
-    setUpdating,
-  ] = useState<string>('');
-  const [
-    actionError,
-    setActionError,
-  ] = useState<string>('');
-  const [
-    confirmingUpdate,
-    setConfirmingUpdate,
-  ] = useState<Web_Api_Container | null>(null);
-  const [
-    confirmingUpdateAll,
-    setConfirmingUpdateAll,
-  ] = useState<boolean>(false);
-  const running: boolean = overview !== null && overview['running'];
+export const ContainersView = (props: Web_Components_ContainersView_Props): Web_ContainersView_ContainersView_Returns => {
+  const containers: Web_ContainersView_ContainersView_Containers = props['containers'];
+  const error: Web_ContainersView_ContainersView_Error = props['error'];
+  const onRefresh: Web_ContainersView_ContainersView_OnRefresh = props['onRefresh'];
+  const onStartCheck: Web_ContainersView_ContainersView_OnStartCheck = props['onStartCheck'];
+  const onStartUpdate: Web_ContainersView_ContainersView_OnStartUpdate = props['onStartUpdate'];
+  const overview: Web_ContainersView_ContainersView_Overview = props['overview'];
+  const busyState: Web_ContainersView_ContainersView_BusyState = useState<Web_ContainersView_ContainersView_Busy>(false);
+  const busy: Web_ContainersView_ContainersView_Busy = busyState[0];
+  const setBusy: Web_ContainersView_ContainersView_SetBusy = busyState[1];
+  const checkingState: Web_ContainersView_ContainersView_CheckingState = useState<Web_ContainersView_ContainersView_Checking>('');
+  const checking: Web_ContainersView_ContainersView_Checking = checkingState[0];
+  const setChecking: Web_ContainersView_ContainersView_SetChecking = checkingState[1];
+  const updatingState: Web_ContainersView_ContainersView_UpdatingState = useState<Web_ContainersView_ContainersView_Updating>('');
+  const updating: Web_ContainersView_ContainersView_Updating = updatingState[0];
+  const setUpdating: Web_ContainersView_ContainersView_SetUpdating = updatingState[1];
+  const actionErrorState: Web_ContainersView_ContainersView_ActionErrorState = useState<Web_ContainersView_ContainersView_ActionError>('');
+  const actionError: Web_ContainersView_ContainersView_ActionError = actionErrorState[0];
+  const setActionError: Web_ContainersView_ContainersView_SetActionError = actionErrorState[1];
+  const confirmingUpdateState: Web_ContainersView_ContainersView_ConfirmingUpdateState = useState<Web_ContainersView_ContainersView_ConfirmingUpdate>(null);
+  const confirmingUpdate: Web_ContainersView_ContainersView_ConfirmingUpdate = confirmingUpdateState[0];
+  const setConfirmingUpdate: Web_ContainersView_ContainersView_SetConfirmingUpdate = confirmingUpdateState[1];
+  const confirmingUpdateAllState: Web_ContainersView_ContainersView_ConfirmingUpdateAllState = useState<Web_ContainersView_ContainersView_ConfirmingUpdateAll>(false);
+  const confirmingUpdateAll: Web_ContainersView_ContainersView_ConfirmingUpdateAll = confirmingUpdateAllState[0];
+  const setConfirmingUpdateAll: Web_ContainersView_ContainersView_SetConfirmingUpdateAll = confirmingUpdateAllState[1];
+  const running: Web_ContainersView_ContainersView_Running = overview !== null && overview['running'] === true;
 
   // A row says "Checking…" only until the check it started is done.
-  useEffect((): void => {
-    if (!running) {
+  useEffect(() => {
+    if (running === false) {
       setChecking('');
       setUpdating('');
     }
+
+    return;
   }, [running]);
 
   /**
@@ -245,9 +340,13 @@ export const ContainersView = ({
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
+   * @param {Web_ContainersView_ContainersView_Check_Container} container - Container.
+   *
+   * @returns {Web_ContainersView_ContainersView_Check_Returns}
+   *
    * @since 1.0.0
    */
-  const check = async (container: Web_Api_Container): Promise<void> => {
+  const check: Web_ContainersView_ContainersView_Check = async (container: Web_ContainersView_ContainersView_Check_Container): Web_ContainersView_ContainersView_Check_Returns => {
     setBusy(true);
     setActionError('');
     try {
@@ -259,6 +358,8 @@ export const ContainersView = ({
     } finally {
       setBusy(false);
     }
+
+    return;
   };
 
   /**
@@ -267,9 +368,14 @@ export const ContainersView = ({
    * Starts an apply cycle for one container, or for all managed containers.
    * The scheduler completion event refreshes each row with its new result.
    *
+   * @param {Web_ContainersView_ContainersView_Update_Container} [container] - Container.
+   * @param {Web_ContainersView_ContainersView_Update_Rollback}  [rollback]  - Rollback.
+   *
+   * @returns {Web_ContainersView_ContainersView_Update_Returns}
+   *
    * @since 1.1.0
    */
-  const update = async (container?: Web_Api_Container, rollback: boolean = true): Promise<void> => {
+  const update: Web_ContainersView_ContainersView_Update = async (container?: Web_ContainersView_ContainersView_Update_Container, rollback: Web_ContainersView_ContainersView_Update_Rollback = true): Web_ContainersView_ContainersView_Update_Returns => {
     setBusy(true);
     setActionError('');
     try {
@@ -281,6 +387,8 @@ export const ContainersView = ({
     } finally {
       setBusy(false);
     }
+
+    return;
   };
 
   /**
@@ -289,22 +397,36 @@ export const ContainersView = ({
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
+   * @returns {Web_ContainersView_ContainersView_Refresh_Returns}
+   *
    * @since 1.0.0
    */
-  const refresh = async (): Promise<void> => {
+  const refresh: Web_ContainersView_ContainersView_Refresh = async (): Web_ContainersView_ContainersView_Refresh_Returns => {
     setBusy(true);
     try {
       await onRefresh();
     } finally {
       setBusy(false);
     }
+
+    return;
   };
 
-  const availableCount: number = (containers === null) ? 0 : containers.filter((container: Web_Api_Container): boolean => container['managed'] && !container['monitorOnly'] && container['lastStatus'] === 'available').length;
+  const availableCount: Web_ContainersView_ContainersView_AvailableCount = (containers === null) ? 0 : containers.filter((container) => {
+    return (
+      container['managed'] === true
+      && container['monitorOnly'] === false
+      && container['lastStatus'] === 'available'
+    );
+  }).length;
 
-  let content: ReactElement | null = null;
+  let content: Web_ContainersView_ContainersView_Content = null;
 
-  if (containers === null && error instanceof ApiError && error.code === 'docker_unreachable') {
+  if (
+    containers === null
+    && error instanceof ApiError
+    && error.code === 'docker_unreachable'
+  ) {
     content = (
       <div className="empty-state">
         <span><Icon name="warning" size={22} /></span>
@@ -344,7 +466,7 @@ export const ContainersView = ({
           </tr>
         </thead>
         <tbody>
-          {containers.map((container: Web_Api_Container): ReactElement => (
+          {containers.map((container) => (
             <tr key={container['id']}>
               <td className="cell-container">
                 <BreakableText breakAtNameSeparators className="container-name" text={container['name']} />
@@ -352,7 +474,7 @@ export const ContainersView = ({
                 <ImageName className="container-note container-inline-image" image={container['image']} />
                 <span className="container-inline">
                   <LastResult container={container} />
-                  {(container['managed']) ? (
+                  {(container['managed'] === true) ? (
                     <span className="container-note">{managedNote(container)}</span>
                   ) : (
                     <span className="container-note">{`Not managed\u00a0·\u00a0${container['note']}`}</span>
@@ -369,17 +491,25 @@ export const ContainersView = ({
                 <Managed container={container} />
               </td>
               <td className="cell-actions">
-                {(container['managed']) ? (
+                {(container['managed'] === true) ? (
                   <Button
                     disabled={busy || running}
-                    onClick={(): void => {
-                      if ((container['lastStatus'] === 'available' || container['lastStatus'] === 'held') && !container['monitorOnly']) {
+                    onClick={() => {
+                      if (
+                        (
+                          container['lastStatus'] === 'available'
+                          || container['lastStatus'] === 'held'
+                        )
+                        && container['monitorOnly'] === false
+                      ) {
                         setConfirmingUpdate(container);
 
                         return;
                       }
 
                       void check(container);
+
+                      return;
                     }}
                   >
                     {actionLabel(container, running && checking === container['id'], running && updating === container['id'])}
@@ -404,7 +534,7 @@ export const ContainersView = ({
           {(availableCount === 0) ? null : (
             <Button
               disabled={busy || running}
-              onClick={(): void => setConfirmingUpdateAll(true)}
+              onClick={() => setConfirmingUpdateAll(true)}
             >
               {`Update all (${availableCount})`}
             </Button>
@@ -412,8 +542,10 @@ export const ContainersView = ({
           <Button
             disabled={busy}
             icon="refresh"
-            onClick={(): void => {
+            onClick={() => {
               void refresh();
+
+              return;
             }}
           >
             Refresh
@@ -440,13 +572,15 @@ export const ContainersView = ({
       {(confirmingUpdate === null) ? null : (
         <UpdateConfirmationDialog
           container={confirmingUpdate}
-          onCancel={(): void => setConfirmingUpdate(null)}
-          onConfirm={(rollback): void => {
-            const container: Web_Api_Container = confirmingUpdate;
+          onCancel={() => setConfirmingUpdate(null)}
+          onConfirm={(rollback) => {
+            const confirmedContainer: Web_ContainersView_ContainersView_ConfirmedContainer = confirmingUpdate;
 
             setConfirmingUpdate(null);
 
-            void update(container, rollback);
+            void update(confirmedContainer, rollback);
+
+            return;
           }}
         />
       )}
@@ -457,11 +591,13 @@ export const ContainersView = ({
         confirmLabel="Update all"
         error=""
         message="Outpost checks every managed container, applies newer images, and updates itself last if needed. Monitor-only containers stay unchanged."
-        onCancel={(): void => setConfirmingUpdateAll(false)}
-        onConfirm={(): void => {
+        onCancel={() => setConfirmingUpdateAll(false)}
+        onConfirm={() => {
           setConfirmingUpdateAll(false);
 
           void update();
+
+          return;
         }}
         open={confirmingUpdateAll}
         title="Update all available containers?"

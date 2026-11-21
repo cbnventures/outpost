@@ -1,15 +1,25 @@
 import { formatDate } from '@/web/format.ts';
+import {
+  longDigestPattern,
+  longDigestReferencePattern,
+} from '@/web/regex.js';
 
 import type {
+  Web_OutpostFormat_FormatUntil_Days,
+  Web_OutpostFormat_FormatUntil_Formatter,
+  Web_OutpostFormat_FormatUntil_Hours,
+  Web_OutpostFormat_FormatUntil_Minutes,
   Web_OutpostFormat_FormatUntil_Now,
   Web_OutpostFormat_FormatUntil_Returns,
+  Web_OutpostFormat_FormatUntil_Seconds,
+  Web_OutpostFormat_FormatUntil_Timestamp,
   Web_OutpostFormat_FormatUntil_Value,
   Web_OutpostFormat_ShortDigests_Returns,
   Web_OutpostFormat_ShortDigests_Text,
 } from '@/types/web/outpost-format.d.ts';
 
 /**
- * Outpost Format - Format until.
+ * Outpost Format - Format Until.
  *
  * Describes the time until a scheduled check in the largest whole unit.
  * Outpost's scheduler copy uses it without extending shared date formatting.
@@ -25,34 +35,38 @@ export const formatUntil = (
   value: Web_OutpostFormat_FormatUntil_Value,
   now: Web_OutpostFormat_FormatUntil_Now = Date.now(),
 ): Web_OutpostFormat_FormatUntil_Returns => {
-  if (value === null || value === undefined || value === '') {
+  if (
+    value === null
+    || value === undefined
+    || value === ''
+  ) {
     return 'not scheduled';
   }
 
-  const timestamp: number = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) {
+  const timestamp: Web_OutpostFormat_FormatUntil_Timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp) === true) {
     return 'unknown';
   }
 
-  const seconds: number = Math.round((timestamp - now) / 1000);
+  const seconds: Web_OutpostFormat_FormatUntil_Seconds = Math.round((timestamp - now) / 1000);
   if (seconds < 45) {
     return 'in under a minute';
   }
 
-  const formatter: Intl.RelativeTimeFormat = new Intl.RelativeTimeFormat(undefined, {
+  const formatter: Web_OutpostFormat_FormatUntil_Formatter = new Intl.RelativeTimeFormat(undefined, {
     numeric: 'auto',
   });
-  const minutes: number = Math.round(seconds / 60);
+  const minutes: Web_OutpostFormat_FormatUntil_Minutes = Math.round(seconds / 60);
   if (minutes < 60) {
     return formatter.format(minutes, 'minute');
   }
 
-  const hours: number = Math.round(minutes / 60);
+  const hours: Web_OutpostFormat_FormatUntil_Hours = Math.round(minutes / 60);
   if (hours < 24) {
     return formatter.format(hours, 'hour');
   }
 
-  const days: number = Math.round(hours / 24);
+  const days: Web_OutpostFormat_FormatUntil_Days = Math.round(hours / 24);
   if (days < 30) {
     return formatter.format(days, 'day');
   }
@@ -61,7 +75,7 @@ export const formatUntil = (
 };
 
 /**
- * Outpost Format - Short digests.
+ * Outpost Format - Short Digests.
  *
  * Shortens Docker digests to the familiar 12-character form in narrow views.
  * Outpost keeps this container-specific formatter outside the shared helpers.
@@ -75,5 +89,5 @@ export const formatUntil = (
 export const shortDigests = (
   text: Web_OutpostFormat_ShortDigests_Text,
 ): Web_OutpostFormat_ShortDigests_Returns => text
-  .replace(/sha256:([0-9a-f]{12})[0-9a-f]{52}/gu, 'sha256:$1…')
-  .replace(/\b([0-9a-f]{12})[0-9a-f]{52}\b/gu, '$1…');
+  .replace(new RegExp(longDigestReferencePattern, 'gu'), 'sha256:$1…')
+  .replace(new RegExp(longDigestPattern, 'gu'), '$1…');

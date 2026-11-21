@@ -1,7 +1,7 @@
 import type { Web_Api_Result } from './api.d.ts';
 
 /**
- * Web - History View - Result list - Separates summaries from full detail.
+ * History View.
  *
  * @since 1.1.0
  */

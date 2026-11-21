@@ -32,11 +32,29 @@ import {
 import type { Web_AppNavigation_Route } from '@/types/web/app-navigation.d.ts';
 import type {
   Web_Navigation_Browser,
-  Web_Navigation_HistoryURL,
   Web_Navigation_Location,
   Web_Navigation_PopStateListener,
 } from '@/types/web/navigation.d.ts';
 import type {
+  Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute,
+  Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Returns,
+  Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Route,
+  Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_Stop,
+  Web_Navigation_BrowserHistory_ReplacesAnUnknownPathWithTheFirstPage_Stop,
+  Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute,
+  Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Returns,
+  Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Route,
+  Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_Stop,
+  Web_Navigation_CreateHistoryBrowser_Entries,
+  Web_Navigation_CreateHistoryBrowser_InitialPath,
+  Web_Navigation_CreateHistoryBrowser_Listeners,
+  Web_Navigation_CreateHistoryBrowser_Move,
+  Web_Navigation_CreateHistoryBrowser_Move_Direction,
+  Web_Navigation_CreateHistoryBrowser_Move_NextPath,
+  Web_Navigation_CreateHistoryBrowser_Move_NextPosition,
+  Web_Navigation_CreateHistoryBrowser_Move_Returns,
+  Web_Navigation_CreateHistoryBrowser_NextPath,
+  Web_Navigation_CreateHistoryBrowser_Returns,
   Web_Navigation_DashboardNavigation_KeepsDesktopAndPhoneDestinationsAligned_MoreGroup,
   Web_Navigation_DashboardNavigation_KeepsDesktopAndPhoneDestinationsAligned_MoreLevel,
   Web_Navigation_DashboardNavigation_KeepsDesktopAndPhoneDestinationsAligned_Tabs,
@@ -54,26 +72,29 @@ import type {
   Web_Navigation_NavigationSheetStack_OpensPushesPopsAndClosesWithoutMutation_MoreLevel,
   Web_Navigation_NavigationSheetStack_OpensPushesPopsAndClosesWithoutMutation_PushedStack,
   Web_Navigation_NavigationSheetStack_OpensPushesPopsAndClosesWithoutMutation_RootStack,
+  Web_Navigation_PathFromHistoryUrl_CurrentPath,
+  Web_Navigation_PathFromHistoryUrl_Returns,
+  Web_Navigation_PathFromHistoryUrl_Url,
   Web_Navigation_RouteState,
 } from '@/types/web/navigation.test.d.ts';
 
 /**
- * Web - Navigation Test - Path From History URL.
+ * Navigation - Path From History URL.
  *
  * Normalizes the URL shapes accepted by History API calls for the in-memory
  * browser fixture. Relative strings resolve against a stable test origin.
  *
- * @param {Web_Navigation_HistoryURL} url         - Url.
- * @param {string}                    currentPath - Current path.
+ * @param {Web_Navigation_PathFromHistoryUrl_Url}         url         - Url.
+ * @param {Web_Navigation_PathFromHistoryUrl_CurrentPath} currentPath - Current path.
  *
- * @returns {string}
+ * @returns {Web_Navigation_PathFromHistoryUrl_Returns}
  *
  * @since 1.1.0
  */
 const pathFromHistoryURL = (
-  url: Web_Navigation_HistoryURL,
-  currentPath: string,
-): string => {
+  url: Web_Navigation_PathFromHistoryUrl_Url,
+  currentPath: Web_Navigation_PathFromHistoryUrl_CurrentPath,
+): Web_Navigation_PathFromHistoryUrl_Returns => {
   if (url === undefined || url === null) {
     return currentPath;
   }
@@ -86,46 +107,49 @@ const pathFromHistoryURL = (
 };
 
 /**
- * Web - Navigation Test - Create History Browser.
+ * Navigation - Create History Browser.
  *
  * Provides the shared navigation helpers with a deterministic browser history.
  * Tests can move Back and Forward without depending on a DOM environment.
  *
- * @param {string} initialPath - Initial path.
+ * @param {Web_Navigation_CreateHistoryBrowser_InitialPath} initialPath - Initial path.
  *
- * @returns {Web_Navigation_HistoryFixture}
+ * @returns {Web_Navigation_CreateHistoryBrowser_Returns}
  *
  * @since 1.1.0
  */
-const createHistoryBrowser = (initialPath: string): Web_Navigation_HistoryFixture => {
-  const entries: string[] = [initialPath];
+const createHistoryBrowser = (initialPath: Web_Navigation_CreateHistoryBrowser_InitialPath): Web_Navigation_CreateHistoryBrowser_Returns => {
+  const entries: Web_Navigation_CreateHistoryBrowser_Entries = [initialPath];
   const position: Web_Navigation_HistoryPosition = { value: 0 };
-  const listeners: Set<Web_Navigation_PopStateListener> = new Set<Web_Navigation_PopStateListener>();
+  const listeners: Web_Navigation_CreateHistoryBrowser_Listeners = new Set<Web_Navigation_PopStateListener>();
   const location: Web_Navigation_Location = { pathname: initialPath };
 
   /**
-   * Web - Navigation Test - Create History Browser - Move.
+   * Navigation - Move.
    *
    * Moves to an existing entry and emits the browser's popstate notification.
    * Attempts beyond either end of the history list leave state unchanged.
    *
-   * @param {number} direction - Direction.
+   * @param {Web_Navigation_CreateHistoryBrowser_Move_Direction} direction - Direction.
+   *
+   * @returns {Web_Navigation_CreateHistoryBrowser_Move_Returns}
    *
    * @since 1.1.0
    */
-  const move = (direction: number): void => {
-    const nextPosition: number = position['value'] + direction;
+  const move: Web_Navigation_CreateHistoryBrowser_Move = (direction: Web_Navigation_CreateHistoryBrowser_Move_Direction): Web_Navigation_CreateHistoryBrowser_Move_Returns => {
+    const nextPosition: Web_Navigation_CreateHistoryBrowser_Move_NextPosition = position['value'] + direction;
     if (nextPosition < 0 || nextPosition >= entries.length) {
       return;
     }
 
-    const nextPath: string | undefined = entries.at(nextPosition);
+    const nextPath: Web_Navigation_CreateHistoryBrowser_Move_NextPath = entries.at(nextPosition);
     if (nextPath === undefined) {
       return;
     }
 
     position.value = nextPosition;
     location.pathname = nextPath;
+
     for (const listener of listeners) {
       listener();
     }
@@ -134,24 +158,26 @@ const createHistoryBrowser = (initialPath: string): Web_Navigation_HistoryFixtur
   };
 
   const browser: Web_Navigation_Browser = {
-    addEventListener: (_type, listener): void => {
+    addEventListener: (_type, listener) => {
       listeners.add(listener);
 
       return;
     },
     history: {
-      pushState: (_data, _unused, url): void => {
-        const nextPath: string = pathFromHistoryURL(url, location['pathname']);
+      pushState: (_data, _unused, url) => {
+        const nextPath: Web_Navigation_CreateHistoryBrowser_NextPath = pathFromHistoryURL(url, location['pathname']);
 
         entries.splice(position['value'] + 1);
+
         entries.push(nextPath);
+
         position.value = entries.length - 1;
         location.pathname = nextPath;
 
         return;
       },
-      replaceState: (_data, _unused, url): void => {
-        const nextPath: string = pathFromHistoryURL(url, location['pathname']);
+      replaceState: (_data, _unused, url) => {
+        const nextPath: Web_Navigation_CreateHistoryBrowser_NextPath = pathFromHistoryURL(url, location['pathname']);
 
         entries.splice(position['value'], 1, nextPath);
         location.pathname = nextPath;
@@ -160,7 +186,7 @@ const createHistoryBrowser = (initialPath: string): Web_Navigation_HistoryFixtur
       },
     },
     location,
-    removeEventListener: (_type, listener): void => {
+    removeEventListener: (_type, listener) => {
       listeners.delete(listener);
 
       return;
@@ -168,10 +194,10 @@ const createHistoryBrowser = (initialPath: string): Web_Navigation_HistoryFixtur
   };
 
   return {
-    back: (): void => move(-1),
+    back: () => move(-1),
     browser,
     entries,
-    forward: (): void => move(1),
+    forward: () => move(1),
   };
 };
 
@@ -376,21 +402,23 @@ describe('browser history', () => {
       value: resolveAppNavigationPath('/')['route'],
     };
     /**
-     * Web - Navigation Test - Remember Route.
+     * Navigation - Remember Route.
      *
      * Records each route published by initial and popstate navigation.
      * Assertions read the same mutable holder after every transition.
      *
-     * @param {Web_AppNavigation_Route} route - Route.
+     * @param {Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Route} route - Route.
+     *
+     * @returns {Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Returns}
      *
      * @since 1.1.0
      */
-    const rememberRoute = (route: Web_AppNavigation_Route): void => {
+    const rememberRoute: Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute = (route: Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Route): Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_RememberRoute_Returns => {
       routeState.value = route;
 
       return;
     };
-    const stop: () => void = startNavigationHistory(
+    const stop: Web_Navigation_BrowserHistory_PushesPageEntriesAndRestoresThemWithBackAndForward_Stop = startNavigationHistory(
       fixture['browser'],
       resolveAppNavigationPath,
       rememberRoute,
@@ -435,10 +463,10 @@ describe('browser history', () => {
     const routeState: Web_Navigation_RouteState = {
       value: resolveAppNavigationPath('/')['route'],
     };
-    const stop: () => void = startNavigationHistory(
+    const stop: Web_Navigation_BrowserHistory_ReplacesAnUnknownPathWithTheFirstPage_Stop = startNavigationHistory(
       fixture['browser'],
       resolveAppNavigationPath,
-      (route: Web_AppNavigation_Route): void => {
+      (route) => {
         routeState.value = route;
 
         return;
@@ -462,21 +490,23 @@ describe('browser history', () => {
       value: resolveAppNavigationPath('/')['route'],
     };
     /**
-     * Web - Navigation Test - Remember Route.
+     * Navigation - Remember Route.
      *
      * Records repeated address application around authentication completion.
      * The stable holder verifies those applications do not change history.
      *
-     * @param {Web_AppNavigation_Route} route - Route.
+     * @param {Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Route} route - Route.
+     *
+     * @returns {Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Returns}
      *
      * @since 1.1.0
      */
-    const rememberRoute = (route: Web_AppNavigation_Route): void => {
+    const rememberRoute: Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute = (route: Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Route): Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_RememberRoute_Returns => {
       routeState.value = route;
 
       return;
     };
-    const stop: () => void = startNavigationHistory(
+    const stop: Web_Navigation_BrowserHistory_RestoresTheRequestedAddressAfterSignInOrFirstRunSetup_Stop = startNavigationHistory(
       fixture['browser'],
       resolveAppNavigationPath,
       rememberRoute,

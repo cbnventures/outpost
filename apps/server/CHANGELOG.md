@@ -1,5 +1,14 @@
 # outpost-app-server
 
+## 1.2.1 - 2026-11-21
+
+### UPDATED
+- Tests now report coverage through a `check:coverage` script, which fails when line, function, branch or statement coverage drops below the project minimum, and the README badges now include that coverage.
+- Web dashboard and mock API code, which now follows the full lint rule set and reads the Discord webhook placeholder from a chat platform helper, with no change in behavior.
+- Notification delivery code, which now uses one adapter per service with no change to saved destinations or the requests they send.
+- Nova 0.49.0, which supplies the coverage thresholds behind `check:coverage` through its `VitestCoverage` toolkit and brings updated ESLint presets and stricter type checks to the workspace's tooling.
+- README introduction, which now describes the project with its new long description.
+
 ## 1.2.0 - 2026-11-17
 
 ### UPDATED

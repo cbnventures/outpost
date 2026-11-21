@@ -1,8 +1,5 @@
-import type {
-  DatabaseSync,
-  SQLOutputValue,
-  StatementResultingChanges,
-} from 'node:sqlite';
+// eslint-disable-next-line n/no-unsupported-features/node-builtins -- The image's Node.js release ships node:sqlite, but the rule still marks it experimental.
+import type { DatabaseSync, SQLOutputValue, StatementResultingChanges } from 'node:sqlite';
 
 import type { RegistryCredentials } from 'outpost-package-registry';
 import type { z } from 'zod';

@@ -26,7 +26,6 @@ export default [
     ignores: [
       'apps/**',
       'packages/**',
-      'tools/**',
     ],
   },
   {

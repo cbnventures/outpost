@@ -3,7 +3,7 @@ import type { ComponentType } from 'react';
 import type { Web_Components_Icon_Props } from '@/types/web/components.d.ts';
 
 /**
- * Web - Primitives - Icon module.
+ * Primitives.
  *
  * @since 1.1.0
  */

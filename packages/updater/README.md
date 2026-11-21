@@ -31,6 +31,9 @@
   <a href="https://github.com/cbnventures/outpost/blob/HEAD/LICENSE">
     <img alt="GitHub License" src="https://img.shields.io/github/license/cbnventures/outpost?style=for-the-badge&logo=googledocs&logoColor=%23ffffff&color=%2348a56a">
   </a>
+  <a href="https://github.com/cbnventures/outpost/actions">
+    <img alt="Test Coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Foutpost.cbnventures.io%2Fbadges%2Fcoverage.json&style=for-the-badge&logo=vitest&logoColor=%23ffffff">
+  </a>
   <a href="https://github.com/sponsors/cbnventures">
     <img alt="Become a GitHub Sponsor" src="https://img.shields.io/badge/github-sponsor-gray?style=for-the-badge&logo=githubsponsors&logoColor=%23ffffff&color=%23eaaf41">
   </a>
@@ -43,7 +46,7 @@
 <!-- nova-region: introduction -->
 ## Introduction
 
-Keeps your Docker containers on the latest image: checks registries on a schedule, pulls new images, and recreates containers with their original settings, volumes, and networks, rolling back automatically when the new container fails to start. Label-based opt-in or opt-out, monitor-only mode, notifications to ntfy, Telegram, Discord, email, and more, an HTTP API, and Prometheus metrics, shipped as one non-root s6-overlay image.
+Pull image updates on your schedule and bring each container back with its original settings, volumes, and networks. Pick containers by label or watch in monitor-only mode, follow it all from a web dashboard, and get notified through ntfy, Telegram, Discord, email, and more.
 <!-- nova-region-end: introduction -->
 
 <!-- nova-region: documentation -->

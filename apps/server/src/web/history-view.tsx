@@ -26,69 +26,105 @@ import {
   Icon,
 } from '@/web/primitives.tsx';
 
-import type { ReactElement } from 'react';
-
-import type {
-  Web_Api_Report,
-  Web_Api_Result,
-} from '@/types/web/api.d.ts';
 import type {
   Web_Components_HistoryView_Props,
-  Web_Components_ResultCount,
   Web_Components_ResultList_Detail,
   Web_Components_ResultList_Props,
 } from '@/types/web/components.d.ts';
+import type {
+  Web_HistoryView_HistoryView_Action,
+  Web_HistoryView_HistoryView_Content,
+  Web_HistoryView_HistoryView_Error,
+  Web_HistoryView_HistoryView_ErrorNotice,
+  Web_HistoryView_HistoryView_Expanded,
+  Web_HistoryView_HistoryView_ExpandedState,
+  Web_HistoryView_HistoryView_History,
+  Web_HistoryView_HistoryView_Key,
+  Web_HistoryView_HistoryView_OnRefresh,
+  Web_HistoryView_HistoryView_Open,
+  Web_HistoryView_HistoryView_Refresh,
+  Web_HistoryView_HistoryView_Refresh_Returns,
+  Web_HistoryView_HistoryView_Refreshing,
+  Web_HistoryView_HistoryView_RefreshingState,
+  Web_HistoryView_HistoryView_Returns,
+  Web_HistoryView_HistoryView_SetExpanded,
+  Web_HistoryView_HistoryView_SetRefreshing,
+  Web_HistoryView_HistoryView_Started,
+  Web_HistoryView_HistoryView_Summary,
+  Web_HistoryView_HistoryView_Toggle,
+  Web_HistoryView_HistoryView_Toggle_Key,
+  Web_HistoryView_HistoryView_Toggle_Returns,
+  Web_HistoryView_ReportDot_Report,
+  Web_HistoryView_ReportDot_Returns,
+  Web_HistoryView_ReportKey_Report,
+  Web_HistoryView_ReportKey_Returns,
+  Web_HistoryView_ResultList_Compact,
+  Web_HistoryView_ResultList_Results,
+  Web_HistoryView_ResultList_Returns,
+} from '@/types/web/history-view.d.ts';
 
 // reportKey tells checks apart; two checks never start and finish at the same moments.
 
 /**
- * History View - Report key.
+ * History View - Report Key.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
+ * @param {Web_HistoryView_ReportKey_Report} report - Report.
+ *
+ * @returns {Web_HistoryView_ReportKey_Returns}
+ *
  * @since 1.0.0
  */
-const reportKey = (report: Web_Api_Report): string => `${report['startedAt']}/${report['finishedAt']}`;
+const reportKey = (report: Web_HistoryView_ReportKey_Report): Web_HistoryView_ReportKey_Returns => `${report['startedAt']}/${report['finishedAt']}`;
 
 // reportDot is green when something was updated, red when anything failed, and neutral otherwise.
 
 /**
- * History View - Report dot.
+ * History View - Report Dot.
  *
  * Centralizes this operation for the surrounding workflow.
  * Callers reuse one implementation instead of repeating the behavior.
  *
+ * @param {Web_HistoryView_ReportDot_Report} report - Report.
+ *
+ * @returns {Web_HistoryView_ReportDot_Returns}
+ *
  * @since 1.0.0
  */
-const reportDot = (report: Web_Api_Report): string => {
-  if (reportFailed(report)) {
+const reportDot = (report: Web_HistoryView_ReportDot_Report): Web_HistoryView_ReportDot_Returns => {
+  if (reportFailed(report) === true) {
     return 'status-dot status-error';
   }
 
-  return (report['results'].some((result: Web_Api_Result): boolean => result['status'] === 'updated')) ? 'status-dot status-seeding' : 'status-dot status-paused';
+  return (report['results'].some((result) => result['status'] === 'updated') === true) ? 'status-dot status-seeding' : 'status-dot status-paused';
 };
 
 /**
- * History View - Result list.
+ * History View - Result List.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_ResultList_Props} props - Props.
+ *
+ * @returns {Web_HistoryView_ResultList_Returns}
+ *
  * @since 1.0.0
  */
-export const ResultList = ({
-  compact = false,
-  results,
-}: Web_Components_ResultList_Props): ReactElement => {
+export const ResultList = (props: Web_Components_ResultList_Props): Web_HistoryView_ResultList_Returns => {
+  const compact: Web_HistoryView_ResultList_Compact = props['compact'] ?? false;
+  const results: Web_HistoryView_ResultList_Results = props['results'];
+
   if (results.length === 0) {
     return <p className="select-list select-list-empty">No containers were checked.</p>;
   }
 
   return (
-    <ul className={(compact) ? 'activity-list activity-list-compact' : 'activity-list'}>
-      {results.map((result: Web_Api_Result, index: number): ReactElement => {
-        const detail: Web_Components_ResultList_Detail = (compact) ? (result['summary'] ?? result['detail']) : result['detail'];
+    <ul className={(compact === true) ? 'activity-list activity-list-compact' : 'activity-list'}>
+      {results.map((result, index) => {
+        const detail: Web_Components_ResultList_Detail = (compact === true) ? (result['summary'] ?? result['detail']) : result['detail'];
 
         return (
           <li className="activity-row" key={`${result['container']}-${index}`}>
@@ -114,26 +150,27 @@ export const ResultList = ({
 };
 
 /**
- * History View.
+ * History View - History View.
  *
  * Stores this module-level value in one named location.
  * Related code reuses it instead of duplicating the definition.
  *
+ * @param {Web_Components_HistoryView_Props} props - Props.
+ *
+ * @returns {Web_HistoryView_HistoryView_Returns}
+ *
  * @since 1.0.0
  */
-export const HistoryView = ({
-  error,
-  history,
-  onRefresh,
-}: Web_Components_HistoryView_Props): ReactElement => {
-  const [
-    expanded,
-    setExpanded,
-  ] = useState<string[]>([]);
-  const [
-    refreshing,
-    setRefreshing,
-  ] = useState<boolean>(false);
+export const HistoryView = (props: Web_Components_HistoryView_Props): Web_HistoryView_HistoryView_Returns => {
+  const error: Web_HistoryView_HistoryView_Error = props['error'];
+  const history: Web_HistoryView_HistoryView_History = props['history'];
+  const onRefresh: Web_HistoryView_HistoryView_OnRefresh = props['onRefresh'];
+  const expandedState: Web_HistoryView_HistoryView_ExpandedState = useState<Web_HistoryView_HistoryView_Expanded>([]);
+  const expanded: Web_HistoryView_HistoryView_Expanded = expandedState[0];
+  const setExpanded: Web_HistoryView_HistoryView_SetExpanded = expandedState[1];
+  const refreshingState: Web_HistoryView_HistoryView_RefreshingState = useState<Web_HistoryView_HistoryView_Refreshing>(false);
+  const refreshing: Web_HistoryView_HistoryView_Refreshing = refreshingState[0];
+  const setRefreshing: Web_HistoryView_HistoryView_SetRefreshing = refreshingState[1];
 
   /**
    * History View - Refresh.
@@ -141,15 +178,19 @@ export const HistoryView = ({
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
+   * @returns {Web_HistoryView_HistoryView_Refresh_Returns}
+   *
    * @since 1.0.0
    */
-  const refresh = async (): Promise<void> => {
+  const refresh: Web_HistoryView_HistoryView_Refresh = async (): Web_HistoryView_HistoryView_Refresh_Returns => {
     setRefreshing(true);
     try {
       await onRefresh();
     } finally {
       setRefreshing(false);
     }
+
+    return;
   };
 
   /**
@@ -158,18 +199,24 @@ export const HistoryView = ({
    * Centralizes this operation for the surrounding workflow.
    * Callers reuse one implementation instead of repeating the behavior.
    *
+   * @param {Web_HistoryView_HistoryView_Toggle_Key} key - Key.
+   *
+   * @returns {Web_HistoryView_HistoryView_Toggle_Returns}
+   *
    * @since 1.0.0
    */
-  const toggle = (key: string): void => {
-    setExpanded((current: string[]): string[] => (
-      (current.includes(key)) ? current.filter((candidate: string): boolean => candidate !== key) : [
+  const toggle: Web_HistoryView_HistoryView_Toggle = (key: Web_HistoryView_HistoryView_Toggle_Key): Web_HistoryView_HistoryView_Toggle_Returns => {
+    setExpanded((current) => (
+      (current.includes(key) === true) ? current.filter((candidate) => candidate !== key) : [
         ...current,
         key,
       ]
     ));
+
+    return;
   };
 
-  let content: ReactElement | null = null;
+  let content: Web_HistoryView_HistoryView_Content = null;
 
   if (history === null) {
     content = (
@@ -187,26 +234,40 @@ export const HistoryView = ({
   } else {
     content = (
       <ul className="history-list">
-        {history.map((report: Web_Api_Report, index: number): ReactElement => {
-          const key: string = reportKey(report);
-          const open: boolean = expanded.includes(key);
-          const action: string = cycleActionLabel(report['action']);
-          const started: string = triggerLabel(report['trigger']);
-          const summary: string[] = [
+        {history.map((report, index) => {
+          const key: Web_HistoryView_HistoryView_Key = reportKey(report);
+          const open: Web_HistoryView_HistoryView_Open = expanded.includes(key);
+          const action: Web_HistoryView_HistoryView_Action = cycleActionLabel(report['action']);
+          const started: Web_HistoryView_HistoryView_Started = triggerLabel(report['trigger']);
+          const summary: Web_HistoryView_HistoryView_Summary = [
             `took ${formatDuration(checkDuration(report))}`,
-            ...countResults(report['results']).map((entry: Web_Components_ResultCount): string => countLabel(entry)),
+            ...countResults(report['results']).map((entry) => countLabel(entry)),
           ];
+          let errorNotice: Web_HistoryView_HistoryView_ErrorNotice = null;
+
+          if (
+            report['error'] !== null
+            && report['error'] !== undefined
+            && report['error'] !== ''
+          ) {
+            errorNotice = (
+              <div className="form-error" role="alert">
+                <Icon name="warning" size={16} />
+                <span>{`The ${action.toLowerCase()} failed: ${report['error']}`}</span>
+              </div>
+            );
+          }
 
           return (
-            <li className={(open) ? 'history-item history-item-open' : 'history-item'} key={key}>
+            <li className={(open === true) ? 'history-item history-item-open' : 'history-item'} key={key}>
               <button
                 aria-controls={`history-check-${index}`}
                 aria-expanded={open}
                 className="history-row"
-                onClick={(): void => toggle(key)}
+                onClick={() => toggle(key)}
                 type="button"
               >
-                <span aria-label={(reportFailed(report)) ? 'Failed' : 'Finished'} className={reportDot(report)} role="img" />
+                <span aria-label={(reportFailed(report) === true) ? 'Failed' : 'Finished'} className={reportDot(report)} role="img" />
                 <span className="history-main">
                   <span className="history-title">
                     <time dateTime={report['startedAt']}>{formatDate(report['startedAt'])}</time>
@@ -214,19 +275,14 @@ export const HistoryView = ({
                     {(started === '') ? null : <span className="tag">{started}</span>}
                     {(report['rollback'] === false) ? <span className="tag tag-warning">Rollback disabled</span> : null}
                   </span>
-                  <small>{summary.map((part: string): string => keepTogether(part)).join('\u00a0· ')}</small>
+                  <small>{summary.map((part) => keepTogether(part)).join('\u00a0· ')}</small>
                 </span>
                 <span className="activity-time">{formatRelative(report['startedAt'])}</span>
-                <Icon name={(open) ? 'chevron-down' : 'chevron'} size={16} />
+                <Icon name={(open === true) ? 'chevron-down' : 'chevron'} size={16} />
               </button>
-              {(open) ? (
+              {(open === true) ? (
                 <div className="history-results" id={`history-check-${index}`}>
-                  {(report['error'] === null || report['error'] === undefined || report['error'] === '') ? null : (
-                    <div className="form-error" role="alert">
-                      <Icon name="warning" size={16} />
-                      <span>{`The ${action.toLowerCase()} failed: ${report['error']}`}</span>
-                    </div>
-                  )}
+                  {errorNotice}
                   <ResultList results={report['results']} />
                 </div>
               ) : null}
@@ -247,8 +303,10 @@ export const HistoryView = ({
         <Button
           disabled={refreshing}
           icon="refresh"
-          onClick={(): void => {
+          onClick={() => {
             void refresh();
+
+            return;
           }}
         >
           Refresh
