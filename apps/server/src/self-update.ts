@@ -14,7 +14,10 @@ import type {
   SelfUpdate_FinishSelfUpdate_Pending,
   SelfUpdate_FinishSelfUpdate_Returns,
   SelfUpdate_FinishSelfUpdate_Status,
+  SelfUpdate_FinishSelfUpdate_StillRunning,
+  SelfUpdate_FinishSelfUpdate_WaitDeadline,
   SelfUpdate_FinishSelfUpdate_Waited,
+  SelfUpdate_FinishSelfUpdate_WaitSeconds,
   SelfUpdate_FinishSelfUpdate_WaitStartedAt,
   SelfUpdate_HandOver_Context,
   SelfUpdate_HandOver_Current,
@@ -60,10 +63,12 @@ import type {
   SelfUpdate_ShortImageId_Returns,
   SelfUpdate_WaitForExit_Context,
   SelfUpdate_WaitForExit_Deadline,
+  SelfUpdate_WaitForExit_ErrorMessage,
   SelfUpdate_WaitForExit_Inspected,
   SelfUpdate_WaitForExit_Name,
   SelfUpdate_WaitForExit_Poll,
   SelfUpdate_WaitForExit_Returns,
+  SelfUpdate_WaitForExit_StopAtDeadline,
 } from './types/self-update.d.ts';
 
 /**
@@ -254,7 +259,7 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
   logDebug('self-update', `Started helper ${plan['name']} to move ${name} to image ${shortImageId(request['newImageId'])}`);
 
   // Reaching the end of this wait means the helper stopped without swapping Outpost.
-  const exitCode: SelfUpdate_HandOver_ExitCode = await waitForExit(helperId, deadline, context);
+  const exitCode: SelfUpdate_HandOver_ExitCode = await waitForExit(helperId, deadline, true, context);
   const outcome: SelfUpdate_HandOver_Outcome = readOutcome(context['handoff']);
   const helperRan: SelfUpdate_HandOver_HelperRan = context.now().getTime() - helperStartedAt;
   let helperEnding: SelfUpdate_HandOver_HelperEnding = 'was gone';
@@ -282,7 +287,8 @@ export async function handOver(request: SelfUpdate_HandOver_Request, trigger: Se
  * Self Update - Finish Self Update.
  *
  * Run by the Outpost that is running after a swap, new or restored. It waits for
- * the helper, then builds the cycle's single report with Outpost's own row.
+ * the helper without stopping it, then builds the cycle's single report with
+ * Outpost's own row.
  *
  * @param {SelfUpdate_FinishSelfUpdate_Pending} pending - Pending.
  * @param {SelfUpdate_FinishSelfUpdate_Context} context - Context.
@@ -295,17 +301,26 @@ export async function finishSelfUpdate(pending: SelfUpdate_FinishSelfUpdate_Pend
   const current: SelfUpdate_FinishSelfUpdate_Current = context['handoff'].read();
   const waitStartedAt: SelfUpdate_FinishSelfUpdate_WaitStartedAt = context.now().getTime();
 
+  // Counted from this Outpost's start, since a slow host can use up the hand-over deadline before the new container boots.
+  const waitSeconds: SelfUpdate_FinishSelfUpdate_WaitSeconds = context['settings']['stopTimeoutSeconds'] + context['settings']['healthTimeoutSeconds'] + 60;
+  const waitDeadline: SelfUpdate_FinishSelfUpdate_WaitDeadline = new Date(waitStartedAt + (waitSeconds * 1000)).toISOString();
+
   logDebug('self-update', `Waiting for helper ${pending['helperName']} to finish moving ${pending['containerName']} to image ${shortImageId(pending['newImageId'])}`);
 
-  await waitForExit(pending['helperName'], pending['deadline'], context);
+  await waitForExit(pending['helperName'], waitDeadline, false, context);
 
   const outcome: SelfUpdate_FinishSelfUpdate_Outcome = readOutcome(context['handoff']);
   const waited: SelfUpdate_FinishSelfUpdate_Waited = context.now().getTime() - waitStartedAt;
+  const stillRunning: SelfUpdate_FinishSelfUpdate_StillRunning = outcome === undefined && context.now().getTime() >= Date.parse(waitDeadline);
   let failedImageId: SelfUpdate_FinishSelfUpdate_FailedImageId = (current !== undefined) ? current['failedImageId'] : undefined;
   let status: SelfUpdate_FinishSelfUpdate_Status = 'failed';
   let detail: SelfUpdate_FinishSelfUpdate_Detail = `The self-update helper stopped before it finished; see docker logs ${pending['helperName']}`;
 
-  if (outcome === undefined) {
+  if (stillRunning === true) {
+    logDebug('self-update', `Helper ${pending['helperName']} was still running after ${String(waited)} ms, so it was left to finish`);
+
+    detail = `The self-update helper was still running after ${String(waitSeconds)}s, so Outpost left it to finish; see docker logs ${pending['helperName']}`;
+  } else if (outcome === undefined) {
     logDebug('self-update', `Helper ${pending['helperName']} ended after ${String(waited)} ms without saying how the swap went`);
   } else {
     logDebug('self-update', `Helper ${pending['helperName']} reported ${outcome['status']} after ${String(waited)} ms`);
@@ -414,17 +429,19 @@ export async function removeExitedHelpers(engine: SelfUpdate_RemoveExitedHelpers
  * Self Update - Wait For Exit.
  *
  * Polls a container once a second until it stops, and returns its exit code.
- * Past the deadline it stops the container and returns undefined.
+ * Past the deadline it returns undefined, stopping the container first only
+ * when asked to.
  *
- * @param {SelfUpdate_WaitForExit_Name}     name     - Name.
- * @param {SelfUpdate_WaitForExit_Deadline} deadline - Deadline.
- * @param {SelfUpdate_WaitForExit_Context}  context  - Context.
+ * @param {SelfUpdate_WaitForExit_Name}           name           - Name.
+ * @param {SelfUpdate_WaitForExit_Deadline}       deadline       - Deadline.
+ * @param {SelfUpdate_WaitForExit_StopAtDeadline} stopAtDeadline - Stop at deadline.
+ * @param {SelfUpdate_WaitForExit_Context}        context        - Context.
  *
  * @returns {SelfUpdate_WaitForExit_Returns}
  *
  * @since 1.0.0
  */
-async function waitForExit(name: SelfUpdate_WaitForExit_Name, deadline: SelfUpdate_WaitForExit_Deadline, context: SelfUpdate_WaitForExit_Context): SelfUpdate_WaitForExit_Returns {
+async function waitForExit(name: SelfUpdate_WaitForExit_Name, deadline: SelfUpdate_WaitForExit_Deadline, stopAtDeadline: SelfUpdate_WaitForExit_StopAtDeadline, context: SelfUpdate_WaitForExit_Context): SelfUpdate_WaitForExit_Returns {
   /**
    * Self Update - Wait For Exit - Poll.
    *
@@ -436,19 +453,27 @@ async function waitForExit(name: SelfUpdate_WaitForExit_Name, deadline: SelfUpda
    * @since 1.0.0
    */
   const poll: SelfUpdate_WaitForExit_Poll = async () => {
-    const inspected: SelfUpdate_WaitForExit_Inspected = await context['engine'].inspectContainer(name).catch(() => undefined);
+    let inspected: SelfUpdate_WaitForExit_Inspected = undefined;
 
-    // A container that is gone leaves nothing to wait for.
-    if (inspected === undefined) {
-      return undefined;
+    try {
+      inspected = await context['engine'].inspectContainer(name);
+    } catch (error) {
+      const errorMessage: SelfUpdate_WaitForExit_ErrorMessage = (error instanceof Error) ? error['message'] : String(error);
+
+      // A container that is gone leaves nothing to wait for. Any other error, such as a busy Docker host, is checked again.
+      if (errorMessage.startsWith('Docker Engine API returned HTTP 404:') === true) {
+        return undefined;
+      }
     }
 
-    if (inspected['State']['Running'] === false) {
+    if (inspected !== undefined && inspected['State']['Running'] === false) {
       return inspected['State']['ExitCode'];
     }
 
     if (context.now().getTime() >= Date.parse(deadline)) {
-      await context['engine'].stopContainer(name, 10).catch(() => undefined);
+      if (stopAtDeadline === true) {
+        await context['engine'].stopContainer(name, 10).catch(() => undefined);
+      }
 
       return undefined;
     }

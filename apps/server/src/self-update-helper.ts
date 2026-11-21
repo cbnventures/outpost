@@ -21,6 +21,7 @@ import type {
   SelfUpdateHelper_ImageConfigCache,
   SelfUpdateHelper_Inspected,
   SelfUpdateHelper_Outcome,
+  SelfUpdateHelper_Pending,
   SelfUpdateHelper_Reference,
   SelfUpdateHelper_Result,
 } from './types/self-update-helper.d.ts';
@@ -102,6 +103,17 @@ let outcome: SelfUpdateHelper_Outcome = {
 try {
   if (containerId === '' || reference === '') {
     throw new Error('The self-update helper needs OUTPOST_SELF_UPDATE_CONTAINER and OUTPOST_SELF_UPDATE_REFERENCE.');
+  }
+
+  const pending: SelfUpdateHelper_Pending = (handoff.read() ?? { version: 1 })['pending'];
+
+  // A leftover helper started again by hand would swap a container that was already replaced, under the wrong name.
+  if (
+    pending === undefined
+    || pending['containerId'] !== containerId
+    || pending['outcome'] !== undefined
+  ) {
+    throw new Error('No self-update is waiting for this helper, so it left every container alone.');
   }
 
   const inspected: SelfUpdateHelper_Inspected = await engine.inspectContainer(containerId);

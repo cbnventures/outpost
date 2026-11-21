@@ -1,5 +1,10 @@
 # outpost-app-server
 
+## 1.2.2 - 2026-11-21
+
+### FIXED
+- Self-updates on slow Docker hosts no longer report a failure while the swap is still finishing. The new Outpost waits for the helper instead of stopping it, so the previous container is removed as usual, and a leftover helper started again by hand leaves every container alone.
+
 ## 1.2.1 - 2026-11-21
 
 ### UPDATED

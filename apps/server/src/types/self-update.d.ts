@@ -100,9 +100,15 @@ export type SelfUpdate_FinishSelfUpdate_Current = Handoff_File | undefined;
 
 export type SelfUpdate_FinishSelfUpdate_WaitStartedAt = number;
 
+export type SelfUpdate_FinishSelfUpdate_WaitSeconds = number;
+
+export type SelfUpdate_FinishSelfUpdate_WaitDeadline = string;
+
 export type SelfUpdate_FinishSelfUpdate_Outcome = Handoff_Outcome | undefined;
 
 export type SelfUpdate_FinishSelfUpdate_Waited = number;
+
+export type SelfUpdate_FinishSelfUpdate_StillRunning = boolean;
 
 export type SelfUpdate_FinishSelfUpdate_FailedImageId = string | undefined;
 
@@ -239,6 +245,8 @@ export type SelfUpdate_WaitForExit_Name = string;
 
 export type SelfUpdate_WaitForExit_Deadline = string;
 
+export type SelfUpdate_WaitForExit_StopAtDeadline = boolean;
+
 export type SelfUpdate_WaitForExit_Context = Pick<SelfUpdate_Context, 'engine' | 'now' | 'sleep'>;
 
 export type SelfUpdate_WaitForExit_Returns = Promise<number | undefined>;
@@ -246,3 +254,5 @@ export type SelfUpdate_WaitForExit_Returns = Promise<number | undefined>;
 export type SelfUpdate_WaitForExit_Poll = () => Promise<number | undefined>;
 
 export type SelfUpdate_WaitForExit_Inspected = DockerContainerInspect | undefined;
+
+export type SelfUpdate_WaitForExit_ErrorMessage = string;

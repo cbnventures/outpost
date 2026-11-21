@@ -8,7 +8,7 @@ import type { UpdateStatus } from 'outpost-package-updater';
 import type { Runner as Handoff } from '../handoff.js';
 import type { Runner as ImageConfigCache } from '../image-config-cache.js';
 import type { Config_LoadConfig_Settings } from './config.d.ts';
-import type { Handoff_Outcome_Status } from './handoff.d.ts';
+import type { Handoff_Outcome_Status, Handoff_Pending } from './handoff.d.ts';
 
 /**
  * Self Update Helper.
@@ -38,6 +38,8 @@ export type SelfUpdateHelper_Outcome = {
   detail: SelfUpdateHelper_Outcome_Detail;
   previousImageMetadataAvailable?: SelfUpdateHelper_Outcome_PreviousImageMetadataAvailable;
 };
+
+export type SelfUpdateHelper_Pending = Handoff_Pending | undefined;
 
 export type SelfUpdateHelper_Inspected = DockerContainerInspect;
 

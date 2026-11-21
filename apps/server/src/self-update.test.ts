@@ -30,13 +30,21 @@ import type {
   SelfUpdate_FinishSelfUpdate_FinishesAnUpdateAndRemovesThePreviousImage_Report,
   SelfUpdate_FinishSelfUpdate_KeepsTheHelperWhenItNeverFinished_Context,
   SelfUpdate_FinishSelfUpdate_KeepsTheHelperWhenItNeverFinished_Report,
+  SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Context,
+  SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Report,
   SelfUpdate_FinishSelfUpdate_RemembersAnImageThatWasRolledBack_Context,
   SelfUpdate_FinishSelfUpdate_RemembersAnImageThatWasRolledBack_Report,
+  SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Context,
+  SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Pending,
+  SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Polls,
+  SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Report,
   SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Context,
   SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Pending,
   SelfUpdate_HandOver_HandsOverAndReportsAHelperThatStopsEarly_Result,
   SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Context,
   SelfUpdate_HandOver_SkipsAnImageThatFailedToStartLastTime_Result,
+  SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Context,
+  SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Result,
   SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Context,
   SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Engine,
   SelfUpdate_LogsEachStepWhileDebugLoggingIsOn_Lines,
@@ -192,7 +200,7 @@ function createContext(fileName: SelfUpdate_CreateContext_FileName, helperExitCo
       createContainer: vi.fn(async () => 'helper-id'),
       inspectContainer: vi.fn(async (id) => {
         if (helperExitCode === undefined) {
-          throw new Error(`No such container: ${id}`);
+          throw new Error(`Docker Engine API returned HTTP 404: No such container: ${id}`);
         }
 
         return {
@@ -516,6 +524,122 @@ describe('self update', () => {
     expect(context['engine']['removeContainer']).not.toHaveBeenCalled();
 
     expect(context['handoff'].read()).toBeUndefined();
+
+    return;
+  });
+
+  it('waits for a slow helper past the hand-over deadline without stopping it', async () => {
+    const context: SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Context = createContext('slow-helper.json', 0);
+    const latePending: SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Pending = {
+      ...pending,
+      deadline: '2026-10-25T03:59:00.000Z',
+    };
+    let polls: SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Polls = 0;
+
+    context['handoff'].write({
+      version: 1,
+      pending: latePending,
+    });
+
+    // A busy Docker host fails one check, then the helper keeps waiting on the new container before it reports.
+    context['engine']['inspectContainer'].mockImplementation(async (id) => {
+      polls += 1;
+
+      if (polls === 1) {
+        throw new Error('Docker Engine API request failed: socket hang up');
+      }
+
+      if (polls < 30) {
+        return {
+          ...outpostContainer,
+          Id: id,
+        };
+      }
+
+      context['handoff'].recordOutcome({
+        detail: 'Recreated with cbnventures/outpost:latest',
+        finishedAt: '2026-10-25T04:00:30.000Z',
+        status: 'updated',
+      });
+
+      return {
+        ...outpostContainer,
+        Id: id,
+        State: {
+          Running: false,
+          Status: 'exited',
+          ExitCode: 0,
+        },
+      };
+    });
+
+    const report: SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Report = await finishSelfUpdate(latePending, context);
+
+    expect(context['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    expect(report['results'].at(-1)).toMatchObject({
+      status: 'updated',
+      detail: 'Recreated with cbnventures/outpost:latest',
+    });
+
+    expect(context['engine']['removeContainer']).toHaveBeenCalledWith('outpost-outpost-self-update');
+
+    expect(context['engine']['removeImage']).toHaveBeenCalledWith('sha256:old');
+
+    expect(context['handoff'].read()).toBeUndefined();
+
+    return;
+  });
+
+  it('leaves a helper that is still running after the wait', async () => {
+    const context: SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Context = createContext('stuck-helper.json', 0);
+
+    context['handoff'].write({
+      version: 1,
+      pending,
+    });
+
+    context['engine']['inspectContainer'].mockImplementation(async (id) => ({
+      ...outpostContainer,
+      Id: id,
+    }));
+
+    const report: SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Report = await finishSelfUpdate(pending, context);
+
+    expect(report['results'].at(-1)).toMatchObject({
+      status: 'failed',
+      detail: 'The self-update helper was still running after 210s, so Outpost left it to finish; see docker logs outpost-outpost-self-update',
+    });
+
+    expect(context['sleep']).toHaveBeenCalledTimes(210);
+
+    expect(context['engine']['stopContainer']).not.toHaveBeenCalled();
+
+    expect(context['engine']['removeContainer']).not.toHaveBeenCalled();
+
+    expect(context['handoff'].read()).toBeUndefined();
+
+    return;
+  });
+
+  it('stops a helper that never reaches Outpost by the hand-over deadline', async () => {
+    const context: SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Context = createContext('stuck-hand-over.json', 0);
+
+    context['engine']['inspectContainer'].mockImplementation(async (id) => ({
+      ...outpostContainer,
+      Id: id,
+    }));
+
+    const result: SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Result = await handOver(request, 'schedule', context);
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'The self-update helper didn\'t finish in time',
+    });
+
+    expect(context['engine']['stopContainer']).toHaveBeenCalledExactlyOnceWith('helper-id', 10);
+
+    expect(context['engine']['removeContainer']).toHaveBeenLastCalledWith('helper-id');
 
     return;
   });

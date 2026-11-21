@@ -81,6 +81,37 @@ export type SelfUpdate_FinishSelfUpdate_KeepsTheHelperWhenItNeverFinished_Contex
 export type SelfUpdate_FinishSelfUpdate_KeepsTheHelperWhenItNeverFinished_Report = UpdateReport;
 
 /**
+ * Self Update - Finish Self Update - Leaves A Helper That Is Still Running After The Wait.
+ *
+ * @since 1.2.2
+ */
+export type SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Context = SelfUpdate_FakeContext;
+
+export type SelfUpdate_FinishSelfUpdate_LeavesAHelperThatIsStillRunningAfterTheWait_Report = UpdateReport;
+
+/**
+ * Self Update - Finish Self Update - Waits For A Slow Helper Past The Hand Over Deadline.
+ *
+ * @since 1.2.2
+ */
+export type SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Context = SelfUpdate_FakeContext;
+
+export type SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Pending = Handoff_Pending;
+
+export type SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Polls = number;
+
+export type SelfUpdate_FinishSelfUpdate_WaitsForASlowHelperPastTheHandOverDeadline_Report = UpdateReport;
+
+/**
+ * Self Update - Hand Over - Stops A Helper That Never Reaches Outpost By The Hand Over Deadline.
+ *
+ * @since 1.2.2
+ */
+export type SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Context = SelfUpdate_FakeContext;
+
+export type SelfUpdate_HandOver_StopsAHelperThatNeverReachesOutpostByTheHandOverDeadline_Result = UpdateResult;
+
+/**
  * Self Update - Finish Self Update - Remembers An Image That Was Rolled Back.
  *
  * @since 1.0.0
