@@ -1,6 +1,6 @@
 {
   "name": "outpost-app-server",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -30,7 +30,7 @@
     "node": "^22 || ^24 || ^26"
   },
   "dependencies": {
-    "@cbnventures/nova": "0.49.0",
+    "@cbnventures/nova": "0.54.0",
     "@simplewebauthn/server": "14.0.3",
     "croner": "9.1.0",
     "express": "5.1.0",

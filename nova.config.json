@@ -546,7 +546,6 @@
         "nova"
       ],
       "patterns": [
-        "/assets/",
         "graphify-out/"
       ]
     },
@@ -981,6 +980,14 @@
     }
   },
   "settings": {
+    "changelog": {
+      "workspaceOrder": [
+        "outpost-app-server",
+        "outpost-package-updater",
+        "outpost-package-registry",
+        "outpost-package-docker-engine"
+      ]
+    },
     "coverage": {
       "minimum": 55
     },

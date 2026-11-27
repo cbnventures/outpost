@@ -144,15 +144,31 @@ const config: DocusaurusNovaConfig = {
             light: '#D97706',
             dark: '#D97706',
           },
-          text: undefined,
-          border: undefined,
-          warning: undefined,
-          danger: undefined,
+          text: {
+            light: '#1D262F',
+            dark: '#DDE3E9',
+          },
+          border: {
+            light: '#C8D1DA',
+            dark: '#38424D',
+          },
+          warning: {
+            light: '#B08B11',
+            dark: '#F1C841',
+          },
+          danger: {
+            light: '#B8233C',
+            dark: '#EF5D75',
+          },
+          success: {
+            light: '#1F8455',
+            dark: '#4ED093',
+          },
         },
         fonts: {
-          display: undefined,
-          body: undefined,
-          code: undefined,
+          display: 'Archivo',
+          body: 'Work Sans',
+          code: 'Inconsolata',
         },
         navbar: undefined,
         footer: undefined,
@@ -209,8 +225,14 @@ const config: DocusaurusNovaConfig = {
 
       // Analytics.
       analytics: {
-        gtm: {
-          containerId: 'GTM-T74GGDFD',
+        googleAnalytics: {
+          measurementId: 'G-VJ3P7P2QC7',
+        },
+        metaPixel: {
+          pixelId: '4702649570016630',
+        },
+        clarity: {
+          projectId: 'zid26pm61c',
         },
       },
 

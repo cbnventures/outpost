@@ -1,5 +1,10 @@
 # outpost-app-server
 
+## 1.2.3 - 2026-11-27
+
+### UPDATED
+- The documentation site now loads Google Analytics, Microsoft Clarity and Meta Pixel directly instead of through Google Tag Manager and has its own fonts and colors, and the project uses Nova 0.54.0.
+
 ## 1.2.2 - 2026-11-21
 
 ### FIXED
